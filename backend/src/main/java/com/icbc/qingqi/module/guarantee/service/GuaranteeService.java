@@ -152,6 +152,9 @@ public class GuaranteeService {
 
     /**
      * 查找或创建房东记录（按手机号）
+     * <p>
+     * biz_landlord.user_id 非空且唯一（房东也是系统用户）：
+     * 创建前按手机号关联已注册用户，未注册则报错提示使用演示房东账号。
      */
     private BizLandlord getOrCreateLandlord(GuaranteeApplyDTO dto) {
         BizLandlord existing = landlordMapper.selectOne(
@@ -159,7 +162,15 @@ public class GuaranteeService {
         if (existing != null) {
             return existing;
         }
+        // 按手机号关联已注册的系统用户（演示：landlord01 / 13900000003）
+        SysUser landlordUser = userMapper.selectOne(
+                new LambdaQueryWrapper<SysUser>().eq(SysUser::getPhone, dto.getLandlordPhone()));
+        if (landlordUser == null) {
+            throw new BizException(ErrorCode.USER_NOT_FOUND,
+                    "该房东手机号未注册为系统用户，请使用已注册房东账号（演示：landlord01 / 13900000003）");
+        }
         BizLandlord landlord = new BizLandlord();
+        landlord.setUserId(landlordUser.getId());
         landlord.setRealName(dto.getLandlordName());
         landlord.setIdCard(dto.getLandlordIdCard());
         landlord.setPhone(dto.getLandlordPhone());
