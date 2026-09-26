@@ -44,8 +44,8 @@ qingqi-ecity/
 ├── user-web/         # 用户前端（Vue 3 + JS）
 ├── admin-web/        # 管理前端（Vue 3 + TS）
 ├── docs/              # 文档目录
-│   ├── deployment/    # 部署文档（即本目录）
-│   └── scripts/      # 一键启动脚本（Windows / Linux）
+│   └── deployment/    # 部署文档（即本目录）
+├── scripts/           # 一键启动脚本（Windows / Linux）
 ├── docker-compose.yml # Docker Compose 编排文件
 └── README.md          # 项目说明
 ```
@@ -208,7 +208,7 @@ mvn spring-boot:run
 
 ```cmd
 # Windows
-> 项目未内置 Maven Wrapper，请使用系统 Maven（`mvn spring-boot:run`）或 IDE 启动。
+> 项目已内置 Maven Wrapper（`backend/mvnw`），Windows 用 `mvnw.cmd`、Linux/macOS 用 `./mvnw` 启动；也可用系统 Maven 或 IDE 启动。
 
 # Linux / Mac
 ```
@@ -350,8 +350,8 @@ docker compose up -d --build
 
 启动后访问：
 - 用户前端：<http://localhost:8081>
-- 管理前端：<http://localhost:8083>
-- 后端 API：<http://localhost:8082/api>
+- 管理前端：<http://localhost:8082>
+- 后端 API：<http://localhost:8080/api>
 
 ---
 
@@ -364,7 +364,7 @@ docker compose up -d --build
 **Windows：**
 
 ```cmd
-cd docs\scripts\windows
+cd scripts\windows
 99-start-all.bat
 ```
 

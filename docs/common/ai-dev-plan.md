@@ -257,7 +257,7 @@
 ### AI 该做什么
 1. 给出部署方案：云服务器（建议 2C4G 起步，Ubuntu 22.04/Debian）+ Docker Compose（mysql/backend/frontend 三服务）+ Nginx 反向代理 + HTTPS（Let's Encrypt 或云厂商证书）。
 2. 提供服务器初始化脚本：安装 Docker、克隆代码、配置环境变量（数据库密码、JWT 密钥）、`docker compose up -d --build`。
-3. 提供 Nginx 配置：`/` → 前端静态资源（8088 或直接 80），`/api` → 后端（8082），WebSocket/长连接按需。
+3. 提供 Nginx 配置：`/` → 前端静态资源（8088 或直接 80），`/api` → 后端（8080），WebSocket/长连接按需。
 4. 提供 HTTPS 配置步骤与证书自动续期（certbot）。
 5. 部署后做公网验证：域名可访问、接口可用、HTTPS 证书有效。
 
@@ -403,7 +403,7 @@
 1) 实现页面：Login/Home/Guarantee/Loan/Budget/Bookkeeping/Safety/Message；
 2) Axios 封装 baseURL=/api/v1、Token 注入、1002 自动登出；
 3) 路由守卫未登录跳登录页；
-4) 与后端联调（后端端口 8082 时用 VITE_API_TARGET=http://localhost:8082 npm run dev）；
+4) 与后端联调（后端端口 8080 时用 VITE_API_TARGET=http://localhost:8080 npm run dev）；
 5) 保证 npm run build 通过并产出 dist/。完成后给出页面清单与联调结果。
 ```
 

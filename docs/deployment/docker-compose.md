@@ -8,11 +8,11 @@
 
 | 服务 | 镜像/构建 | 容器名 | 端口 | 说明 |
 | --- | --- | --- | --- | --- |
-| mysql | mysql:8.0 | qqecity-mysql | 3307:3306 | 数据库，自动初始化 schema + 演示数据 |
-| redis | redis:7-alpine | qqecity-redis | 6380:6379 | JWT 黑名单（backend 运行时依赖） |
-| backend | 构建自 ./backend/Dockerfile | qqecity-backend | 8082:8080 | Spring Boot 后端 API |
-| user-web | 构建自 ./user-web/Dockerfile | qqecity-user-web | 8081 | 用户端前端（Nginx 静态托管） |
-| admin-web | 构建自 ./admin-web/Dockerfile | qqecity-admin-web | 8083:80 | 管理端前端（Nginx 静态托管） |
+| mysql | mysql:8.0 | qqecity-mysql | 3306:3306 | 数据库，自动初始化 schema + 演示数据 |
+| redis | redis:7-alpine | qqecity-redis | 6379:6379 | JWT 黑名单（backend 运行时依赖） |
+| backend | 构建自 ./backend/Dockerfile | qqecity-backend | 8080:8080 | Spring Boot 后端 API |
+| user-web | 构建自 ./user-web/Dockerfile | qqecity-user-web | 8081:80 | 用户端前端（Nginx 静态托管） |
+| admin-web | 构建自 ./admin-web/Dockerfile | qqecity-admin-web | 8082:80 | 管理端前端（Nginx 静态托管） |
 
 ## 前置要求
 
@@ -35,11 +35,11 @@ docker compose up -d --build
 | 入口 | 地址 | 说明 |
 | --- | --- | --- |
 | 用户端 | http://localhost:8081 | 青年用户使用的主前端 |
-| 管理端 | http://localhost:8083 | 运营/管理员使用的后台 |
-| 后端 API | http://localhost:8082/api | Spring Boot 服务（接口统一 /api 前缀） |
-| 接口文档 | http://localhost:8082/api/doc.html | Knife4j 接口在线文档 |
-| MySQL | localhost:3307 | 数据库（用户：qingqi / 密码：qingqi123） |
-| Redis | localhost:6380 | 缓存（密码：redis123） |
+| 管理端 | http://localhost:8082 | 运营/管理员使用的后台 |
+| 后端 API | http://localhost:8080/api | Spring Boot 服务（接口统一 /api 前缀） |
+| 接口文档 | http://localhost:8080/api/doc.html | Knife4j 接口在线文档 |
+| MySQL | localhost:3306 | 数据库（用户：root / 密码：123456） |
+| Redis | localhost:6379 | 缓存（无密码） |
 
 ## 常用命令
 
@@ -76,12 +76,11 @@ docker compose restart backend
 
 | 变量 | 所在服务 | 默认值 | 说明 |
 | --- | --- | --- | --- |
-| MYSQL_ROOT_PASSWORD | mysql | root123456 | MySQL root 密码 |
+| MYSQL_ROOT_PASSWORD | mysql | 123456 | MySQL root 密码 |
 | MYSQL_DATABASE | mysql | qingqi | 数据库名 |
-| MYSQL_USER / MYSQL_PASSWORD | mysql | qingqi / qingqi123 | 业务库用户名密码 |
 | SPRING_DATASOURCE_URL | backend | jdbc:mysql://mysql:3306/qingqi... | 数据源连接串 |
-| SPRING_DATASOURCE_USERNAME / PASSWORD | backend | qingqi / qingqi123 | 数据库账号 |
-| SPRING_DATA_REDIS_HOST / PASSWORD | backend | redis / redis123 | Redis 连接信息 |
+| SPRING_DATASOURCE_USERNAME / PASSWORD | backend | root / 123456 | 数据源账号（复用 MySQL root） |
+| SPRING_DATA_REDIS_HOST / PORT / PASSWORD | backend | redis / 6379 /（无密码） | Redis 连接信息 |
 
 > 生产部署请务必修改默认密码，使用 `.env` 文件或环境变量覆盖。
 

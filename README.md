@@ -275,9 +275,9 @@ npm run dev
 
 | 服务 | 地址 |
 | --- | --- |
-| 后端 API | http://localhost:8082/api |
+| 后端 API | http://localhost:8080/api |
 | 用户前端 | http://localhost:8081 |
-| 管理前端 | http://localhost:8083 |
+| 管理前端 | http://localhost:8082 |
 
 ---
 
