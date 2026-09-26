@@ -65,7 +65,7 @@ public class SysMessageService {
     public void markAsRead(Long userId, Long id) {
         SysMessage message = messageMapper.selectById(id);
         if (message == null || !message.getUserId().equals(userId)) {
-            throw new BizException(ErrorCode.BIZ_ERROR, "消息不存在或无权操作");
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "消息不存在或无权操作");
         }
         if (message.getIsRead() != null && message.getIsRead() == 1) {
             return; // 已读则不重复更新

@@ -13,7 +13,7 @@
 | 数据库 | MySQL | 8.0 |
 | 缓存 | Redis | 7.x |
 | 鉴权 | JWT（jjwt） | 0.12.x |
-| 接口文档 | springdoc-openapi（Swagger UI） | 2.4.x |
+| 接口文档 | Knife4j（springdoc-openapi） | 4.4.0 |
 
 **选择理由**：
 - 与银行现有系统（Java 系）技术栈同族；生态成熟、资料多；模块化包结构预留微服务拆分
@@ -42,9 +42,12 @@ backend/src/main/java/com/icbc/qingqi/
 │   ├── ErrorCode.java
 │   ├── BizException.java
 │   └── GlobalExceptionHandler.java
-├── config/                   # 配置层：跨域、MyBatis-Plus
+├── config/                   # 配置层：跨域、MyBatis-Plus、Redis、安全、审计字段
 │   ├── CorsConfig.java
-│   └── MybatisPlusConfig.java
+│   ├── MybatisPlusConfig.java
+│   ├── MyMetaObjectHandler.java
+│   ├── RedisConfig.java
+│   └── SecurityConfig.java
 ├── security/                 # 安全层：JWT 签发/校验、登录上下文
 │   ├── JwtUtil.java
 │   ├── JwtAuthFilter.java
@@ -72,18 +75,18 @@ backend/src/main/java/com/icbc/qingqi/
 | 应用服务层 | `module/*` 下的 Controller/Service |
 | 智能引擎层 | 骨架阶段以服务内规则模拟（AI 合同复审、预审规则、骗局甄别规则） |
 | 业务中台层 | 模拟桩：银行能力由服务层直接模拟，预留适配点 |
-| 数据层 | MySQL（schema.sql 25 张表）+ Redis（预留） |
+| 数据层 | MySQL（schema.sql 25 张表）+ Redis（JWT 黑名单 + 缓存） |
 
 ## 五、关键设计取舍
 
 1. **银行能力用模拟桩**：放款、保函开立、征信查询等银行侧能力不真实接入，由服务层模拟规则返回（如 B 类预审"不查征信、给额度区间"）。模拟桩保证演示闭环完整，且预留了替换为真实接口的适配点。
-2. **密码散列先简化**：骨架阶段用 SHA-256 散列存储演示账号密码；正式化须替换为加盐算法（如 BCrypt）并通过安全评审。已在代码注释中标注。
+2. **密码加密**：使用 Spring Security `BCryptPasswordEncoder` 加盐散列存储，演示账号密码统一为 `123456`（对应 data.sql 中的 BCrypt 哈希）。
 3. **Redis 一期不作为强依赖**：docker-compose 中预留 Redis 容器，但后端未硬依赖，避免骨架阶段因 Redis 未启动而无法运行。
 
 ## 六、接口契约
 
 - 接口前缀：`/api/v1`
 - 统一返回：`{"code": 0, "message": "success", "data": {...}}`
-- 错误码：0/1001/1002/2001/2002/3001/3002/4001/5000（与设计说明书 8.2 一致）
+- 错误码：定义见 ErrorCode.java（0/1001/1002/2001/2002/3001/3002/4001/5000，未登录为 1002）
 - 鉴权方式：`Authorization: Bearer <JWT>`
 - 免登录路径：`/api/v1/auth/**`

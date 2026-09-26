@@ -134,18 +134,18 @@
 
 ### 我该做什么
 1. 提供运行环境（本机 JDK17 + IDEA 或 Maven；或 Docker）。
-2. 验收接口：用 Swagger UI 逐个调用，核对入参出参与说明书第 8 章一致。
+2. 验收接口：用 Knife4j 逐个调用，核对入参出参与说明书第 8 章一致。
 3. 核对业务规则：保函复审命中风险词转人工、预审 B 类不触发征信、预算提醒阈值正确。
 4. 对"银行能力"确认模拟桩行为（额度区间规则、受托支付定向商户）。
 
 ### 产出物
 - 可运行后端（49+ 个 Java 文件）
-- Swagger 接口文档（本地 `/swagger-ui` 或 springdoc 页面）
+- Knife4j 接口文档（本地 `/api/doc.html`）
 - 接口自测记录（curl 或 Swagger 截图）
 
 ### 检查要点
 - [ ] `mvn package` 通过、应用可启动（端口避开占用，如 8082）？
-- [ ] 登录成功返回 JWT；携带 Token 可访问受保护接口，无 Token 返回 2001？
+- [ ] 登录成功返回 JWT；携带 Token 可访问受保护接口，无 Token 返回 1002？
 - [ ] 所有接口返回 `{code,message,data}`，错误码符合 8.2 约定？
 - [ ] 每模块主链路接口可用且业务规则正确？
 - [ ] 演示账号能走通"注册→登录→调业务接口"？
@@ -157,7 +157,7 @@
 **目标**：实现 Vue3 前端全部页面（登录/首页/保函/贷款/预算/记账/安全/消息），与后端联调通过，`npm run build` 产出可部署静态包。
 
 ### AI 该做什么
-1. 搭建/维护 Vue3 + Vite5 工程：路由守卫（未登录跳登录）、Pinia 用户态、Axios 封装（baseURL `/api/v1`、Token 注入、统一错误提示、2001 自动登出）。
+1. 搭建/维护 Vue3 + Vite5 工程：路由守卫（未登录跳登录）、Pinia 用户态、Axios 封装（baseURL `/api/v1`、Token 注入、统一错误提示、1002 自动登出）。
 2. 按原型实现页面：
    - Login：手机号+密码登录、注册入口
    - Home：模块入口卡片、快捷演示
@@ -244,7 +244,7 @@
 ### 检查要点
 - [ ] 演示主链路全绿？
 - [ ] 越权访问被拦截（用户 A 无法读取用户 B 数据）？
-- [ ] 无 Token/伪造 Token 返回 2001？
+- [ ] 无 Token/伪造 Token 返回 1002？
 - [ ] 压测下登录/列表接口无 5xx、无长时间阻塞？
 - [ ] 遗留缺陷均有明确处理决定（修/接受/后置）？
 
@@ -399,9 +399,9 @@
 
 **【第五步 · 前端网页开发】**
 ```
-请完善 frontend/（Vue3+Vite5+ElementPlus+Pinia）：
+请完善 user-web/ 与 admin-web/（Vue3+Vite5+ElementPlus+Pinia）：
 1) 实现页面：Login/Home/Guarantee/Loan/Budget/Bookkeeping/Safety/Message；
-2) Axios 封装 baseURL=/api/v1、Token 注入、2001 自动登出；
+2) Axios 封装 baseURL=/api/v1、Token 注入、1002 自动登出；
 3) 路由守卫未登录跳登录页；
 4) 与后端联调（后端端口 8082 时用 VITE_API_TARGET=http://localhost:8082 npm run dev）；
 5) 保证 npm run build 通过并产出 dist/。完成后给出页面清单与联调结果。

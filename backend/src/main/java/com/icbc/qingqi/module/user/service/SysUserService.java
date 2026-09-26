@@ -9,8 +9,8 @@ import com.icbc.qingqi.module.user.dto.*;
 import com.icbc.qingqi.module.user.entity.SysUser;
 import com.icbc.qingqi.module.user.mapper.SysUserMapper;
 import com.icbc.qingqi.security.JwtUtil;
-import com.icbc.qingqi.security.PasswordUtil;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 /**
@@ -25,15 +25,14 @@ public class SysUserService {
 
     private final SysUserMapper userMapper;
     private final JwtUtil jwtUtil;
-    private final PasswordUtil passwordUtil;
+    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     @Value("${jwt.access-token-ttl}")
     private Long accessTokenTtl;
 
-    public SysUserService(SysUserMapper userMapper, JwtUtil jwtUtil, PasswordUtil passwordUtil) {
+    public SysUserService(SysUserMapper userMapper, JwtUtil jwtUtil) {
         this.userMapper = userMapper;
         this.jwtUtil = jwtUtil;
-        this.passwordUtil = passwordUtil;
     }
 
     // ============================================================
@@ -50,12 +49,12 @@ public class SysUserService {
         Long count = userMapper.selectCount(
                 new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, dto.getUsername()));
         if (count != null && count > 0) {
-            throw new BizException(ErrorCode.CONFLICT, "用户已存在");
+            throw new BizException(ErrorCode.USER_ALREADY_EXISTS);
         }
 
         SysUser user = new SysUser();
         user.setUsername(dto.getUsername());
-        user.setPassword(passwordUtil.encode(dto.getPassword()));
+        user.setPassword(passwordEncoder.encode(dto.getPassword()));
         user.setNickname(dto.getNickname() != null ? dto.getNickname() : dto.getUsername());
         user.setPhone(dto.getPhone());
         user.setEmail(dto.getEmail());
@@ -73,17 +72,17 @@ public class SysUserService {
         SysUser user = userMapper.selectOne(
                 new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, dto.getUsername()));
         if (user == null) {
-            throw new BizException(ErrorCode.NOT_FOUND, "用户不存在");
+            throw new BizException(ErrorCode.USER_NOT_FOUND);
         }
 
         // 校验密码
-        if (!passwordUtil.matches(dto.getPassword(), user.getPassword())) {
-            throw new BizException(ErrorCode.BIZ_ERROR, "密码错误");
+        if (!passwordEncoder.matches(dto.getPassword(), user.getPassword())) {
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "密码错误");
         }
 
         // 校验状态
         if (user.getStatus() != null && user.getStatus() == 0) {
-            throw new BizException(ErrorCode.BIZ_ERROR, "账号已被禁用");
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "账号已被禁用");
         }
 
         // 生成 Token
@@ -142,7 +141,7 @@ public class SysUserService {
     public UserVO getCurrentUser(Long userId) {
         SysUser user = userMapper.selectById(userId);
         if (user == null) {
-            throw new BizException(ErrorCode.NOT_FOUND, "用户不存在");
+            throw new BizException(ErrorCode.USER_NOT_FOUND);
         }
         return toVO(user);
     }
@@ -167,14 +166,14 @@ public class SysUserService {
     public void changePassword(Long userId, String oldPassword, String newPassword) {
         SysUser user = userMapper.selectById(userId);
         if (user == null) {
-            throw new BizException(ErrorCode.NOT_FOUND, "用户不存在");
+            throw new BizException(ErrorCode.USER_NOT_FOUND);
         }
-        if (!passwordUtil.matches(oldPassword, user.getPassword())) {
-            throw new BizException(ErrorCode.BIZ_ERROR, "原密码错误");
+        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "原密码错误");
         }
         SysUser update = new SysUser();
         update.setId(userId);
-        update.setPassword(passwordUtil.encode(newPassword));
+        update.setPassword(passwordEncoder.encode(newPassword));
         userMapper.updateById(update);
     }
 
@@ -209,11 +208,11 @@ public class SysUserService {
         Long count = userMapper.selectCount(
                 new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, dto.getUsername()));
         if (count != null && count > 0) {
-            throw new BizException(ErrorCode.CONFLICT, "用户已存在");
+            throw new BizException(ErrorCode.USER_ALREADY_EXISTS);
         }
         SysUser user = new SysUser();
         user.setUsername(dto.getUsername());
-        user.setPassword(passwordUtil.encode(dto.getPassword()));
+        user.setPassword(passwordEncoder.encode(dto.getPassword()));
         user.setNickname(dto.getNickname());
         user.setPhone(dto.getPhone());
         user.setEmail(dto.getEmail());
@@ -252,7 +251,7 @@ public class SysUserService {
     public UserVO getUserById(Long id) {
         SysUser user = userMapper.selectById(id);
         if (user == null) {
-            throw new BizException(ErrorCode.NOT_FOUND, "用户不存在");
+            throw new BizException(ErrorCode.USER_NOT_FOUND);
         }
         return toVO(user);
     }

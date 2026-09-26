@@ -16,5 +16,5 @@
 
 - 用户人群类型用于资质准入判断（如应届毕业生、青年创业者等），与各业务模块的准入规则关联
 - 登录成功后签发 JWT，前端存储并在后续请求中通过 `Authorization: Bearer <JWT>` 携带
-- 密码采用 SHA-256 散列存储（演示系统），正式化须替换为 BCrypt 等加盐算法
+- 密码采用 Spring Security `BCryptPasswordEncoder` 加盐散列存储（与 data.sql 演示账号哈希一致）
 - 演示账号（用户名登录）：`admin / 123456`
