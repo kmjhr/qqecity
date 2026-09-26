@@ -20,7 +20,7 @@ echo.
 REM 检查 SQL 文件是否存在
 if not exist "%SCHEMA_SQL%" (
     echo ❌ 找不到 schema.sql：%SCHEMA_SQL%
-    echo    请确认脚本在 docs\scripts\windows\ 目录下运行
+    echo    请确认脚本在 scripts\windows\ 目录下运行
     pause
     exit /b 1
 )

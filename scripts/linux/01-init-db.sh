@@ -25,7 +25,7 @@ DATA_SQL_ABS="$(cd "$(dirname "$DATA_SQL")" && pwd)/$(basename "$DATA_SQL")"
 
 if [ ! -f "$SCHEMA_SQL_ABS" ]; then
     echo "❌ 找不到 schema.sql：$SCHEMA_SQL_ABS"
-    echo "   请确认脚本在 docs/scripts/linux/ 目录下运行"
+    echo "   请确认脚本在 scripts/linux/ 目录下运行"
     exit 1
 fi
 

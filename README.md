@@ -107,11 +107,12 @@ qingqi-ecity/
 │   ├── user-web/                   # 用户前端文档
 │   ├── admin-web/                  # 管理前端文档
 │   ├── common/                     # 公共文档（需求/技术选型/排期/AI计划）
-│   ├── deployment/                 # 部署配置指南
-│   └── scripts/                    # 部署脚本（Windows + Linux 双平台）
-│       ├── README.md               # 脚本使用说明
-│       ├── windows/                # Windows 批处理脚本（10个）
-│       └── linux/                  # Linux Shell 脚本（10个）
+│   └── deployment/                 # 部署配置指南（10 篇）
+│
+├── scripts/                        # 部署脚本（Windows + Linux 双平台）
+│   ├── README.md                   # 脚本使用说明
+│   ├── windows/                    # Windows 批处理脚本（10个）
+│   └── linux/                      # Linux Shell 脚本（10个）
 │
 ├── prototype/                      # HTML 静态原型（可点击）
 │
@@ -127,7 +128,7 @@ qingqi-ecity/
 
 **Windows：**
 ```cmd
-cd docs\scripts\windows
+cd scripts\windows
 00-check-env.bat      # 1. 检查环境
 01-init-db.bat        # 2. 初始化数据库（建库+建表+演示数据）
 04-init-project.bat   # 3. 项目初始化（编译后端+安装前端依赖）
@@ -136,7 +137,7 @@ cd docs\scripts\windows
 
 **Linux / macOS：**
 ```bash
-cd docs/scripts/linux
+cd scripts/linux
 chmod +x *.sh
 ./00-check-env.sh     # 1. 检查环境
 ./01-init-db.sh       # 2. 初始化数据库
@@ -144,7 +145,7 @@ chmod +x *.sh
 ./99-start-all.sh     # 4. 一键启动全部服务
 ```
 
-> 详细说明见 [脚本集 README](docs/scripts/README.md)
+> 详细说明见 [脚本集 README](scripts/README.md)
 
 ---
 
@@ -159,8 +160,10 @@ docker compose up -d --build
 
 启动后访问：
 - 用户前端：http://localhost:8081
-- 管理前端：http://localhost:8083
-- 后端 API：http://localhost:8082/api（接口文档：http://localhost:8082/api/doc.html）
+- 管理前端：http://localhost:8082
+- 后端 API：http://localhost:8080/api（接口文档：http://localhost:8080/api/doc.html）
+- MySQL：localhost:3306（root / 123456）
+- Redis：localhost:6379（无密码）
 
 > 详细说明见 [Docker 部署文档](docs/deployment/docker-compose.md)
 
@@ -199,7 +202,7 @@ mysql -uroot -p123456 qingqi < backend/sql/schema.sql
 mysql -uroot -p123456 qingqi < backend/sql/data.sql
 ```
 
-> 完整数据库部署说明见 [数据库服务安装参考（MySQL + Redis）](docs/deployment/database-services.md)
+> 完整数据库部署说明见 [MySQL 部署文档](docs/deployment/mysql-deployment.md) + [Redis 部署文档](docs/deployment/redis-deployment.md)
 
 #### 第 3 步：启动后端
 
@@ -311,7 +314,8 @@ npm run dev
 
 | 文档 | 说明 |
 | --- | --- |
-| [数据库服务安装参考](docs/deployment/database-services.md) | MySQL + Redis 双平台安装、建库导入 |
+| [MySQL 部署文档](docs/deployment/mysql-deployment.md) | MySQL 8.0 双平台安装、建库导入、远程访问 |
+| [Redis 部署文档](docs/deployment/redis-deployment.md) | Redis 7.x 双平台安装、安全加固 |
 | [后端配置指南](docs/deployment/03-backend-config.md) | application.yml 完整详解 |
 | [前端配置指南](docs/deployment/04-frontend-config.md) | 端口 / Vite 代理配置 |
 | [Docker 部署文档](docs/deployment/docker-compose.md) | Docker Compose 一键部署 |

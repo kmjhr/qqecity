@@ -36,8 +36,11 @@ if command -v mvn &> /dev/null; then
     MAVEN_VER=$(mvn -version 2>&1 | head -1 | awk '{print $3}')
     echo "    ✅ Maven 已安装：$MAVEN_VER"
     PASS=$((PASS + 1))
+elif [ -f "$BACKEND_DIR/mvnw" ]; then
+    echo "    ✅ Maven Wrapper 已就绪（项目内置，首次运行自动下载 Maven）"
+    PASS=$((PASS + 1))
 else
-    echo "    ⚠️  未检测到 Maven（IDE 内置或 Maven Wrapper 可忽略）"
+    echo "    ❌ 未检测到 Maven，且项目未包含 Maven Wrapper"
     echo "       Ubuntu: sudo apt install maven"
     echo "       CentOS: sudo yum install maven"
     FAIL=$((FAIL + 1))
@@ -110,7 +113,7 @@ if [ $REDIS_OK -eq 1 ]; then
     echo "    ✅ Redis 连接成功（${REDIS_HOST}:${REDIS_PORT}）"
 else
     echo "    ⚠️  Redis 连接失败或未安装（推荐安装：JWT 黑名单依赖；未安装时后端自动降级）"
-    echo "       参考文档：docs/deployment/database-services.md"
+    echo "       参考文档：docs/deployment/mysql-deployment.md + docs/deployment/redis-deployment.md"
 fi
 PASS=$((PASS + 1))
 echo ""

@@ -1,7 +1,8 @@
 # ============================================================
-# 青启e城 - 基础骨架 Docker Compose 编排
+# 青启e城 - Docker Compose 一键编排
 # 服务：MySQL 8 + Redis 7 + 后端 + 用户前端 + 管理前端
 # 启动：docker compose up -d --build
+# 停止：docker compose down
 # ============================================================
 
 services:
@@ -11,13 +12,11 @@ services:
     container_name: qqecity-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: root123456
+      MYSQL_ROOT_PASSWORD: 123456
       MYSQL_DATABASE: qingqi
-      MYSQL_USER: qingqi
-      MYSQL_PASSWORD: qingqi123
       TZ: Asia/Shanghai
     ports:
-      - "3307:3306"
+      - "3306:3306"
     volumes:
       - mysql-data:/var/lib/mysql
       - ./backend/sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
@@ -30,10 +29,10 @@ services:
     container_name: qqecity-redis
     restart: unless-stopped
     ports:
-      - "6380:6379"
+      - "6379:6379"
     volumes:
       - redis-data:/data
-    command: redis-server --appendonly yes --requirepass redis123
+    command: redis-server --appendonly yes
 
   # ---------- 后端 API ----------
   backend:
@@ -46,13 +45,14 @@ services:
       - mysql
       - redis
     environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/qingqi?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
-      SPRING_DATASOURCE_USERNAME: qingqi
-      SPRING_DATASOURCE_PASSWORD: qingqi123
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/qingqi?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: 123456
       SPRING_DATA_REDIS_HOST: redis
-      SPRING_DATA_REDIS_PASSWORD: redis123
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD:
     ports:
-      - "8082:8080"
+      - "8080:8080"
 
   # ---------- 用户前端 ----------
   user-web:
@@ -76,7 +76,7 @@ services:
     depends_on:
       - backend
     ports:
-      - "8083:80"
+      - "8082:80"
 
 volumes:
   mysql-data:

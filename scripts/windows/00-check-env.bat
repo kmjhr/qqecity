@@ -43,8 +43,11 @@ if %errorlevel%==0 (
     )
     echo     ✅ Maven 已安装：!MAVEN_VER!
     set /a PASS+=1
+) else if exist "%BACKEND_DIR%\mvnw.cmd" (
+    echo     ✅ Maven Wrapper 已就绪（项目内置，首次运行自动下载 Maven）
+    set /a PASS+=1
 ) else (
-    echo     ⚠️  未检测到 Maven（使用 IDE 内置 Maven 可忽略）
+    echo     ❌ 未检测到 Maven，且项目未包含 Maven Wrapper
     echo        下载地址：https://maven.apache.org/download.cgi
     set /a FAIL+=1
 )
@@ -119,7 +122,7 @@ if %REDIS_OK%==1 (
     echo     ✅ Redis 连接成功（%REDIS_HOST%:%REDIS_PORT%）
 ) else (
     echo     ⚠️  Redis 连接失败或未安装（推荐安装：JWT 黑名单依赖；未安装时后端自动降级）
-    echo        参考文档：docs/deployment/database-services.md
+    echo        参考文档：docs\deployment\mysql-deployment.md + docs\deployment\redis-deployment.md
 )
 set /a PASS+=1
 echo.

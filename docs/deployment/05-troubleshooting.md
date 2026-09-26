@@ -245,7 +245,7 @@ npm install -g windows-build-tools
 
 3. **防火墙拦截**
    - 本地一般无此问题，远程连接需检查防火墙
-   - 参考 [database-services.md](./database-services.md#四三防火墙放行-3306-端口)
+   - 参考 [mysql-deployment.md](./mysql-deployment.md#四开启远程访问内网测试用)
 
 4. **bind-address 配置**
    - 远程连接时，MySQL 需要绑定 `0.0.0.0` 而不是 `127.0.0.1`
@@ -331,7 +331,7 @@ jdbc:mysql://127.0.0.1:3306/qingqi?useUnicode=true&characterEncoding=utf8&useSSL
 
 1. 确认密码是否正确（默认测试密码 `123456`）
 2. 检查 application.yml 中的密码配置
-3. 如忘记密码，参考 [database-services.md](./database-services.md#-access-denied-for-user-rootlocalhost) 重置密码
+3. 如忘记密码，参考 [mysql-deployment.md](./mysql-deployment.md#常见报错排查) 重置密码
 
 ### 2.5 远程连接不上
 
@@ -345,7 +345,7 @@ jdbc:mysql://127.0.0.1:3306/qingqi?useUnicode=true&characterEncoding=utf8&useSSL
 | `Host 'xxx' is not allowed` | 没有远程访问账号 | 创建 `root@'%'` 账号 |
 | `Access denied` | 远程账号密码错误 | 重新设置远程账号密码 |
 
-详细步骤见 [database-services.md](./database-services.md#四开启远程访问内网测试用)。
+详细步骤见 [mysql-deployment.md](./mysql-deployment.md#四开启远程访问内网测试用)。
 
 ---
 
@@ -424,7 +424,7 @@ redis-cli
    bind 127.0.0.1 192.168.1.100
    ```
 
-更多 Redis 问题见 [database-services.md](./database-services.md#六常见报错排查)。
+更多 Redis 问题见 [redis-deployment.md](./redis-deployment.md#五常见报错排查)。
 
 ---
 
@@ -807,8 +807,8 @@ server: {
 
 | 问题类型 | 参考文档 |
 |----------|----------|
-| MySQL 部署与问题 | [database-services.md](./database-services.md) |
-| Redis 部署与问题 | [database-services.md](./database-services.md) |
+| MySQL 部署与问题 | [mysql-deployment.md](./mysql-deployment.md) |
+| Redis 部署与问题 | [redis-deployment.md](./redis-deployment.md) |
 | 后端配置 | [03-backend-config.md](./03-backend-config.md) |
 | 前端配置 | [04-frontend-config.md](./04-frontend-config.md) |
 | Docker 部署 | [docker-compose.md](./docker-compose.md) |

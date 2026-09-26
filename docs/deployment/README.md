@@ -6,21 +6,24 @@
 
 ## 快速导航
 
+### 入门必读（按顺序阅读）
+
 | 文档 | 说明 | 适用阶段 |
 |------|------|----------|
-| [01-env-preparation.md](./01-env-preparation.md) | 环境准备指南：JDK / Node.js / MySQL / Redis 等软件安装与验证 | 环境准备阶段 |
-| [02-project-setup.md](./02-project-setup.md) | 项目克隆与初始化全流程：从 git clone 到服务启动的 7 步操作 | 项目初始化阶段 |
-| [03-backend-config.md](./03-backend-config.md) | 后端配置指南：application.yml 完整配置说明与常见修改场景 | 后端配置阶段 |
-| [04-frontend-config.md](./04-frontend-config.md) | 前端配置指南：环境变量、Vite 代理、双前端项目配置说明 | 前端配置阶段 |
-| [05-troubleshooting.md](./05-troubleshooting.md) | 常见问题排查总览：环境 / 数据库 / Redis / 前后端启动 / 功能类问题 | 问题排查阶段 |
+| [01-env-preparation.md](./01-env-preparation.md) | 环境准备：JDK / Node.js / MySQL / Redis / Git 安装与验证 | 环境准备阶段 |
+| [02-project-setup.md](./02-project-setup.md) | 项目初始化：从 git clone 到服务启动的 7 步操作 | 项目初始化阶段 |
+| [03-backend-config.md](./03-backend-config.md) | 后端配置：application.yml 完整配置说明 | 后端配置阶段 |
+| [04-frontend-config.md](./04-frontend-config.md) | 前端配置：Vite 代理、双前端项目配置说明 | 前端配置阶段 |
+| [05-troubleshooting.md](./05-troubleshooting.md) | 问题排查：环境 / 数据库 / Redis / 前后端 / 功能类 | 问题排查阶段 |
 
-### 相关部署文档
+### 专项部署文档
 
 | 文档 | 说明 |
 |------|------|
-| [database-services.md](./database-services.md) | 数据库服务安装参考（MySQL + Redis，Windows / Linux 双平台 + 数据导入） |
-| [docker-compose.md](./docker-compose.md) | Docker Compose 一键部署指南 |
-| [database-design.md](./database-design.md) | 数据库设计与 ER 图说明 |
+| [mysql-deployment.md](./mysql-deployment.md) | MySQL 8.0 部署（Windows / Linux 双平台 + 远程访问 + 数据导入） |
+| [redis-deployment.md](./redis-deployment.md) | Redis 7.x 部署（Windows / Linux 双平台 + 远程访问 + 安全加固） |
+| [docker-compose.md](./docker-compose.md) | Docker Compose 一键部署（MySQL + Redis + 后端 + 双前端） |
+| [database-design.md](./database-design.md) | 数据库设计与 ER 图（25 张表结构说明） |
 
 ---
 
@@ -29,9 +32,8 @@
 ```
 克隆代码 → 环境准备 → 数据库初始化 → 项目初始化 → 启动服务
    ↓          ↓            ↓              ↓            ↓
-git clone  JDK/Node/     建库+导入       配置文件     后端8080
-          MySQL/Redis    schema+data    application   前端5173/5174
-                                        yml / .env
+git clone  JDK/Node/     建库+导入       编译+装依赖    后端8080
+         MySQL/Redis    schema+data     Maven/npm     前端5173/5174
 ```
 
 **第 1 步：克隆代码**
@@ -43,30 +45,55 @@ cd qingqi-ecity
 
 **第 2 步：环境准备**
 
-安装 JDK 17+、Node.js 18+、MySQL 8.0、Redis 6.0+（推荐安装，用于 Token 黑名单）。详见 [01-env-preparation.md](./01-env-preparation.md)。
+安装 JDK 17+、Node.js 18+、MySQL 8.0（必须）、Redis（推荐）。详见 [01-env-preparation.md](./01-env-preparation.md)。
 
 **第 3 步：数据库初始化**
 
-创建数据库 `qingqi`，导入 `schema.sql` 和 `data.sql`。详见 [database-services.md](./database-services.md#三创建数据库与导入数据)。
+创建数据库 `qingqi`，导入表结构和演示数据。最快方式用脚本：
+
+```bash
+# Windows
+scripts\windows\01-init-db.bat
+
+# Linux
+scripts/linux/01-init-db.sh
+```
+
+手动导入方式见 [MySQL 部署文档 · 第三章](./mysql-deployment.md#三创建数据库与导入数据)。
 
 **第 4 步：项目初始化**
 
-修改后端 `application.yml`（数据库/Redis 连接信息）。前端端口与代理直接配置在 `vite.config.js`，项目未使用 `.env` 文件。详见 [02-project-setup.md](./02-project-setup.md)。
+后端编译 + 前端依赖安装：
+
+```bash
+# Windows
+scripts\windows\04-init-project.bat
+
+# Linux
+scripts/linux/04-init-project.sh
+```
 
 **第 5 步：启动服务**
 
-- 后端：`mvn spring-boot:run`（端口 8080）
-- 用户前端：`cd user-web && npm run dev`（端口 5173）
-- 管理前端：`cd admin-web && npm run dev`（端口 5174）
+```bash
+# Windows — 一键全部启动
+scripts\windows\99-start-all.bat
+
+# Linux — 一键全部启动
+scripts/linux/99-start-all.sh
+```
+
+或手动分别启动：
+- 后端：在 `backend/` 目录运行 `mvn spring-boot:run`（端口 8080）
+- 用户前端：在 `user-web/` 目录运行 `npm run dev`（端口 5173）
+- 管理前端：在 `admin-web/` 目录运行 `npm run dev`（端口 5174）
 
 ---
 
 ## 演示账号速查表
 
-> 所有演示账号密码统一为：`123456`
+> 所有演示账号密码统一为：**`123456`**
 
-| 账号 | 角色 | 说明 | 登录端 |
-|------|------|------|--------|
 | 账号 | 角色 | 说明 | 登录端 |
 |------|------|------|--------|
 | `admin` | 系统管理员 | 管理后台全部权限 | 管理端 |
@@ -79,24 +106,37 @@ cd qingqi-ecity
 
 ## 访问地址速查表
 
+### 本地开发模式
+
 | 服务 | 地址 | 说明 |
 |------|------|------|
 | 后端 API | `http://localhost:8080/api` | Spring Boot 服务，接口前缀 `/api` |
 | 接口文档 | `http://localhost:8080/api/doc.html` | Knife4j / Swagger 接口文档 |
 | 用户前端 | `http://localhost:5173` | 青启e城用户端（Vue 3 + Vite） |
 | 管理前端 | `http://localhost:5174` | 青启e城管理端（Vue 3 + Vite） |
-| MySQL | `127.0.0.1:3306` | 数据库名：`qingqi`，账号：`root/123456` |
-| Redis | `127.0.0.1:6379` | 默认无密码（内网测试用） |
+| MySQL | `127.0.0.1:3306` | 数据库名：`qingqi`，账号：`root / 123456` |
+| Redis | `127.0.0.1:6379` | 默认无密码（本地开发用） |
+
+### Docker 模式
+
+| 服务 | 地址 |
+|------|------|
+| 后端 API | `http://localhost:8080/api` |
+| 用户前端 | `http://localhost:8081` |
+| 管理前端 | `http://localhost:8082` |
+| MySQL | `127.0.0.1:3306` |
+| Redis | `127.0.0.1:6379` |
 
 ---
 
 ## 相关资源
 
-- **脚本目录**：`docs/scripts/` — Windows / Linux 一键启动脚本、数据库导入脚本
-  - `docs/scripts/windows/` — Windows 平台脚本
-  - `docs/scripts/linux/` — Linux 平台脚本
-  - `docs/scripts/README.md` — 脚本使用说明
+- **脚本目录**：[`scripts/`](../../scripts/) — Windows / Linux 一键脚本
+  - `scripts/windows/` — Windows 平台（.bat）
+  - `scripts/linux/` — Linux 平台（.sh）
+  - [`scripts/README.md`](../../scripts/README.md) — 脚本使用完整说明
 - **技术选型文档**：[tech-stack.md](../common/tech-stack.md)
+- **需求清单**：[requirements.md](../common/requirements.md)
 - **数据库设计**：[database-design.md](./database-design.md)
 - **Docker 部署**：[docker-compose.md](./docker-compose.md)
 
@@ -114,7 +154,7 @@ cd qingqi-ecity
 - [ ] Redis 已启动（推荐安装；未安装时后端自动降级，仅黑名单功能失效）
 - [ ] 后端 application.yml 数据库 / Redis 配置正确
 - [ ] 后端启动成功，端口 8080 无报错
-- [ ] 前端 .env 配置正确，`npm install` 无报错
+- [ ] `npm install` 无报错，两个前端依赖安装完成
 - [ ] 用户前端启动成功，端口 5173 可访问
 - [ ] 管理前端启动成功，端口 5174 可访问
-- [ ] 演示账号可正常登录，功能可正常使用
+- [ ] 演示账号可正常登录

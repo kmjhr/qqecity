@@ -57,7 +57,8 @@
 | [04-frontend-config.md](deployment/04-frontend-config.md) | 🎨 前端配置指南（环境变量 / Vite 代理） |
 | [05-troubleshooting.md](deployment/05-troubleshooting.md) | 🔍 常见问题排查（6 大类 25+ 问题） |
 | **部署专题文档** | |
-| [database-services.md](deployment/database-services.md) | 🗄️ 数据库服务安装参考（MySQL + Redis 双平台） |
+| [mysql-deployment.md](deployment/mysql-deployment.md) | 🗄️ MySQL 部署（Windows / Linux 双平台 + 远程访问） |
+| [redis-deployment.md](deployment/redis-deployment.md) | 💾 Redis 部署（Windows / Linux 双平台 + 安全加固） |
 | [docker-compose.md](deployment/docker-compose.md) | 🐳 Docker Compose 一键部署 |
 | [database-design.md](deployment/database-design.md) | 📐 数据库设计与 ER 关系图（25 张表） |
 
@@ -65,20 +66,21 @@
 
 | 文档 | 说明 |
 | --- | --- |
-| [适配报告.md](./适配报告.md) | 代码骨架 ↔ 原始需求文档适配报告（7 章完整记录） |
+| [适配报告.md](./适配报告.md) | 第一期：代码骨架 ↔ 原始需求文档适配报告 |
+| [适配报告-第二期.md](./适配报告-第二期.md) | 第二期：数据库 + 原型 + 脚本 + 文档体系适配报告 |
 
 ---
 
 ## 🔧 配套脚本
 
-`scripts/` 目录提供一键脚本，Windows / Linux 双平台支持：
+`scripts/` 目录（项目根目录下）提供一键脚本，Windows / Linux 双平台支持：
 
 | 脚本目录 | 说明 |
 | --- | --- |
-| [scripts/windows/](./scripts/windows/) | Windows 批处理脚本（环境检查 / 数据库初始化 / 服务启动等） |
-| [scripts/linux/](./scripts/linux/) | Linux Shell 脚本（功能同上） |
+| `scripts/windows/` | Windows 批处理脚本（环境检查 / 数据库初始化 / 服务启动等） |
+| `scripts/linux/` | Linux Shell 脚本（功能同上） |
 
-详细使用说明见 [脚本集 README](./scripts/README.md)。
+详细使用说明见 [脚本集 README](../scripts/README.md)。
 
 ---
 

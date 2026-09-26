@@ -22,7 +22,7 @@
 | 软件 | 版本要求 | 用途 | 是否必须 |
 |------|----------|------|----------|
 | **JDK** | 17+ | 后端 Spring Boot 运行环境 | ✅ 必须 |
-| **Maven** | 3.6+ | 后端项目构建与依赖管理 | ⭕ 推荐（可用 IDE 内置 Maven，项目未内置 Wrapper） |
+| **Maven** | 3.9.x（Wrapper 内置） | 后端项目构建与依赖管理 | ✅ 无需单独安装（项目内置 Maven Wrapper） |
 | **Node.js** | 18+ | 前端 Vue 3 开发与构建环境 | ✅ 必须 |
 | **npm / pnpm** | npm 9+（随 Node） | 前端包管理 | ✅ 必须（随 Node 自带） |
 | **MySQL** | 8.0 | 项目数据库 | ✅ 必须 |
@@ -51,21 +51,17 @@
 
 > 💡 推荐使用 **Temurin（Eclipse Adoptium）** 版本，开源免费，长期支持。
 
-### 2.2 Maven（可选）
+### 2.2 Maven（无需单独安装）
 
-> 如果使用 IntelliJ IDEA，内置了 Maven，可以跳过此步。项目未内置 Maven Wrapper，需使用系统 Maven 或 IDE。
+> 项目内置 **Maven Wrapper**（`backend/mvnw` / `backend/mvnw.cmd`），首次运行自动下载 Maven 3.9.6，无需手动安装和配置环境变量。
+>
+> 如需使用自己安装的 Maven，确保 `mvn -v` 可用即可；脚本会优先使用系统 Maven，其次使用 Wrapper。
 
-**下载地址：** <https://maven.apache.org/download.cgi>
+**使用方式：**
+- Windows：在 `backend/` 目录下执行 `mvnw.cmd <目标>`
+- Linux / macOS：在 `backend/` 目录下执行 `./mvnw <目标>`
 
-选择 `Binary zip archive` 版本。
-
-**安装步骤：**
-
-1. 解压到 `D:\apache-maven-3.9.x\`
-2. 配置环境变量：
-   - 新建系统变量 `MAVEN_HOME`，值为 `D:\apache-maven-3.9.x`
-   - 编辑 `Path`，添加 `%MAVEN_HOME%\bin`
-3. 验证：`mvn -v`
+> 💡 如果已有全局 Maven，可跳过此节；两者二选一即可。
 
 ### 2.3 Node.js 18+
 
@@ -83,7 +79,7 @@
 
 ### 2.4 MySQL 8.0
 
-详见 [database-services.md](./database-services.md) 第一章（MySQL 部分）。
+详见 [mysql-deployment.md](./mysql-deployment.md) 第一、二章（Windows 平台安装）。
 
 简要步骤：
 1. 下载 MySQL 8.0 ZIP 版或 Installer 版
@@ -93,7 +89,7 @@
 
 ### 2.5 Redis（推荐安装）
 
-详见 [database-services.md](./database-services.md) 第二章（Redis 部分）。
+详见 [redis-deployment.md](./redis-deployment.md) 第二章（Windows 平台安装）。
 
 简要步骤：
 1. 下载 Redis for Windows（<https://github.com/tporadowski/redis/releases>）
@@ -165,26 +161,21 @@ echo 'export PATH=$JAVA_HOME/bin:$PATH' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-### 3.2 Maven（可选）
+### 3.2 Maven（无需单独安装）
 
-**Ubuntu / CentOS 通用：**
+> 项目内置 **Maven Wrapper**（`backend/mvnw`），首次运行自动下载 Maven 3.9.6，无需手动安装。
+>
+> 也可使用系统包管理器安装（可选）：
 
 ```bash
-# 下载（版本号以官网最新为准）
-cd /opt
-wget https://dlcdn.apache.org/maven/maven-3/3.9.6/binaries/apache-maven-3.9.6-bin.tar.gz
-tar -zxvf apache-maven-3.9.6-bin.tar.gz
+# Ubuntu
+sudo apt install maven -y
 
-# 配置环境变量
-echo 'export MAVEN_HOME=/opt/apache-maven-3.9.6' >> ~/.bashrc
-echo 'export PATH=$MAVEN_HOME/bin:$PATH' >> ~/.bashrc
-source ~/.bashrc
-
-# 验证
-mvn -v
+# CentOS
+sudo yum install maven -y
 ```
 
-> 项目未内置 Maven Wrapper，请使用系统 Maven：`mvn -v`。
+> 💡 脚本会优先使用系统 `mvn`，其次使用项目内置的 `./mvnw`。
 
 ### 3.3 Node.js 18+
 
@@ -214,11 +205,11 @@ npm -v
 
 ### 3.4 MySQL 8.0
 
-详见 [database-services.md](./database-services.md) 第一章（MySQL 部分）。
+详见 [mysql-deployment.md](./mysql-deployment.md) 第一章（Linux 平台安装）。
 
 ### 3.5 Redis（推荐安装）
 
-详见 [database-services.md](./database-services.md) 第二章（Redis 部分）。
+详见 [redis-deployment.md](./redis-deployment.md) 第一章（Linux 平台安装）。
 
 ### 3.6 Git
 

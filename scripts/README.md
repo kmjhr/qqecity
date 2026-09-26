@@ -8,7 +8,7 @@
 ## 📁 目录结构
 
 ```
-docs/scripts/
+scripts/
 ├── README.md                    # 本文档
 ├── windows/                     # Windows 脚本（.bat）
 │   ├── config.bat               # ⚙️ 统一配置文件（数据库/Redis/端口等）
@@ -49,8 +49,8 @@ cd qingqi-ecity
 
 根据你的系统，编辑对应的配置文件：
 
-- **Windows**：`docs/scripts/windows/config.bat`
-- **Linux**：`docs/scripts/linux/config.sh`
+- **Windows**：`scripts/windows/config.bat`
+- **Linux**：`scripts/linux/config.sh`
 
 默认配置（本地开发用）：
 - MySQL：`127.0.0.1:3306` / `root` / `123456` / 数据库名 `qingqi`
@@ -63,11 +63,11 @@ cd qingqi-ecity
 
 ```bash
 # Windows
-docs\scripts\windows\00-check-env.bat
+scripts\windows\00-check-env.bat
 
 # Linux
-chmod +x docs/scripts/linux/*.sh
-docs/scripts/linux/00-check-env.sh
+chmod +x scripts/linux/*.sh
+scripts/linux/00-check-env.sh
 ```
 
 确保至少 Java、Node.js、MySQL 通过检查（Redis 推荐安装，用于 Token 黑名单）。
@@ -78,10 +78,10 @@ docs/scripts/linux/00-check-env.sh
 
 ```bash
 # Windows
-docs\scripts\windows\01-init-db.bat
+scripts\windows\01-init-db.bat
 
 # Linux
-docs/scripts/linux/01-init-db.sh
+scripts/linux/01-init-db.sh
 ```
 
 完成后会显示 25 张表和 5 个演示账号。
@@ -90,36 +90,36 @@ docs/scripts/linux/01-init-db.sh
 
 ```bash
 # Windows
-docs\scripts\windows\04-init-project.bat
+scripts\windows\04-init-project.bat
 
 # Linux
-docs/scripts/linux/04-init-project.sh
+scripts/linux/04-init-project.sh
 ```
 
 ### 第 6 步：启动全部服务
 
 ```bash
 # Windows
-docs\scripts\windows\99-start-all.bat
+scripts\windows\99-start-all.bat
 
 # Linux
-docs/scripts/linux/99-start-all.sh
+scripts/linux/99-start-all.sh
 ```
 
 或者分别启动：
 
 ```bash
 # 启动后端
-docs\scripts\windows\05-start-backend.bat     # Windows
-docs/scripts/linux/05-start-backend.sh        # Linux
+scripts\windows\05-start-backend.bat     # Windows
+scripts/linux/05-start-backend.sh        # Linux
 
 # 启动用户前端
-docs\scripts\windows\06-start-user-web.bat    # Windows
-docs/scripts/linux/06-start-user-web.sh       # Linux
+scripts\windows\06-start-user-web.bat    # Windows
+scripts/linux/06-start-user-web.sh       # Linux
 
 # 启动管理前端
-docs\scripts\windows\07-start-admin-web.bat   # Windows
-docs/scripts/linux/07-start-admin-web.sh      # Linux
+scripts\windows\07-start-admin-web.bat   # Windows
+scripts/linux/07-start-admin-web.sh      # Linux
 ```
 
 ---
@@ -128,13 +128,13 @@ docs/scripts/linux/07-start-admin-web.sh      # Linux
 
 所有演示账号统一密码：**`123456`**
 
-| 账号 | 角色 | 说明 |
-|------|------|------|
-| `admin` | 系统管理员 | 管理后台全部权限 |
-| `testuser` | 青年用户（在校生） | 体验全部用户功能 |
-| `entrepreneur` | 青年创业者 | 体验青创e贷、经营赋能 |
-| `landlord01` | 房东 | 体验保函确认、索赔 |
-| `banker01` | 银行运营岗 | 体验人工审核 |
+| 账号 | 角色 | 说明 | 适用端 |
+|------|------|------|--------|
+| `admin` | 系统管理员 | 管理后台全部权限 | 管理前端 |
+| `testuser` | 青年用户（在校生） | 体验全部用户功能 | 用户前端 |
+| `entrepreneur` | 青年创业者 | 体验青创e贷、经营赋能 | 用户前端 |
+| `landlord01` | 房东 | 体验保函确认、索赔 | 用户前端 |
+| `banker01` | 银行运营岗 | 体验人工审核 | 管理前端 |
 
 ---
 
@@ -192,11 +192,12 @@ docs/scripts/linux/07-start-admin-web.sh      # Linux
 
 ## 📚 相关文档
 
-更详细的部署说明见：
+更详细的部署说明见 `docs/deployment/` 目录：
 
-- [数据库服务安装参考（MySQL + Redis）](../deployment/database-services.md)
-
-- [Docker Compose 部署指南](../deployment/docker-compose.md)
+- [MySQL 部署文档](../docs/deployment/mysql-deployment.md)
+- [Redis 部署文档](../docs/deployment/redis-deployment.md)
+- [Docker Compose 部署指南](../docs/deployment/docker-compose.md)
+- [常见问题排查](../docs/deployment/05-troubleshooting.md)
 
 ---
 
@@ -209,7 +210,7 @@ A: 请在 cmd 窗口中运行脚本（而非直接双击），这样可以看到
 ### Q: Linux 脚本报 Permission denied？
 A: 加执行权限：
 ```bash
-chmod +x docs/scripts/linux/*.sh
+chmod +x scripts/linux/*.sh
 ```
 
 ### Q: MySQL 连接失败？

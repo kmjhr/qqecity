@@ -100,8 +100,8 @@ Vite 代理配置文件：`user-web/vite.config.js`（管理端为 `admin-web/vi
 
 ### 2.3 脚本配置文件
 
-- **Windows：** `docs/scripts/windows/config.bat` — 配置 MySQL 连接等参数
-- **Linux：** `docs/scripts/linux/config.sh` — 配置 MySQL 连接等参数
+- **Windows：** `scripts/windows/config.bat` — 配置 MySQL 连接等参数
+- **Linux：** `scripts/linux/config.sh` — 配置 MySQL 连接等参数
 
 使用脚本启动时需要修改对应配置文件。
 
@@ -109,7 +109,7 @@ Vite 代理配置文件：`user-web/vite.config.js`（管理端为 `admin-web/vi
 
 ## 第 3 步：数据库初始化
 
-> 详细步骤见 [database-services.md](./database-services.md#三创建数据库与导入数据)
+> 详细步骤见 [mysql-deployment.md](./mysql-deployment.md#三创建数据库与导入数据)
 
 ### 3.1 确保 MySQL 服务已启动
 
@@ -161,7 +161,7 @@ SELECT id, username, role FROM sys_user LIMIT 5;
 ## 第 4 步：Redis 配置（推荐安装）
 
 > Redis 用于 JWT 黑名单与缓存，推荐安装；未启动时后端会自动降级（跳过黑名单检查），仅登出后 Token 立即失效功能受影响。
-> 详细部署见 [database-services.md](./database-services.md#五redis-部署)
+> 详细部署见 [redis-deployment.md](./redis-deployment.md)
 
 ### 4.1 确保 Redis 服务已启动
 
@@ -357,7 +357,7 @@ docker compose up -d --build
 
 ## 脚本方式快速启动
 
-> 详细说明见 `docs/scripts/README.md`
+> 详细说明见 [脚本集 README](../../scripts/README.md)
 
 项目提供了 Windows 和 Linux 的一键启动脚本，可自动完成数据库初始化、后端编译启动、前端启动等操作。
 
@@ -371,7 +371,7 @@ cd docs\scripts\windows
 **Linux：**
 
 ```bash
-cd docs/scripts/linux
+cd scripts/linux
 chmod +x 99-start-all.sh
 ./99-start-all.sh
 ```
