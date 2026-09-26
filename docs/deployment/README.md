@@ -84,7 +84,7 @@ scripts/linux/99-start-all.sh
 ```
 
 或手动分别启动：
-- 后端：在 `backend/` 目录运行 `mvn spring-boot:run`（端口 8080）
+- 后端：在 `backend/` 目录运行 `./mvnw spring-boot:run`（Linux/macOS）或 `mvnw.cmd spring-boot:run`（Windows），端口 8080
 - 用户前端：在 `user-web/` 目录运行 `npm run dev`（端口 5173）
 - 管理前端：在 `admin-web/` 目录运行 `npm run dev`（端口 5174）
 

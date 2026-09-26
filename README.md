@@ -179,7 +179,7 @@ docker compose up -d --build
 | Node.js | 18+ | ✅ 必须 |
 | MySQL | 8.0 | ✅ 必须 |
 | Redis | 6.0+ | ✅ 推荐安装（JWT 黑名单依赖；未安装时后端自动降级，不检查黑名单，仅限演示） |
-| Maven | 3.6+ | ⚪ 推荐（可用 IDE 内置） |
+| Maven Wrapper | 3.9.x（内置） | ✅ 项目自带，无需安装 |
 | Git | 最新 | ✅ 必须 |
 
 > 环境安装详细步骤见 [环境准备指南](docs/deployment/01-env-preparation.md)
@@ -209,8 +209,11 @@ mysql -uroot -p123456 qingqi < backend/sql/data.sql
 ```bash
 cd backend
 
-# 方式 A：Maven 命令行
-mvn spring-boot:run
+# 方式 A：Maven Wrapper（推荐，无需安装 Maven）
+# Windows
+mvnw.cmd spring-boot:run
+# Linux / macOS
+./mvnw spring-boot:run
 
 # 方式 B：IDE 运行
 # 用 IDEA 打开项目，运行 QingqiApplication.java

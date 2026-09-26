@@ -243,7 +243,7 @@ git config --global user.email "你的邮箱"
 | 软件 | 验证命令 | 预期输出示例 |
 |------|----------|--------------|
 | JDK | `java -version` | `openjdk version "17.0.x"` |
-| Maven | `mvn -v` | `Apache Maven 3.9.x` |
+| Maven Wrapper | `cd backend && ./mvnw -v`（Linux）或 `mvnw.cmd -v`（Win） | Apache Maven 3.9.x（首次运行自动下载） |
 | Node.js | `node -v` | `v18.x.x` |
 | npm | `npm -v` | `9.x.x` |
 | MySQL | `mysql -u root -p123456 -e "SELECT VERSION();"` | `8.0.x` |
@@ -312,7 +312,7 @@ pnpm config set registry https://registry.npmmirror.com
 ## 环境检查清单
 
 - [ ] JDK 17+ 已安装，`java -version` 正常
-- [ ] Maven 已安装（或使用 IDE 内置 Maven）
+- [ ] Maven Wrapper 已就绪（项目内置，无需单独安装）
 - [ ] Node.js 18+ 已安装，`node -v` 正常
 - [ ] npm 可用，已配置淘宝镜像源
 - [ ] MySQL 8.0 已安装并启动
