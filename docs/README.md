@@ -57,11 +57,9 @@
 | [04-frontend-config.md](deployment/04-frontend-config.md) | 🎨 前端配置指南（环境变量 / Vite 代理） |
 | [05-troubleshooting.md](deployment/05-troubleshooting.md) | 🔍 常见问题排查（6 大类 25+ 问题） |
 | **部署专题文档** | |
-| [mysql-deployment.md](deployment/mysql-deployment.md) | 🗄️ MySQL 部署（Windows / Linux 双平台） |
-| [redis-deployment.md](deployment/redis-deployment.md) | 💾 Redis 部署（Windows / Linux 双平台） |
+| [database-services.md](deployment/database-services.md) | 🗄️ 数据库服务安装参考（MySQL + Redis 双平台） |
 | [docker-compose.md](deployment/docker-compose.md) | 🐳 Docker Compose 一键部署 |
 | [database-design.md](deployment/database-design.md) | 📐 数据库设计与 ER 关系图（25 张表） |
-| [project-structure.md](deployment/project-structure.md) | 📁 项目目录结构总览 |
 
 ### 适配报告
 
@@ -77,10 +75,10 @@
 
 | 脚本目录 | 说明 |
 | --- | --- |
-| [scripts/windows/](../scripts/windows/) | Windows 批处理脚本（环境检查 / 数据库初始化 / 服务启动等） |
-| [scripts/linux/](../scripts/linux/) | Linux Shell 脚本（功能同上） |
+| [scripts/windows/](./scripts/windows/) | Windows 批处理脚本（环境检查 / 数据库初始化 / 服务启动等） |
+| [scripts/linux/](./scripts/linux/) | Linux Shell 脚本（功能同上） |
 
-详细使用说明见 [脚本集 README](../scripts/README.md)。
+详细使用说明见 [脚本集 README](./scripts/README.md)。
 
 ---
 

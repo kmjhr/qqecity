@@ -12,7 +12,7 @@
 - [第 1 步：克隆代码](#第-1-步克隆代码)
 - [第 2 步：配置文件说明](#第-2-步配置文件说明)
 - [第 3 步：数据库初始化](#第-3-步数据库初始化)
-- [第 4 步：Redis 配置（可选）](#第-4-步redis-配置可选)
+- [第 4 步：Redis 配置（推荐安装）](#第-4-步redis-配置推荐安装)
 - [第 5 步：后端编译启动](#第-5-步后端编译启动)
 - [第 6 步：前端启动](#第-6-步前端启动)
 - [第 7 步：验证全链路](#第-7-步验证全链路)
@@ -27,7 +27,7 @@
 
 ```bash
 # 进入工作目录
-cd D:\codex\codex-data
+cd <你的工作目录>
 
 # 克隆代码（替换为实际仓库地址）
 git clone <仓库地址> qingqi-ecity
@@ -41,17 +41,16 @@ cd qingqi-ecity
 ```
 qingqi-ecity/
 ├── backend/           # Spring Boot 后端项目
-├── frontend/          # 前端项目（用户端 + 管理端）
-│   ├── user-web/      # 用户端（Vue 3）
-│   └── admin-web/     # 管理端（Vue 3）
+├── user-web/         # 用户前端（Vue 3 + JS）
+├── admin-web/        # 管理前端（Vue 3 + TS）
 ├── docs/              # 文档目录
-│   └── deployment/    # 部署文档（即本目录）
-├── scripts/           # 一键启动脚本
+│   ├── deployment/    # 部署文档（即本目录）
+│   └── scripts/      # 一键启动脚本（Windows / Linux）
 ├── docker-compose.yml # Docker Compose 编排文件
 └── README.md          # 项目说明
 ```
 
-更多目录结构说明见 [project-structure.md](./project-structure.md)。
+更多目录结构说明见根目录 [README.md](../../README.md)「项目结构」章节。
 
 ---
 
@@ -79,7 +78,7 @@ qingqi-ecity/
 
 ### 2.2 前端配置文件
 
-**用户前端：** `frontend/user-web/.env.development`
+**用户前端：** `user-web/`（本项目未使用 .env 文件，端口与 API 代理直接配置在 `user-web/vite.config.js`）
 
 ```env
 VITE_API_BASE_URL=/api
@@ -87,7 +86,7 @@ VITE_APP_TITLE=青启e城
 VITE_PORT=5173
 ```
 
-**管理前端：** `frontend/admin-web/.env.development`
+**管理前端：** `admin-web/`（同上，配置在 `admin-web/vite.config.ts`）
 
 ```env
 VITE_API_BASE_URL=/api
@@ -95,14 +94,14 @@ VITE_APP_TITLE=青启e城管理后台
 VITE_PORT=5174
 ```
 
-Vite 代理配置文件：`vite.config.js` 中的 `server.proxy`，将 `/api` 代理到后端 `http://localhost:8080`。
+Vite 代理配置文件：`user-web/vite.config.js`（管理端为 `admin-web/vite.config.ts`）中的 `server.proxy`，将 `/api` 代理到后端 `http://localhost:8080`。
 
 > 详细配置说明见 [04-frontend-config.md](./04-frontend-config.md)。
 
 ### 2.3 脚本配置文件
 
-- **Windows：** `scripts/windows/config.bat` — 配置 MySQL 连接等参数
-- **Linux：** `scripts/linux/config.sh` — 配置 MySQL 连接等参数
+- **Windows：** `docs/scripts/windows/config.bat` — 配置 MySQL 连接等参数
+- **Linux：** `docs/scripts/linux/config.sh` — 配置 MySQL 连接等参数
 
 使用脚本启动时需要修改对应配置文件。
 
@@ -110,7 +109,7 @@ Vite 代理配置文件：`vite.config.js` 中的 `server.proxy`，将 `/api` �
 
 ## 第 3 步：数据库初始化
 
-> 详细步骤见 [mysql-deployment.md](./mysql-deployment.md#三创建数据库与导入数据)
+> 详细步骤见 [database-services.md](./database-services.md#三创建数据库与导入数据)
 
 ### 3.1 确保 MySQL 服务已启动
 
@@ -159,10 +158,10 @@ SELECT id, username, role FROM sys_user LIMIT 5;
 
 ---
 
-## 第 4 步：Redis 配置（可选）
+## 第 4 步：Redis 配置（推荐安装）
 
-> MVP 阶段 Redis 为可选依赖，不启用也能跑通核心业务流程。
-> 详细部署见 [redis-deployment.md](./redis-deployment.md)
+> Redis 用于 JWT 黑名单与缓存，推荐安装；未启动时后端会自动降级（跳过黑名单检查），仅登出后 Token 立即失效功能受影响。
+> 详细部署见 [database-services.md](./database-services.md#五redis-部署)
 
 ### 4.1 确保 Redis 服务已启动
 
@@ -186,7 +185,7 @@ spring:
       database: 0
 ```
 
-> 如果不使用 Redis，可保持默认配置（连接失败不影响核心功能），或在代码中禁用 Redis 相关配置。
+> 如果不安装 Redis，保持默认配置即可，后端会打印警告并自动跳过黑名单检查（仅影响登出/强制下线功能）。
 
 ---
 
@@ -205,14 +204,13 @@ mvn clean compile
 mvn spring-boot:run
 ```
 
-### 5.2 方式二：Maven Wrapper 启动（无需安装 Maven）
+### 5.2 方式二：使用 IDE 或系统 Maven 启动
 
 ```cmd
 # Windows
-mvnw.cmd spring-boot:run
+> 项目未内置 Maven Wrapper，请使用系统 Maven（`mvn spring-boot:run`）或 IDE 启动。
 
 # Linux / Mac
-./mvnw spring-boot:run
 ```
 
 ### 5.3 方式三：IDEA 启动（推荐开发时使用）
@@ -233,7 +231,7 @@ Started QingqiApplication in xx.xxx seconds
 打开浏览器访问：
 
 - 接口健康检查：<http://localhost:8080/api/health>
-- 接口文档：<http://localhost:8080/doc.html>
+- 接口文档：<http://localhost:8080/api/doc.html>
 
 > 如果端口被占用，见 [05-troubleshooting.md](./05-troubleshooting.md) 排查。
 
@@ -247,7 +245,7 @@ Started QingqiApplication in xx.xxx seconds
 
 ```cmd
 # 进入用户前端目录
-cd frontend/user-web
+cd user-web
 
 # 安装依赖（首次执行需要几分钟）
 npm install
@@ -270,7 +268,7 @@ npm run dev
 
 ```cmd
 # 进入管理前端目录
-cd frontend/admin-web
+cd admin-web
 
 # 安装依赖
 npm install
@@ -298,7 +296,7 @@ npm run dev
 **用户端：**
 
 1. 打开 <http://localhost:5173>
-2. 使用演示账号登录：`user01` / `123456`
+2. 使用演示账号登录：`testuser` / `123456`
 3. 登录成功后跳转到首页，显示用户信息
 
 **管理端：**
@@ -315,13 +313,13 @@ npm run dev
 http://localhost:8080/api/health
 ```
 
-返回 `{"code":200,"message":"success","data":"ok"}` 即为正常。
+返回 `{"code":0,"message":"success","data":"ok"}` 即为正常。
 
 **方式二：接口文档**
 
-打开 <http://localhost:8080/doc.html>，在 Swagger 页面测试登录接口：
+打开 <http://localhost:8080/api/doc.html>，在 Knife4j 页面测试登录接口：
 
-- 接口：`POST /api/auth/login`
+- 接口：`POST /api/v1/auth/login`
 - 参数：`{ "username": "admin", "password": "123456" }`
 - 预期：返回 token
 
@@ -347,35 +345,35 @@ http://localhost:8080/api/health
 
 ```bash
 # 在项目根目录执行
-docker-compose up -d
+docker compose up -d --build
 ```
 
 启动后访问：
-- 用户前端：<http://localhost:5173>
-- 管理前端：<http://localhost:5174>
-- 后端 API：<http://localhost:8080>
+- 用户前端：<http://localhost:8081>
+- 管理前端：<http://localhost:8083>
+- 后端 API：<http://localhost:8082/api>
 
 ---
 
 ## 脚本方式快速启动
 
-> 详细说明见 `scripts/README.md`
+> 详细说明见 `docs/scripts/README.md`
 
 项目提供了 Windows 和 Linux 的一键启动脚本，可自动完成数据库初始化、后端编译启动、前端启动等操作。
 
 **Windows：**
 
 ```cmd
-cd scripts\windows
-start-all.bat
+cd docs\scripts\windows
+99-start-all.bat
 ```
 
 **Linux：**
 
 ```bash
-cd scripts/linux
-chmod +x start-all.sh
-./start-all.sh
+cd docs/scripts/linux
+chmod +x 99-start-all.sh
+./99-start-all.sh
 ```
 
 ---
@@ -385,10 +383,10 @@ chmod +x start-all.sh
 - [ ] 代码已克隆到本地，目录结构完整
 - [ ] MySQL 服务已启动，数据库 `qingqi` 已创建
 - [ ] schema.sql 已导入，data.sql 已导入
-- [ ] Redis 服务已启动（可选）
+- [ ] Redis 服务已启动（推荐安装；未安装时后端自动降级）
 - [ ] 后端 application.yml 配置正确
 - [ ] 后端启动成功，端口 8080 正常监听
-- [ ] 接口文档 /doc.html 可访问
+- [ ] 接口文档 /api/doc.html 可访问
 - [ ] 用户前端 npm install 完成
 - [ ] 用户前端启动成功，端口 5173 可访问
 - [ ] 管理前端 npm install 完成

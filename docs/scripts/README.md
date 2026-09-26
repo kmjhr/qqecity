@@ -8,7 +8,7 @@
 ## 📁 目录结构
 
 ```
-scripts/
+docs/scripts/
 ├── README.md                    # 本文档
 ├── windows/                     # Windows 脚本（.bat）
 │   ├── config.bat               # ⚙️ 统一配置文件（数据库/Redis/端口等）
@@ -49,8 +49,8 @@ cd qingqi-ecity
 
 根据你的系统，编辑对应的配置文件：
 
-- **Windows**：`scripts/windows/config.bat`
-- **Linux**：`scripts/linux/config.sh`
+- **Windows**：`docs/scripts/windows/config.bat`
+- **Linux**：`docs/scripts/linux/config.sh`
 
 默认配置（本地开发用）：
 - MySQL：`127.0.0.1:3306` / `root` / `123456` / 数据库名 `qingqi`
@@ -63,14 +63,14 @@ cd qingqi-ecity
 
 ```bash
 # Windows
-scripts\windows\00-check-env.bat
+docs\scripts\windows\00-check-env.bat
 
 # Linux
-chmod +x scripts/linux/*.sh
-scripts/linux/00-check-env.sh
+chmod +x docs/scripts/linux/*.sh
+docs/scripts/linux/00-check-env.sh
 ```
 
-确保至少 Java、Node.js、MySQL 通过检查（Redis MVP 阶段可选）。
+确保至少 Java、Node.js、MySQL 通过检查（Redis 推荐安装，用于 Token 黑名单）。
 
 ### 第 4 步：初始化数据库
 
@@ -78,10 +78,10 @@ scripts/linux/00-check-env.sh
 
 ```bash
 # Windows
-scripts\windows\01-init-db.bat
+docs\scripts\windows\01-init-db.bat
 
 # Linux
-scripts/linux/01-init-db.sh
+docs/scripts/linux/01-init-db.sh
 ```
 
 完成后会显示 25 张表和 5 个演示账号。
@@ -90,36 +90,36 @@ scripts/linux/01-init-db.sh
 
 ```bash
 # Windows
-scripts\windows\04-init-project.bat
+docs\scripts\windows\04-init-project.bat
 
 # Linux
-scripts/linux/04-init-project.sh
+docs/scripts/linux/04-init-project.sh
 ```
 
 ### 第 6 步：启动全部服务
 
 ```bash
 # Windows
-scripts\windows\99-start-all.bat
+docs\scripts\windows\99-start-all.bat
 
 # Linux
-scripts/linux/99-start-all.sh
+docs/scripts/linux/99-start-all.sh
 ```
 
 或者分别启动：
 
 ```bash
 # 启动后端
-scripts\windows\05-start-backend.bat     # Windows
-scripts/linux/05-start-backend.sh        # Linux
+docs\scripts\windows\05-start-backend.bat     # Windows
+docs/scripts/linux/05-start-backend.sh        # Linux
 
 # 启动用户前端
-scripts\windows\06-start-user-web.bat    # Windows
-scripts/linux/06-start-user-web.sh       # Linux
+docs\scripts\windows\06-start-user-web.bat    # Windows
+docs/scripts/linux/06-start-user-web.sh       # Linux
 
 # 启动管理前端
-scripts\windows\07-start-admin-web.bat   # Windows
-scripts/linux/07-start-admin-web.sh      # Linux
+docs\scripts\windows\07-start-admin-web.bat   # Windows
+docs/scripts/linux/07-start-admin-web.sh      # Linux
 ```
 
 ---
@@ -159,7 +159,7 @@ scripts/linux/07-start-admin-web.sh      # Linux
 |------|------|------|
 | `03-verify-redis` | Redis 验证 | 连接/读写/内存/持久化/淘汰策略检查 |
 
-> 💡 Redis 为 MVP 可选依赖，不启用也能跑通核心业务。
+> 💡 Redis 用于 JWT 黑名单与缓存，推荐安装；未启动时后端自动降级为不检查黑名单（仅影响登出/强制下线功能）。
 
 ### 项目初始化类
 
@@ -184,7 +184,7 @@ scripts/linux/07-start-admin-web.sh      # Linux
 
 | 服务 | 地址 | 默认账号 |
 |------|------|----------|
-| 后端 API | http://localhost:8080 | — |
+| 后端 API | http://localhost:8080/api | — |
 | 用户前端 | http://localhost:5173 | testuser / 123456 |
 | 管理前端 | http://localhost:5174 | admin / 123456 |
 
@@ -194,9 +194,9 @@ scripts/linux/07-start-admin-web.sh      # Linux
 
 更详细的部署说明见：
 
-- [MySQL 数据库部署文档](../docs/deployment/mysql-deployment.md)
-- [Redis 部署文档](../docs/deployment/redis-deployment.md)
-- [Docker Compose 部署指南](../docs/deployment/docker-compose.md)
+- [数据库服务安装参考（MySQL + Redis）](../deployment/database-services.md)
+
+- [Docker Compose 部署指南](../deployment/docker-compose.md)
 
 ---
 
@@ -209,7 +209,7 @@ A: 请在 cmd 窗口中运行脚本（而非直接双击），这样可以看到
 ### Q: Linux 脚本报 Permission denied？
 A: 加执行权限：
 ```bash
-chmod +x scripts/linux/*.sh
+chmod +x docs/scripts/linux/*.sh
 ```
 
 ### Q: MySQL 连接失败？
@@ -237,5 +237,4 @@ A: 配置阿里云 Maven 镜像，在 `settings.xml` 的 `<mirrors>` 中添加�
 ```
 
 ### Q: Redis 必须启动吗？
-A: MVP 阶段 Redis 为可选依赖，不启动也能跑通核心业务流程。
-项目配置中 Redis 连接失败不会导致应用启动失败。
+A: 推荐安装（JWT 黑名单依赖）。未启动时后端会跳过黑名单检查并打印警告，登录与核心业务仍可运行，但登出后 Token 不会失效（仅影响登出/强制下线功能）。

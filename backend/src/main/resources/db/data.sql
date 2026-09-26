@@ -19,13 +19,13 @@ INSERT IGNORE INTO `sys_role` (`id`, `role_code`, `role_name`, `description`, `s
 (4, 'BANK_OPERATOR', '银行运营岗', '人工复核保函索赔、贷款审核', 30, 1);
 
 -- 2. sys_user 用户表
--- 密码 123456 的 BCrypt 哈希值：$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2
+-- 密码 123456 的 BCrypt 哈希值：$2a$10$y/gSxzaWZHsGPwKHdLDORepIv3.oNqkDuPUHJsW8YW36hXPailpT.
 INSERT IGNORE INTO `sys_user` (`id`, `username`, `password`, `nickname`, `real_name`, `id_card`, `phone`, `email`, `role`, `user_type`, `status`) VALUES
-(1, 'admin', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '系统管理员', '管小明', NULL, '13800000000', 'admin@example.com', 'ADMIN', 'OTHER', 1),
-(2, 'testuser', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '演示青年', '张青年', NULL, '13900000001', 'test@example.com', 'USER', 'STUDENT', 1),
-(3, 'entrepreneur', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '创业小青年', '李创业', NULL, '13900000002', 'biz@example.com', 'USER', 'ENTREPRENEUR', 1),
-(4, 'landlord01', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '王房东', '王建国', NULL, '13900000003', 'landlord@example.com', 'LANDLORD', 'OTHER', 1),
-(5, 'banker01', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '银行运营', '赵经理', NULL, '13900000004', 'bank@example.com', 'BANK_OPERATOR', 'OTHER', 1);
+(1, 'admin', '$2a$10$y/gSxzaWZHsGPwKHdLDORepIv3.oNqkDuPUHJsW8YW36hXPailpT.', '系统管理员', '管小明', NULL, '13800000000', 'admin@example.com', 'ADMIN', 'OTHER', 1),
+(2, 'testuser', '$2a$10$y/gSxzaWZHsGPwKHdLDORepIv3.oNqkDuPUHJsW8YW36hXPailpT.', '演示青年', '张青年', NULL, '13900000001', 'test@example.com', 'USER', 'STUDENT', 1),
+(3, 'entrepreneur', '$2a$10$y/gSxzaWZHsGPwKHdLDORepIv3.oNqkDuPUHJsW8YW36hXPailpT.', '创业小青年', '李创业', NULL, '13900000002', 'biz@example.com', 'USER', 'ENTREPRENEUR', 1),
+(4, 'landlord01', '$2a$10$y/gSxzaWZHsGPwKHdLDORepIv3.oNqkDuPUHJsW8YW36hXPailpT.', '王房东', '王建国', NULL, '13900000003', 'landlord@example.com', 'LANDLORD', 'OTHER', 1),
+(5, 'banker01', '$2a$10$y/gSxzaWZHsGPwKHdLDORepIv3.oNqkDuPUHJsW8YW36hXPailpT.', '银行运营', '赵经理', NULL, '13900000004', 'bank@example.com', 'BANK_OPERATOR', 'OTHER', 1);
 
 -- 3. sys_user_role 用户角色关联
 INSERT IGNORE INTO `sys_user_role` (`id`, `user_id`, `role_id`) VALUES

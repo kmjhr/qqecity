@@ -45,7 +45,7 @@ echo ""
 # 启动
 echo "🚀 正在启动后端服务..."
 echo "   访问地址：http://localhost:${BACKEND_PORT}"
-echo "   接口文档：http://localhost:${BACKEND_PORT}/doc.html（如集成 knife4j）"
+echo "   接口文档：http://localhost:${BACKEND_PORT}/api/doc.html"
 echo ""
 echo "   按 Ctrl+C 停止服务"
 echo ""

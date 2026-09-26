@@ -48,8 +48,7 @@ backend/src/main/java/com/icbc/qingqi/
 ├── security/                 # 安全层：JWT 签发/校验、登录上下文
 │   ├── JwtUtil.java
 │   ├── JwtAuthFilter.java
-│   ├── UserContext.java
-│   └── PasswordUtil.java
+│   └── UserContext.java
 └── module/                   # 业务模块层（对应五大模块＋公共支撑）
     ├── user/                 # 公共支撑：用户注册/登录/授权
     ├── guarantee/            # 模块1 安居金融风控（租房履约保函）

@@ -93,7 +93,7 @@
 ### AI 该做什么
 1. 依据设计说明书第 6 章，输出 25 张表的建表 SQL（`schema.sql`）：表名、全部字段、类型、主键、唯一键、索引、注释。
 2. 输出 ER 关系描述（文字）：用户 ↔ 授权、保函申请 → 保函信息 → 理赔、贷款申请 → 额度 → 受托支付、预算 → 交易、风控 → 预警/反诈记录、消息 → 推送等。
-3. 生成演示数据（`data.sql`）：演示账号（13800000000/123456，密码 SHA-256 散列）、保函/贷款/预算/消息样例数据。
+3. 生成演示数据（`data.sql`）：演示账号（admin/testuser 等 / 123456，密码 BCrypt 散列）、保函/贷款/预算/消息样例数据。
 4. 校验：表数量=25、每张表有主键、与代码实体字段一一对应。
 
 ### 我该做什么
@@ -120,7 +120,7 @@
 **目标**：实现全部业务接口（JWT 鉴权 + 7 个模块），通过 Swagger 可查看、可用 curl/前端联调。
 
 ### AI 该做什么
-1. 搭建/维护 Spring Boot 骨架：`common`（Result/ErrorCode/BizException/GlobalExceptionHandler）、`config`（跨域、MyBatis-Plus）、`security`（JwtUtil/JwtAuthFilter/UserContext/PasswordUtil）。
+1. 搭建/维护 Spring Boot 骨架：`common`（Result/ErrorCode/BizException/GlobalExceptionHandler）、`config`（跨域、MyBatis-Plus）、`security`（JwtUtil/JwtAuthFilter/UserContext，密码校验用 BCryptPasswordEncoder）。
 2. 按模块开发四件套（Entity + Mapper + Service + Controller）：
    - `user`：注册、登录、当前用户（/api/v1/auth/register、/login、/me）
    - `guarantee`：保函申请、房东确认、AI 合同复审（规则）、缴费出函、保函查询
@@ -383,7 +383,7 @@
 ```
 请依据设计说明书第 6 章，核对并完善 backend/src/main/resources/db/schema.sql：
 1) 确保 25 张表齐全，字段/类型/主键/注释与说明书一致；
-2) 补充或核对 data.sql 演示数据（含演示账号 13800000000/123456，密码 SHA-256 散列）；
+2) 补充或核对 data.sql 演示数据（含演示账号 admin/testuser 等 / 123456，密码 BCrypt 散列）；
 3) 输出 ER 关系文字描述；
 4) 检查幂等性（可重复执行）。完成后给出表清单与核对结果。
 ```

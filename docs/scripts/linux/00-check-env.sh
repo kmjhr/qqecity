@@ -109,8 +109,8 @@ fi
 if [ $REDIS_OK -eq 1 ]; then
     echo "    ✅ Redis 连接成功（${REDIS_HOST}:${REDIS_PORT}）"
 else
-    echo "    ⚠️  Redis 连接失败或未安装（MVP 阶段为可选依赖）"
-    echo "       参考文档：docs/deployment/redis-deployment.md"
+    echo "    ⚠️  Redis 连接失败或未安装（推荐安装：JWT 黑名单依赖；未安装时后端自动降级）"
+    echo "       参考文档：docs/deployment/database-services.md"
 fi
 PASS=$((PASS + 1))
 echo ""

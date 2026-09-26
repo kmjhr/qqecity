@@ -1,5 +1,5 @@
 server:
-  port: 8082
+  port: 8080
   servlet:
     context-path: /api
 
@@ -8,10 +8,13 @@ spring:
     name: qingqi-backend
 
   # 数据源
+  # 注意：本地部署默认使用 root/123456（与 docs/deployment 文档、scripts 配置保持一致）；
+  # 若你安装 MySQL 时设置了其他密码，请把下方默认值改为你的密码，
+  # 或通过环境变量 SPRING_DATASOURCE_PASSWORD 注入（生产环境推荐）。
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/qingqi?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true}
     username: ${SPRING_DATASOURCE_USERNAME:root}
-    password: ${SPRING_DATASOURCE_PASSWORD:root123456}
+    password: ${SPRING_DATASOURCE_PASSWORD:123456}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   # Redis（JWT 黑名单 + 缓存）

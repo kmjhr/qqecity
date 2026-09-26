@@ -8,11 +8,11 @@
 
 | 服务 | 镜像/构建 | 容器名 | 端口 | 说明 |
 | --- | --- | --- | --- | --- |
-| mysql | mysql:8.0 | qqecity-mysql | 3306 | 数据库，自动初始化 schema + 演示数据 |
-| redis | redis:7-alpine | qqecity-redis | 6379 | 缓存（一期预留，非强依赖） |
-| backend | 构建自 ./backend/Dockerfile | qqecity-backend | 8080 | Spring Boot 后端 API |
+| mysql | mysql:8.0 | qqecity-mysql | 3307:3306 | 数据库，自动初始化 schema + 演示数据 |
+| redis | redis:7-alpine | qqecity-redis | 6380:6379 | JWT 黑名单（backend 运行时依赖） |
+| backend | 构建自 ./backend/Dockerfile | qqecity-backend | 8082:8080 | Spring Boot 后端 API |
 | user-web | 构建自 ./user-web/Dockerfile | qqecity-user-web | 8081 | 用户端前端（Nginx 静态托管） |
-| admin-web | 构建自 ./admin-web/Dockerfile | qqecity-admin-web | 8082 | 管理端前端（Nginx 静态托管） |
+| admin-web | 构建自 ./admin-web/Dockerfile | qqecity-admin-web | 8083:80 | 管理端前端（Nginx 静态托管） |
 
 ## 前置要求
 
@@ -35,11 +35,11 @@ docker compose up -d --build
 | 入口 | 地址 | 说明 |
 | --- | --- | --- |
 | 用户端 | http://localhost:8081 | 青年用户使用的主前端 |
-| 管理端 | http://localhost:8082 | 运营/管理员使用的后台 |
-| 后端 API | http://localhost:8080 | Spring Boot 服务 |
-| Swagger 文档 | http://localhost:8080/swagger-ui.html | 接口在线文档 |
-| MySQL | localhost:3306 | 数据库（用户：qingqi / 密码：qingqi123） |
-| Redis | localhost:6379 | 缓存（密码：redis123） |
+| 管理端 | http://localhost:8083 | 运营/管理员使用的后台 |
+| 后端 API | http://localhost:8082/api | Spring Boot 服务（接口统一 /api 前缀） |
+| 接口文档 | http://localhost:8082/api/doc.html | Knife4j 接口在线文档 |
+| MySQL | localhost:3307 | 数据库（用户：qingqi / 密码：qingqi123） |
+| Redis | localhost:6380 | 缓存（密码：redis123） |
 
 ## 常用命令
 
@@ -92,7 +92,7 @@ MySQL 首次启动时会自动执行 `backend/sql/` 目录下的 SQL：
 1. `schema.sql` — 建表（25 张表）
 2. `data.sql` — 演示数据（含演示账号）
 
-演示账号：`13800000000 / 123456`
+演示账号（用户名登录，统一密码 `123456`）：`admin`、`testuser`、`entrepreneur`、`landlord01`、`banker01`
 
 ## 生产部署建议
 

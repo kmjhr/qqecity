@@ -107,12 +107,11 @@ qingqi-ecity/
 │   ├── user-web/                   # 用户前端文档
 │   ├── admin-web/                  # 管理前端文档
 │   ├── common/                     # 公共文档（需求/技术选型/排期/AI计划）
-│   └── deployment/                 # 部署配置指南（11个文档）
-│
-├── scripts/                        # 部署脚本（Windows + Linux 双平台）
-│   ├── README.md                   # 脚本使用说明
-│   ├── windows/                    # Windows 批处理脚本（10个）
-│   └── linux/                      # Linux Shell 脚本（10个）
+│   ├── deployment/                 # 部署配置指南
+│   └── scripts/                    # 部署脚本（Windows + Linux 双平台）
+│       ├── README.md               # 脚本使用说明
+│       ├── windows/                # Windows 批处理脚本（10个）
+│       └── linux/                  # Linux Shell 脚本（10个）
 │
 ├── prototype/                      # HTML 静态原型（可点击）
 │
@@ -128,7 +127,7 @@ qingqi-ecity/
 
 **Windows：**
 ```cmd
-cd scripts\windows
+cd docs\scripts\windows
 00-check-env.bat      # 1. 检查环境
 01-init-db.bat        # 2. 初始化数据库（建库+建表+演示数据）
 04-init-project.bat   # 3. 项目初始化（编译后端+安装前端依赖）
@@ -137,7 +136,7 @@ cd scripts\windows
 
 **Linux / macOS：**
 ```bash
-cd scripts/linux
+cd docs/scripts/linux
 chmod +x *.sh
 ./00-check-env.sh     # 1. 检查环境
 ./01-init-db.sh       # 2. 初始化数据库
@@ -145,7 +144,7 @@ chmod +x *.sh
 ./99-start-all.sh     # 4. 一键启动全部服务
 ```
 
-> 详细说明见 [脚本集 README](scripts/README.md)
+> 详细说明见 [脚本集 README](docs/scripts/README.md)
 
 ---
 
@@ -160,8 +159,8 @@ docker compose up -d --build
 
 启动后访问：
 - 用户前端：http://localhost:8081
-- 管理前端：http://localhost:8082
-- 后端 API：http://localhost:8080/api
+- 管理前端：http://localhost:8083
+- 后端 API：http://localhost:8082/api（接口文档：http://localhost:8082/api/doc.html）
 
 > 详细说明见 [Docker 部署文档](docs/deployment/docker-compose.md)
 
@@ -176,7 +175,7 @@ docker compose up -d --build
 | JDK | 17+ | ✅ 必须 |
 | Node.js | 18+ | ✅ 必须 |
 | MySQL | 8.0 | ✅ 必须 |
-| Redis | 6.0+ | ⚪ 可选（MVP 阶段） |
+| Redis | 6.0+ | ✅ 推荐安装（JWT 黑名单依赖；未安装时后端自动降级，不检查黑名单，仅限演示） |
 | Maven | 3.6+ | ⚪ 推荐（可用 IDE 内置） |
 | Git | 最新 | ✅ 必须 |
 
@@ -200,7 +199,7 @@ mysql -uroot -p123456 qingqi < backend/sql/schema.sql
 mysql -uroot -p123456 qingqi < backend/sql/data.sql
 ```
 
-> 完整数据库部署说明见 [MySQL 部署文档](docs/deployment/mysql-deployment.md)
+> 完整数据库部署说明见 [数据库服务安装参考（MySQL + Redis）](docs/deployment/database-services.md)
 
 #### 第 3 步：启动后端
 
@@ -270,9 +269,9 @@ npm run dev
 
 | 服务 | 地址 |
 | --- | --- |
-| 后端 API | http://localhost:8080/api |
+| 后端 API | http://localhost:8082/api |
 | 用户前端 | http://localhost:8081 |
-| 管理前端 | http://localhost:8082 |
+| 管理前端 | http://localhost:8083 |
 
 ---
 
@@ -312,10 +311,9 @@ npm run dev
 
 | 文档 | 说明 |
 | --- | --- |
-| [MySQL 部署文档](docs/deployment/mysql-deployment.md) | Windows / Linux 双平台部署指南 |
-| [Redis 部署文档](docs/deployment/redis-deployment.md) | Windows / Linux 双平台部署指南 |
+| [数据库服务安装参考](docs/deployment/database-services.md) | MySQL + Redis 双平台安装、建库导入 |
 | [后端配置指南](docs/deployment/03-backend-config.md) | application.yml 完整详解 |
-| [前端配置指南](docs/deployment/04-frontend-config.md) | 环境变量 / Vite 代理配置 |
+| [前端配置指南](docs/deployment/04-frontend-config.md) | 端口 / Vite 代理配置 |
 | [Docker 部署文档](docs/deployment/docker-compose.md) | Docker Compose 一键部署 |
 
 ---
@@ -332,14 +330,14 @@ npm run dev
 - [ ] 管理前端可以正常打开（http://localhost:5174）
 - [ ] 管理端登录成功（admin / 123456）
 - [ ] 消息中心页面可以正常加载消息列表
-- [ ] （可选）Redis 连接正常，Token 黑名单机制可用
+- [ ] Redis 连接正常，Token 黑名单机制可用（未安装 Redis 时黑名单降级，不影响登录）
 
 ---
 
 ## ❓ 遇到问题？
 
 1. 先查 [常见问题排查](docs/deployment/05-troubleshooting.md) —— 6 大类 25+ 常见问题及解法
-2. 再查对应模块的部署文档（MySQL / Redis / 后端 / 前端）
+2. 再查对应部署文档（数据库服务 / 后端 / 前端 / Docker）
 3. 查看后端日志和前端控制台报错信息
 4. 参考 [适配报告](docs/适配报告.md) 了解项目架构演变历史
 

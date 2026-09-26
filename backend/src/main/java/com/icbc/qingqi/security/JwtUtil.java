@@ -110,10 +110,14 @@ public class JwtUtil {
     public String validateToken(String token) {
         try {
             Claims claims = parseToken(token);
-            // 检查是否在黑名单
-            Boolean blacklisted = redisTemplate.hasKey(BLACKLIST_PREFIX + token);
-            if (Boolean.TRUE.equals(blacklisted)) {
-                return "TOKEN_BLACKLISTED";
+            // 检查是否在黑名单（Redis 不可用时降级跳过黑名单检查，仅签名/过期校验仍生效）
+            try {
+                Boolean blacklisted = redisTemplate.hasKey(BLACKLIST_PREFIX + token);
+                if (Boolean.TRUE.equals(blacklisted)) {
+                    return "TOKEN_BLACKLISTED";
+                }
+            } catch (Exception e) {
+                log.warn("Redis 不可用，跳过 Token 黑名单检查：{}", e.getMessage());
             }
             // 检查类型是否为 access
             String type = claims.get(CLAIM_TYPE, String.class);

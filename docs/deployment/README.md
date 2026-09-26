@@ -18,11 +18,9 @@
 
 | 文档 | 说明 |
 |------|------|
-| [mysql-deployment.md](./mysql-deployment.md) | MySQL 数据库部署文档（Windows / Linux 双平台 + 数据导入） |
-| [redis-deployment.md](./redis-deployment.md) | Redis 缓存服务部署文档（Windows / Linux 双平台） |
+| [database-services.md](./database-services.md) | 数据库服务安装参考（MySQL + Redis，Windows / Linux 双平台 + 数据导入） |
 | [docker-compose.md](./docker-compose.md) | Docker Compose 一键部署指南 |
 | [database-design.md](./database-design.md) | 数据库设计与 ER 图说明 |
-| [project-structure.md](./project-structure.md) | 项目目录结构说明 |
 
 ---
 
@@ -45,21 +43,21 @@ cd qingqi-ecity
 
 **第 2 步：环境准备**
 
-安装 JDK 17+、Node.js 18+、MySQL 8.0、Redis 6.0+（可选）。详见 [01-env-preparation.md](./01-env-preparation.md)。
+安装 JDK 17+、Node.js 18+、MySQL 8.0、Redis 6.0+（推荐安装，用于 Token 黑名单）。详见 [01-env-preparation.md](./01-env-preparation.md)。
 
 **第 3 步：数据库初始化**
 
-创建数据库 `qingqi`，导入 `schema.sql` 和 `data.sql`。详见 [mysql-deployment.md](./mysql-deployment.md#三创建数据库与导入数据)。
+创建数据库 `qingqi`，导入 `schema.sql` 和 `data.sql`。详见 [database-services.md](./database-services.md#三创建数据库与导入数据)。
 
 **第 4 步：项目初始化**
 
-修改后端 `application.yml` 和前端 `.env` 配置文件。详见 [02-project-setup.md](./02-project-setup.md)。
+修改后端 `application.yml`（数据库/Redis 连接信息）。前端端口与代理直接配置在 `vite.config.js`，项目未使用 `.env` 文件。详见 [02-project-setup.md](./02-project-setup.md)。
 
 **第 5 步：启动服务**
 
 - 后端：`mvn spring-boot:run`（端口 8080）
-- 用户前端：`cd frontend/user-web && npm run dev`（端口 5173）
-- 管理前端：`cd frontend/admin-web && npm run dev`（端口 5174）
+- 用户前端：`cd user-web && npm run dev`（端口 5173）
+- 管理前端：`cd admin-web && npm run dev`（端口 5174）
 
 ---
 
@@ -69,11 +67,13 @@ cd qingqi-ecity
 
 | 账号 | 角色 | 说明 | 登录端 |
 |------|------|------|--------|
-| `admin` | 超级管理员 | 拥有全部权限，可管理用户、角色、菜单等 | 管理端 |
-| `manager` | 运营管理员 | 负责业务数据审核、内容管理等 | 管理端 |
-| `user01` | 普通用户（青年创业者） | 租房保函 / 青创e贷 / 预算消费 / 金融安全 | 用户端 |
-| `user02` | 普通用户（在校大学生） | 预算消费 / 金融安全为主 | 用户端 |
-| `user03` | 普通用户（新市民） | 租房保函 / 金融安全为主 | 用户端 |
+| 账号 | 角色 | 说明 | 登录端 |
+|------|------|------|--------|
+| `admin` | 系统管理员 | 管理后台全部权限 | 管理端 |
+| `testuser` | 青年用户（在校生） | 体验全部用户功能 | 用户端 |
+| `entrepreneur` | 青年创业者 | 体验青创e贷、经营赋能 | 用户端 |
+| `landlord01` | 房东 | 体验保函确认、索赔 | 用户端 |
+| `banker01` | 银行运营岗 | 体验人工审核 | 管理端 |
 
 ---
 
@@ -81,8 +81,8 @@ cd qingqi-ecity
 
 | 服务 | 地址 | 说明 |
 |------|------|------|
-| 后端 API | `http://localhost:8080` | Spring Boot 服务，接口前缀 `/api` |
-| 接口文档 | `http://localhost:8080/doc.html` | Knife4j / Swagger 接口文档 |
+| 后端 API | `http://localhost:8080/api` | Spring Boot 服务，接口前缀 `/api` |
+| 接口文档 | `http://localhost:8080/api/doc.html` | Knife4j / Swagger 接口文档 |
 | 用户前端 | `http://localhost:5173` | 青启e城用户端（Vue 3 + Vite） |
 | 管理前端 | `http://localhost:5174` | 青启e城管理端（Vue 3 + Vite） |
 | MySQL | `127.0.0.1:3306` | 数据库名：`qingqi`，账号：`root/123456` |
@@ -92,12 +92,11 @@ cd qingqi-ecity
 
 ## 相关资源
 
-- **脚本目录**：`scripts/` — Windows / Linux 一键启动脚本、数据库导入脚本
-  - `scripts/windows/` — Windows 平台脚本
-  - `scripts/linux/` — Linux 平台脚本
-  - `scripts/README.md` — 脚本使用说明
-- **技术选型文档**：`docs/01-技术选型明细.md`
-- **项目目录结构**：[project-structure.md](./project-structure.md)
+- **脚本目录**：`docs/scripts/` — Windows / Linux 一键启动脚本、数据库导入脚本
+  - `docs/scripts/windows/` — Windows 平台脚本
+  - `docs/scripts/linux/` — Linux 平台脚本
+  - `docs/scripts/README.md` — 脚本使用说明
+- **技术选型文档**：[tech-stack.md](../common/tech-stack.md)
 - **数据库设计**：[database-design.md](./database-design.md)
 - **Docker 部署**：[docker-compose.md](./docker-compose.md)
 
@@ -112,7 +111,7 @@ cd qingqi-ecity
 - [ ] MySQL 8.0 已启动，数据库 `qingqi` 已创建
 - [ ] schema.sql 已导入，表数量 = 25
 - [ ] data.sql 已导入，5 个演示账号可登录
-- [ ] Redis 已启动（可选，MVP 阶段可不启用）
+- [ ] Redis 已启动（推荐安装；未安装时后端自动降级，仅黑名单功能失效）
 - [ ] 后端 application.yml 数据库 / Redis 配置正确
 - [ ] 后端启动成功，端口 8080 无报错
 - [ ] 前端 .env 配置正确，`npm install` 无报错

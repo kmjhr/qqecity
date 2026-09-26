@@ -3,7 +3,7 @@ chcp 65001 >nul
 REM =============================================================
 REM 青启e城 · 01 数据库一键初始化（Windows）
 REM 功能：创建数据库 + 导入表结构 + 导入演示数据
-REM 幂等设计：schema.sql 使用 CREATE TABLE IF NOT EXISTS
+REM 幂等设计：schema.sql 使用 DROP TABLE IF EXISTS + CREATE TABLE（可重复导入，重导会清空并重建）
 REM         data.sql 使用 INSERT IGNORE
 REM =============================================================
 
@@ -20,7 +20,7 @@ echo.
 REM 检查 SQL 文件是否存在
 if not exist "%SCHEMA_SQL%" (
     echo ❌ 找不到 schema.sql：%SCHEMA_SQL%
-    echo    请确认脚本在 scripts\windows\ 目录下运行
+    echo    请确认脚本在 docs\scripts\windows\ 目录下运行
     pause
     exit /b 1
 )

@@ -2,7 +2,7 @@
 # =============================================================
 # 青启e城 · 01 数据库一键初始化（Linux）
 # 功能：创建数据库 + 导入表结构 + 导入演示数据
-# 幂等设计：schema.sql 使用 CREATE TABLE IF NOT EXISTS
+# 幂等设计：schema.sql 使用 DROP TABLE IF EXISTS + CREATE TABLE（可重复导入，重导会清空并重建）
 #         data.sql 使用 INSERT IGNORE
 # =============================================================
 
@@ -25,7 +25,7 @@ DATA_SQL_ABS="$(cd "$(dirname "$DATA_SQL")" && pwd)/$(basename "$DATA_SQL")"
 
 if [ ! -f "$SCHEMA_SQL_ABS" ]; then
     echo "❌ 找不到 schema.sql：$SCHEMA_SQL_ABS"
-    echo "   请确认脚本在 scripts/linux/ 目录下运行"
+    echo "   请确认脚本在 docs/scripts/linux/ 目录下运行"
     exit 1
 fi
 

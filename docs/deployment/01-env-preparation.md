@@ -22,11 +22,11 @@
 | 软件 | 版本要求 | 用途 | 是否必须 |
 |------|----------|------|----------|
 | **JDK** | 17+ | 后端 Spring Boot 运行环境 | ✅ 必须 |
-| **Maven** | 3.6+ | 后端项目构建与依赖管理 | ⭕ 推荐（可用 IDE 内置或 Maven Wrapper） |
+| **Maven** | 3.6+ | 后端项目构建与依赖管理 | ⭕ 推荐（可用 IDE 内置 Maven，项目未内置 Wrapper） |
 | **Node.js** | 18+ | 前端 Vue 3 开发与构建环境 | ✅ 必须 |
 | **npm / pnpm** | npm 9+（随 Node） | 前端包管理 | ✅ 必须（随 Node 自带） |
 | **MySQL** | 8.0 | 项目数据库 | ✅ 必须 |
-| **Redis** | 6.0+ | 缓存服务（Token 黑名单、验证码等） | ⭕ 可选（MVP 阶段可不启用） |
+| **Redis** | 6.0+ | 缓存服务（Token 黑名单、验证码等） | ✅ 推荐安装（未安装时后端自动降级，仅黑名单功能失效） |
 | **Git** | 最新版 | 代码版本管理 | ✅ 必须 |
 | **IDE** | IDEA / VS Code | 代码开发工具 | ⭕ 推荐 |
 
@@ -53,7 +53,7 @@
 
 ### 2.2 Maven（可选）
 
-> 如果使用 IntelliJ IDEA，内置了 Maven，可以跳过此步。项目根目录也提供了 Maven Wrapper（`mvnw.cmd`）。
+> 如果使用 IntelliJ IDEA，内置了 Maven，可以跳过此步。项目未内置 Maven Wrapper，需使用系统 Maven 或 IDE。
 
 **下载地址：** <https://maven.apache.org/download.cgi>
 
@@ -83,7 +83,7 @@
 
 ### 2.4 MySQL 8.0
 
-详见 [mysql-deployment.md](./mysql-deployment.md) 第一章。
+详见 [database-services.md](./database-services.md) 第一章（MySQL 部分）。
 
 简要步骤：
 1. 下载 MySQL 8.0 ZIP 版或 Installer 版
@@ -91,9 +91,9 @@
 3. 初始化数据库，设置 root 密码为 `123456`（测试用）
 4. 启动 MySQL 服务
 
-### 2.5 Redis（可选）
+### 2.5 Redis（推荐安装）
 
-详见 [redis-deployment.md](./redis-deployment.md) 第二章。
+详见 [database-services.md](./database-services.md) 第二章（Redis 部分）。
 
 简要步骤：
 1. 下载 Redis for Windows（<https://github.com/tporadowski/redis/releases>）
@@ -184,7 +184,7 @@ source ~/.bashrc
 mvn -v
 ```
 
-> 也可以直接用项目自带的 Maven Wrapper：`./mvnw -v`
+> 项目未内置 Maven Wrapper，请使用系统 Maven：`mvn -v`。
 
 ### 3.3 Node.js 18+
 
@@ -214,11 +214,11 @@ npm -v
 
 ### 3.4 MySQL 8.0
 
-详见 [mysql-deployment.md](./mysql-deployment.md) 第二章。
+详见 [database-services.md](./database-services.md) 第一章（MySQL 部分）。
 
-### 3.5 Redis（可选）
+### 3.5 Redis（推荐安装）
 
-详见 [redis-deployment.md](./redis-deployment.md) 第三章。
+详见 [database-services.md](./database-services.md) 第二章（Redis 部分）。
 
 ### 3.6 Git
 
@@ -321,10 +321,10 @@ pnpm config set registry https://registry.npmmirror.com
 ## 环境检查清单
 
 - [ ] JDK 17+ 已安装，`java -version` 正常
-- [ ] Maven 已安装（或使用 IDE 内置 / Wrapper）
+- [ ] Maven 已安装（或使用 IDE 内置 Maven）
 - [ ] Node.js 18+ 已安装，`node -v` 正常
 - [ ] npm 可用，已配置淘宝镜像源
 - [ ] MySQL 8.0 已安装并启动
-- [ ] Redis 已安装并启动（可选）
+- [ ] Redis 已安装并启动（推荐安装；未安装时后端自动降级）
 - [ ] Git 已安装，用户信息已配置
 - [ ] IDE 已安装（IDEA / VS Code）
