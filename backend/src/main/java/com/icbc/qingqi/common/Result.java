@@ -2,36 +2,60 @@ package com.icbc.qingqi.common;
 
 import lombok.Data;
 
+import java.io.Serializable;
+
 /**
- * 统一返回结构，对应设计说明书 8.2 通用请求与返回格式
+ * 统一响应结果封装
+ * <p>
+ * 格式：{ code, message, data }
+ * 成功：code=0
+ * 失败：code!=0，message 携带错误说明
  */
 @Data
-public class Result<T> {
+public class Result<T> implements Serializable {
 
-    private int code;
+    /** 响应码：0 成功，非 0 失败 */
+    private Integer code;
+
+    /** 响应消息 */
     private String message;
+
+    /** 响应数据 */
     private T data;
 
-    public static <T> Result<T> ok(T data) {
-        Result<T> r = new Result<>();
-        r.setCode(ErrorCode.SUCCESS.getCode());
-        r.setMessage(ErrorCode.SUCCESS.getMessage());
-        r.setData(data);
-        return r;
+    private Result() {}
+
+    private Result(Integer code, String message, T data) {
+        this.code = code;
+        this.message = message;
+        this.data = data;
     }
 
-    public static <T> Result<T> ok() {
-        return ok(null);
+    // ---------- 成功 ----------
+
+    public static <T> Result<T> success() {
+        return new Result<>(ErrorCode.SUCCESS.getCode(), ErrorCode.SUCCESS.getMessage(), null);
     }
+
+    public static <T> Result<T> success(T data) {
+        return new Result<>(ErrorCode.SUCCESS.getCode(), ErrorCode.SUCCESS.getMessage(), data);
+    }
+
+    public static <T> Result<T> success(String message, T data) {
+        return new Result<>(ErrorCode.SUCCESS.getCode(), message, data);
+    }
+
+    // ---------- 失败 ----------
 
     public static <T> Result<T> fail(ErrorCode errorCode) {
-        return fail(errorCode.getCode(), errorCode.getMessage());
+        return new Result<>(errorCode.getCode(), errorCode.getMessage(), null);
     }
 
-    public static <T> Result<T> fail(int code, String message) {
-        Result<T> r = new Result<>();
-        r.setCode(code);
-        r.setMessage(message);
-        return r;
+    public static <T> Result<T> fail(ErrorCode errorCode, String message) {
+        return new Result<>(errorCode.getCode(), message, null);
+    }
+
+    public static <T> Result<T> fail(Integer code, String message) {
+        return new Result<>(code, message, null);
     }
 }

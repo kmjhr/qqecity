@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>预算消费 - 青启e城</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <!-- 顶部导航栏 -->
+  <nav class="navbar">
+    <div class="navbar-inner">
+      <div class="navbar-left">
+        <a href="index.html" class="logo">
+          <div class="logo-icon">青</div>
+          <span>青启e城</span>
+        </a>
+        <div class="nav-menu">
+          <a href="index.html" data-page="home">首页</a>
+          <a href="guarantee.html" data-page="guarantee">安居保函</a>
+          <a href="loan.html" data-page="loan">青创e贷</a>
+          <a href="budget.html" data-page="budget" class="active">预算消费</a>
+          <a href="safety.html" data-page="safety">金融安全</a>
+        </div>
+      </div>
+      <div class="navbar-right">
+        <a href="message.html" class="notification-icon">
+          🔔
+          <span class="notification-dot"></span>
+        </a>
+        <div class="user-area">
+          <div class="user-avatar">刘</div>
+          <span class="user-name">刘小明</span>
+          <div class="user-dropdown">
+            <a href="profile.html">个人中心</a>
+            <a href="login.html">退出登录</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 内容区 -->
+  <div class="page-container">
+    <div class="page-header">
+      <h1>
+        💰 碎片消费治理
+        <span class="demo-badge">演示系统</span>
+      </h1>
+      <p class="subtitle">智能预算管理，心愿储蓄计划，让每一分钱都花在刀刃上。</p>
+    </div>
+
+    <!-- 本月预算概览 -->
+    <div class="card" style="margin-bottom: 24px;">
+      <div class="budget-overview">
+        <div class="budget-chart">
+          <!-- SVG 环形进度条 -->
+          <svg width="160" height="160" viewBox="0 0 160 160">
+            <defs>
+              <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+                <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+              </linearGradient>
+            </defs>
+            <circle cx="80" cy="80" r="70" fill="none" stroke="#f0f0f0" stroke-width="12"/>
+            <circle id="ringFill" cx="80" cy="80" r="70" fill="none" stroke="url(#gradient)" 
+                    stroke-width="12" stroke-linecap="round"
+                    stroke-dasharray="440" stroke-dashoffset="158.4"
+                    transform="rotate(-90 80 80)"/>
+          </svg>
+          <div style="position: relative; margin-top: -110px; text-align: center; pointer-events: none;">
+            <div style="font-size: 24px; font-weight: 700; color: var(--primary);">64%</div>
+            <div style="font-size: 12px; color: var(--text-secondary);">已用比例</div>
+          </div>
+        </div>
+        <div class="budget-summary">
+          <h3>本月预算概览（9月）</h3>
+          <div class="budget-stats-row">
+            <div class="budget-stat-item">
+              <div class="label">总预算</div>
+              <div class="value primary">¥5,000</div>
+            </div>
+            <div class="budget-stat-item">
+              <div class="label">已支出</div>
+              <div class="value">¥3,200</div>
+            </div>
+            <div class="budget-stat-item">
+              <div class="label">剩余</div>
+              <div class="value success">¥1,800</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="budget-actions">
+        <button class="btn btn-primary btn-sm">⚙️ 设置预算</button>
+        <button class="btn btn-outline btn-sm">💸 结余转储蓄</button>
+      </div>
+    </div>
+
+    <!-- 分类预算 -->
+    <div class="card" style="margin-bottom: 24px;">
+      <div class="section-title" style="margin-bottom: 16px;">
+        <span>📊</span>
+        <span>分类预算</span>
+      </div>
+      <div class="category-list" id="categoryList">
+        <!-- 由 JS 渲染 -->
+      </div>
+    </div>
+
+    <!-- 心愿储蓄 -->
+    <div class="card savings-section">
+      <div class="section-title" style="margin-bottom: 16px;">
+        <span>🎯</span>
+        <span>心愿储蓄</span>
+        <button class="btn btn-outline btn-sm" style="margin-left: auto;">+ 新增心愿</button>
+      </div>
+      <div class="savings-grid" id="savingsGrid">
+        <!-- 由 JS 渲染 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- 页脚 -->
+  <footer class="footer">
+    © 2025 青启e城 · 面向青年的城市新场景金融服务平台
+    <span class="demo-tag">演示系统</span>
+  </footer>
+
+  <script src="assets/mock.js"></script>
+  <script>
+    // 渲染分类预算
+    function renderCategoryBudgets() {
+      const list = document.getElementById('categoryList');
+      list.innerHTML = MockData.categoryBudgets.map(c => {
+        const percent = Math.round((c.spent / c.budget) * 100);
+        return `
+          <div class="category-item">
+            <div class="category-icon" style="background: ${c.color}20; color: ${c.color};">
+              ${c.icon}
+            </div>
+            <div class="category-info">
+              <div class="category-name">
+                <span>${c.name}</span>
+                <span class="amount">¥${formatMoney(c.budget)}</span>
+              </div>
+              <div class="category-progress">
+                <div class="category-progress-fill" style="width: ${percent}%; background: ${c.color};"></div>
+              </div>
+              <div class="category-detail">
+                <span>已用 ¥${formatMoney(c.spent)}</span>
+                <span>剩余 ¥${formatMoney(c.budget - c.spent)}</span>
+                <span>${percent}%</span>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 渲染心愿储蓄
+    function renderSavingsGoals() {
+      const grid = document.getElementById('savingsGrid');
+      grid.innerHTML = MockData.savingsGoals.map(s => `
+        <div class="savings-card">
+          <h4>🎁 ${s.name}</h4>
+          <div class="savings-amount">
+            <span>已存 / 目标</span>
+            <span><strong>¥${formatMoney(s.saved)}</strong> / ¥${formatMoney(s.target)}</span>
+          </div>
+          <div class="category-progress" style="margin-bottom: 8px;">
+            <div class="category-progress-fill" style="width: ${s.percent}%; background: linear-gradient(90deg, var(--accent-green), var(--primary));"></div>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--text-secondary);">
+            <span>进度 ${s.percent}%</span>
+            <button class="btn btn-primary btn-sm" style="padding: 4px 12px; font-size: 12px;">存入</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // 初始化
+    renderCategoryBudgets();
+    renderSavingsGoals();
+    setActiveNav('budget');
+  </script>
+</body>
+</html>

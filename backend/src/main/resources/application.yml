@@ -1,31 +1,73 @@
 server:
-  port: 8080
+  port: 8082
+  servlet:
+    context-path: /api
 
 spring:
   application:
-    name: qingqi-ecity
+    name: qingqi-backend
+
+  # 数据源
   datasource:
-    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DB:qingqi}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
-    username: ${MYSQL_USER:root}
-    password: ${MYSQL_PASSWORD:123456}
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/qingqi?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:root123456}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
+  # Redis（JWT 黑名单 + 缓存）
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: 6379
+      password: ${SPRING_DATA_REDIS_PASSWORD:}
+      timeout: 3000ms
+
+  # JSON 序列化配置
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+    default-property-inclusion: non_null
+
+# MyBatis-Plus
 mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
   configuration:
     map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
   global-config:
-    banner: false
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
 
-qingqi:
-  jwt:
-    # 演示用密钥，生产环境必须通过环境变量注入并更换
-    secret: ${QINGQI_JWT_SECRET:qingqi-ecity-demo-jwt-secret-key-please-change-2026}
-    expire-days: 7
+# JWT 配置
+jwt:
+  # 密钥（Base64编码，生产环境请通过环境变量注入）
+  secret: ${JWT_SECRET:cWluZ3FpLWVjaXR5LWp3dC1zZWNyZXQta2V5LTIwMjQ=}
+  # 访问令牌有效期（秒）- 2小时
+  access-token-ttl: 7200
+  # 刷新令牌有效期（秒）- 7天
+  refresh-token-ttl: 604800
+  # Token 前缀
+  token-prefix: "Bearer "
+  # 请求头字段
+  header: Authorization
 
+# Knife4j 接口文档
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
 springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
   swagger-ui:
+    enabled: true
     path: /swagger-ui.html
 
+# 日志
 logging:
   level:
-    com.icbc.qingqi: info
+    com.icbc.qingqi: debug

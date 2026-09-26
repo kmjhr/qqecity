@@ -1,33 +1,37 @@
 package com.icbc.qingqi.security;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.stereotype.Component;
 
 /**
- * 演示用密码散列（SHA-256）。
- * 注意：正式化必须替换为加盐算法（如 BCrypt）并通过安全评审。
+ * 密码工具类
+ * <p>
+ * 统一封装 BCrypt 密码加密与校验，避免在业务代码中散落 new BCryptPasswordEncoder()
+ * 只引入 Spring Security Crypto 的加密器，不引入完整 Spring Security
  */
-public final class PasswordUtil {
+@Component
+public class PasswordUtil {
 
-    private PasswordUtil() {
+    private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
+
+    /**
+     * 加密明文密码
+     *
+     * @param rawPassword 明文密码
+     * @return BCrypt 哈希后的密码
+     */
+    public String encode(String rawPassword) {
+        return encoder.encode(rawPassword);
     }
 
-    public static String hash(String raw) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] bytes = digest.digest(raw.getBytes(StandardCharsets.UTF_8));
-            StringBuilder sb = new StringBuilder();
-            for (byte b : bytes) {
-                sb.append(String.format("%02x", b));
-            }
-            return sb.toString();
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 不可用", e);
-        }
-    }
-
-    public static boolean matches(String raw, String hashed) {
-        return hash(raw).equalsIgnoreCase(hashed);
+    /**
+     * 校验明文密码是否与哈希密码匹配
+     *
+     * @param rawPassword     明文密码
+     * @param encodedPassword 哈希密码
+     * @return true 匹配，false 不匹配
+     */
+    public boolean matches(String rawPassword, String encodedPassword) {
+        return encoder.matches(rawPassword, encodedPassword);
     }
 }

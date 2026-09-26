@@ -1,45 +1,60 @@
 package com.icbc.qingqi.security;
 
-import com.icbc.qingqi.common.BizException;
-import com.icbc.qingqi.common.ErrorCode;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
- * 登录上下文（ThreadLocal）
+ * 当前登录用户上下文
+ * <p>
+ * 通过 ThreadLocal 存储，在一次请求内任意位置可获取当前登录用户信息
+ * 由 JwtAuthFilter 在请求进入时设置，响应返回前清除
  */
-public final class UserContext {
+public class UserContext {
 
-    private static final ThreadLocal<Long> USER_ID = new ThreadLocal<>();
-    private static final ThreadLocal<String> USER_NAME = new ThreadLocal<>();
+    private static final ThreadLocal<CurrentUser> CURRENT_USER = new ThreadLocal<>();
 
-    private UserContext() {
+    public static void set(CurrentUser user) {
+        CURRENT_USER.set(user);
     }
 
-    public static void set(Long userId, String name) {
-        USER_ID.set(userId);
-        USER_NAME.set(name);
+    public static CurrentUser get() {
+        return CURRENT_USER.get();
     }
 
     public static Long getUserId() {
-        return USER_ID.get();
+        CurrentUser user = CURRENT_USER.get();
+        return user != null ? user.getUserId() : null;
     }
 
-    public static String getUserName() {
-        return USER_NAME.get();
+    public static String getUsername() {
+        CurrentUser user = CURRENT_USER.get();
+        return user != null ? user.getUsername() : null;
     }
 
-    /**
-     * 获取当前登录用户，未登录时抛出 2001
-     */
-    public static Long requireUserId() {
-        Long id = USER_ID.get();
-        if (id == null) {
-            throw new BizException(ErrorCode.UNAUTHORIZED);
-        }
-        return id;
+    public static String getRole() {
+        CurrentUser user = CURRENT_USER.get();
+        return user != null ? user.getRole() : null;
+    }
+
+    public static boolean isAdmin() {
+        CurrentUser user = CURRENT_USER.get();
+        return user != null && "ADMIN".equals(user.getRole());
     }
 
     public static void clear() {
-        USER_ID.remove();
-        USER_NAME.remove();
+        CURRENT_USER.remove();
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CurrentUser {
+        /** 用户 ID */
+        private Long userId;
+        /** 用户名 / 手机号 */
+        private String username;
+        /** 角色：USER / ADMIN */
+        private String role;
     }
 }

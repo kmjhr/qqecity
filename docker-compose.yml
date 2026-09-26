@@ -1,44 +1,83 @@
+# ============================================================
+# 青启e城 - 基础骨架 Docker Compose 编排
+# 服务：MySQL 8 + Redis 7 + 后端 + 用户前端 + 管理前端
+# 启动：docker compose up -d --build
+# ============================================================
+
 services:
+  # ---------- 数据库 ----------
   mysql:
     image: mysql:8.0
-    container_name: qingqi-mysql
+    container_name: qqecity-mysql
+    restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: qingqi123
+      MYSQL_ROOT_PASSWORD: root123456
       MYSQL_DATABASE: qingqi
+      MYSQL_USER: qingqi
+      MYSQL_PASSWORD: qingqi123
       TZ: Asia/Shanghai
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
-      - ./backend/src/main/resources/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
-      - ./backend/src/main/resources/db/data.sql:/docker-entrypoint-initdb.d/02-data.sql:ro
       - mysql-data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-pqingqi123"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
+      - ./backend/sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./backend/sql/data.sql:/docker-entrypoint-initdb.d/02-data.sql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
 
+  # ---------- 缓存 ----------
+  redis:
+    image: redis:7-alpine
+    container_name: qqecity-redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --requirepass redis123
+
+  # ---------- 后端 API ----------
   backend:
-    build: ./backend
-    container_name: qingqi-backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: qqecity-backend
+    restart: unless-stopped
     depends_on:
-      mysql:
-        condition: service_healthy
+      - mysql
+      - redis
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/qingqi?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
-      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_USERNAME: qingqi
       SPRING_DATASOURCE_PASSWORD: qingqi123
-      QINGQI_JWT_SECRET: qingqi-ecity-demo-jwt-secret-key-please-change-in-production-2026
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PASSWORD: redis123
     ports:
-      - "8080:8080"
+      - "8082:8080"
 
-  frontend:
-    build: ./frontend
-    container_name: qingqi-frontend
+  # ---------- 用户前端 ----------
+  user-web:
+    build:
+      context: ./user-web
+      dockerfile: Dockerfile
+    container_name: qqecity-user-web
+    restart: unless-stopped
     depends_on:
       - backend
     ports:
-      - "8088:80"
+      - "8081:80"
+
+  # ---------- 管理前端 ----------
+  admin-web:
+    build:
+      context: ./admin-web
+      dockerfile: Dockerfile
+    container_name: qqecity-admin-web
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8083:80"
 
 volumes:
   mysql-data:
+  redis-data:
