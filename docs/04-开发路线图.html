@@ -1,0 +1,63 @@
+<html style="margin:0;padding:0;">
+<title>青启e城演示系统 开发路线图（Sprint 0—8）</title>
+<div style="width:100%;box-sizing:border-box;font-family:system-ui,'PingFang SC','Microsoft YaHei',sans-serif;background:#fff;color:#1f2329;padding:20px 16px;line-height:1.5;">
+  <div style="font-size:20px;font-weight:700;">青启e城演示系统 · 开发路线图（Sprint 0—8）</div>
+  <div style="font-size:14px;color:#5a616b;margin:6px 0 16px;">一期 MVP 演示闭环（第 1—14 周）→ 二期数据联通（第 15—18 周）→ 三期联调上线（第 19—20 周）</div>
+
+  <!-- 阶段条 + 周刻度 -->
+  <div style="border:1px solid #d9dee6;border-radius:8px;padding:12px;margin-bottom:14px;">
+    <div style="display:flex;height:34px;border-radius:6px;overflow:hidden;">
+      <div style="width:70%;background:#deebff;border-right:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:#1a3f8f;">一期 MVP · Sprint 0—5（1—14周）</div>
+      <div style="width:20%;background:#e7f6e9;border-right:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:#1f6b33;">二期 · S6—7（15—18周）</div>
+      <div style="width:10%;background:#fff3d6;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:#8a5a00;">三期 · S8（19—20周）</div>
+    </div>
+    <div style="display:flex;margin-top:6px;font-size:12px;color:#5a616b;">
+      <div style="width:70%;display:flex;justify-content:space-between;"><span>第1周</span><span>第7周</span><span>第14周</span></div>
+      <div style="width:20%;display:flex;justify-content:space-between;"><span>第15周</span><span>第18周</span></div>
+      <div style="width:10%;display:flex;justify-content:space-between;"><span>第19周</span><span>第20周</span></div>
+    </div>
+  </div>
+
+  <!-- 阶段卡片 -->
+  <div style="display:flex;flex-direction:column;gap:12px;">
+
+    <div style="border:1px solid #c7d8f8;border-left:6px solid #3b6fe0;border-radius:8px;padding:14px;">
+      <div style="font-size:16px;font-weight:700;color:#1a3f8f;">一期 · MVP 可演示闭环</div>
+      <div style="font-size:14px;color:#5a616b;margin:4px 0 10px;">目标：注册登录后走通「保函→贷款→预算→反诈」演示主链路，五大模块均有可点入口；第14周达成 MVP 里程碑。</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;">
+        <div style="border:1px solid #b9cdf5;background:#f2f6ff;border-radius:6px;padding:8px 10px;width:200px;"><div style="font-size:14px;font-weight:600;">S0 · 第1周</div><div style="font-size:13px;color:#444;">环境就绪：仓库、docker-compose、CI 占位</div></div>
+        <div style="border:1px solid #b9cdf5;background:#f2f6ff;border-radius:6px;padding:8px 10px;width:200px;"><div style="font-size:14px;font-weight:600;">S1 · 第2—3周</div><div style="font-size:13px;color:#444;">用户注册/登录/JWT、消息中心、主框架</div></div>
+        <div style="border:1px solid #b9cdf5;background:#f2f6ff;border-radius:6px;padding:8px 10px;width:200px;"><div style="font-size:14px;font-weight:600;">S2 · 第4—6周</div><div style="font-size:13px;color:#444;">安居保函：申请→房东确认→AI复审→出函</div></div>
+        <div style="border:1px solid #b9cdf5;background:#f2f6ff;border-radius:6px;padding:8px 10px;width:200px;"><div style="font-size:14px;font-weight:600;">S3 · 第7—9周</div><div style="font-size:13px;color:#444;">青创e贷：B类预审（不查征信）、受托支付模拟</div></div>
+        <div style="border:1px solid #b9cdf5;background:#f2f6ff;border-radius:6px;padding:8px 10px;width:200px;"><div style="font-size:14px;font-weight:600;">S4 · 第10—11周</div><div style="font-size:13px;color:#444;">经营赋能：记账/现金流报表占位接口</div></div>
+        <div style="border:1px solid #3b6fe0;background:#e4edff;border-radius:6px;padding:8px 10px;width:200px;"><div style="font-size:14px;font-weight:600;">S5 · 第12—14周 ★</div><div style="font-size:13px;color:#444;">消费治理＋金融安全页＋消息页，集成联调</div></div>
+      </div>
+    </div>
+
+    <div style="border:1px solid #bfe3c6;border-left:6px solid #2f9e44;border-radius:8px;padding:14px;">
+      <div style="font-size:16px;font-weight:700;color:#1f6b33;">二期 · 数据联通与安全增强（第 15—18 周）</div>
+      <div style="font-size:14px;color:#5a616b;margin:4px 0 10px;">目标：补齐安全能力与数据画像，形成跨场景「青年成长信用画像」闭环。</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;">
+        <div style="border:1px solid #bfe3c6;background:#f0faf1;border-radius:6px;padding:8px 10px;width:200px;"><div style="font-size:14px;font-weight:600;">S6 · 第15周</div><div style="font-size:13px;color:#444;">征信解读占位、高频借贷预警、逾期预判占位</div></div>
+        <div style="border:1px solid #bfe3c6;background:#f0faf1;border-radius:6px;padding:8px 10px;width:200px;"><div style="font-size:14px;font-weight:600;">S7 · 第16—18周</div><div style="font-size:13px;color:#444;">数据中台联通、成长画像、RAG 对话（探索性）</div></div>
+      </div>
+    </div>
+
+    <div style="border:1px solid #f0ddb0;border-left:6px solid #e8a33d;border-radius:8px;padding:14px;">
+      <div style="font-size:16px;font-weight:700;color:#8a5a00;">三期 · 联调与试点上线（第 19—20 周）</div>
+      <div style="font-size:14px;color:#5a616b;margin:4px 0 10px;">目标：可公网访问的稳定演示环境，支持课程答辩与试点演示。</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;">
+        <div style="border:1px solid #f0ddb0;background:#fffaf0;border-radius:6px;padding:8px 10px;width:200px;"><div style="font-size:14px;font-weight:600;">S8 · 第19—20周</div><div style="font-size:13px;color:#444;">安全测试、性能压测、Nginx 部署、试点演示</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 里程碑 -->
+  <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:14px;">
+    <div style="flex:1;min-width:220px;border:1px dashed #3b6fe0;border-radius:8px;padding:10px;background:#f7faff;font-size:14px;"><span style="font-weight:700;color:#1a3f8f;">★ 里程碑（第14周）：</span>MVP 演示闭环——注册 → 保函 → 预审贷款 → 设预算 → 分级提醒 → 反诈甄别，一条主链路可走通。</div>
+    <div style="flex:1;min-width:220px;border:1px dashed #e8a33d;border-radius:8px;padding:10px;background:#fffcf5;font-size:14px;"><span style="font-weight:700;color:#8a5a00;">★ 里程碑（第20周）：</span>试点上线——安全/性能测试达标，公网可访问的演示环境就绪。</div>
+  </div>
+
+  <div style="font-size:12px;color:#8a919c;margin-top:12px;">注：排期为目标排期，对齐设计说明书附录 A（Sprint 0—8）；实际工期受开发资源与联调影响，按里程碑校准。演示数据均为模拟，不构成真实金融服务承诺。</div>
+</div>
+</html>
