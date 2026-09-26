@@ -124,7 +124,7 @@ scripts/linux/99-start-all.sh
 | 后端 API | `http://localhost:8080/api` |
 | 用户前端 | `http://localhost:8081` |
 | 管理前端 | `http://localhost:8082` |
-| MySQL | `127.0.0.1:3306` |
+| MySQL | `127.0.0.1:3307`（宿主机映射，容器内 3306） |
 | Redis | `127.0.0.1:6379` |
 
 ---

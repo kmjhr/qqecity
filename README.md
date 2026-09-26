@@ -162,7 +162,7 @@ docker compose up -d --build
 - 用户前端：http://localhost:8081
 - 管理前端：http://localhost:8082
 - 后端 API：http://localhost:8080/api（接口文档：http://localhost:8080/api/doc.html）
-- MySQL：localhost:3306（root / 123456）
+- MySQL：localhost:3307（root / 123456；Docker 宿主机映射端口，容器内为 3306）
 - Redis：localhost:6379（无密码）
 
 > 详细说明见 [Docker 部署文档](docs/deployment/docker-compose.md)

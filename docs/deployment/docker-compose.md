@@ -8,7 +8,7 @@
 
 | 服务 | 镜像/构建 | 容器名 | 端口 | 说明 |
 | --- | --- | --- | --- | --- |
-| mysql | mysql:8.0 | qqecity-mysql | 3306:3306 | 数据库，自动初始化 schema + 演示数据 |
+| mysql | mysql:8.0 | qqecity-mysql | 3307:3306 | 数据库（宿主机 3307，容器内 3306），自动初始化 schema + 演示数据 |
 | redis | redis:7-alpine | qqecity-redis | 6379:6379 | JWT 黑名单（backend 运行时依赖） |
 | backend | 构建自 ./backend/Dockerfile | qqecity-backend | 8080:8080 | Spring Boot 后端 API |
 | user-web | 构建自 ./user-web/Dockerfile | qqecity-user-web | 8081:80 | 用户端前端（Nginx 静态托管） |
@@ -38,8 +38,10 @@ docker compose up -d --build
 | 管理端 | http://localhost:8082 | 运营/管理员使用的后台 |
 | 后端 API | http://localhost:8080/api | Spring Boot 服务（接口统一 /api 前缀） |
 | 接口文档 | http://localhost:8080/api/doc.html | Knife4j 接口在线文档 |
-| MySQL | localhost:3306 | 数据库（用户：root / 密码：123456） |
+| MySQL | localhost:3307 | 数据库（用户：root / 密码：123456） |
 | Redis | localhost:6379 | 缓存（无密码） |
+
+> 端口说明：MySQL 宿主机映射为 **3307**（容器内仍为 3306），避免与本机已安装的 MySQL 服务（占用 3306）冲突；后端容器通过内部网络 `mysql:3306` 连接，不受影响。
 
 ## 常用命令
 
