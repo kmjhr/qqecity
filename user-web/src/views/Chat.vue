@@ -68,8 +68,8 @@
         </div>
       </div>
 
-      <!-- 常见疑问推荐（淘宝客服风：点击即发送） -->
-      <div v-if="!sending && messages.length <= 2" class="quick-asks">
+      <!-- 常见疑问推荐（淘宝客服风：点击即发送，始终展示） -->
+      <div v-if="!sending" class="quick-asks">
         <div class="quick-title">猜你想问</div>
         <div class="quick-list">
           <el-tag
