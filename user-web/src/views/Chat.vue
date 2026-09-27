@@ -5,9 +5,13 @@
         <div class="card-header">
           <div class="header-left">
             <span>智能对话引擎</span>
-            <el-tag v-if="engineStatus" :type="engineStatus.agentAvailable ? 'success' : 'info'" size="small">
-              {{ engineStatus.activeEngine === 'agent' ? 'AI 增强（agent）' : '本地模式（local）' }}
-            </el-tag>
+            <el-segmented
+              v-model="selectedMode"
+              :options="engineOptions"
+              size="small"
+              style="margin-left: 4px"
+              @change="onModeChange"
+            />
             <el-tag type="warning" size="small">模拟对话引擎</el-tag>
           </div>
           <el-popconfirm title="确定清空全部历史对话？" @confirm="handleClear">
@@ -90,6 +94,17 @@ const messages = ref([])
 const sending = ref(false)
 const historyLoading = ref(false)
 const engineStatus = ref(null)
+const selectedMode = ref('local')
+const engineOptions = [
+  { label: '本地模式', value: 'local' },
+  { label: 'AI 增强', value: 'agent' },
+]
+
+function onModeChange(val) {
+  if (val === 'agent' && engineStatus.value && !engineStatus.value.agentAvailable) {
+    ElMessage.warning('AI 增强暂不可用（未配置 LLM），回答将自动降级为本地引擎')
+  }
+}
 const msgBoxRef = ref(null)
 
 function engineModeName(mode) {
@@ -109,6 +124,9 @@ function formatTime(t) {
 async function loadEngineStatus() {
   try {
     engineStatus.value = await getEngineStatus()
+    if (engineStatus.value && (engineStatus.value.activeEngine === 'agent' || engineStatus.value.activeEngine === 'local')) {
+      selectedMode.value = engineStatus.value.activeEngine
+    }
   } catch (e) { /* 忽略 */ }
 }
 
@@ -135,7 +153,7 @@ async function handleSend() {
   sending.value = true
   await scrollBottom()
   try {
-    const reply = await sendMessage(text)
+    const reply = await sendMessage(text, selectedMode.value)
     messages.value.push(reply)
     await scrollBottom()
   } finally {

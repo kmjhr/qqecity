@@ -69,8 +69,15 @@ public class ChatService {
         // 1. 本地 RAG 召回（local 与 agent 都先召回）
         List<ChatSourceVO> sources = ragEngine.recall(userMsg, scene);
 
-        // 2. 决策引擎模式
-        boolean agentOn = "agent".equalsIgnoreCase(configuredEngine) && llmClient.isAvailable();
+        // 2. 决策引擎模式：请求级 mode 优先（local/agent），缺省用服务端全局配置 chat.engine
+        String effectiveEngine = configuredEngine;
+        if (dto.getMode() != null && !dto.getMode().isBlank()) {
+            String m = dto.getMode().trim().toLowerCase();
+            if ("local".equals(m) || "agent".equals(m)) {
+                effectiveEngine = m;
+            }
+        }
+        boolean agentOn = "agent".equalsIgnoreCase(effectiveEngine) && llmClient.isAvailable();
         String activeEngine;
         String answer;
         if (agentOn) {

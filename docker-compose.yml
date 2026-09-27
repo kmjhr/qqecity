@@ -58,6 +58,8 @@ services:
       CHAT_ENGINE: ${CHAT_ENGINE:-local}
       CHAT_LLM_ENDPOINT: ${CHAT_LLM_ENDPOINT:-https://ark.cn-beijing.volces.com/api/v3/chat/completions}
       CHAT_LLM_MODEL: ${CHAT_LLM_MODEL:-doubao-pro-32k}
+      # 对话引擎 System Prompt 覆盖（可选）：SPRING_APPLICATION_JSON 优先级高于 application.yml，改 prompt 无需重建镜像
+      SPRING_APPLICATION_JSON: ${SPRING_APPLICATION_JSON:-}
     ports:
       - "8080:8080"
 

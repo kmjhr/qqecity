@@ -12,9 +12,9 @@ export function getEngineStatus() {
   return request.get('/v1/chat/engine-status')
 }
 
-/** 发送消息 */
-export function sendMessage(content) {
-  return request.post('/v1/chat/messages', { message: content })
+/** 发送消息（mode 可选：local / agent，不传则用服务端默认） */
+export function sendMessage(content, mode) {
+  return request.post('/v1/chat/messages', mode ? { message: content, mode } : { message: content })
 }
 
 /** 查询历史对话（最近 20 条） */
