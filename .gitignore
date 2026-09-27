@@ -50,3 +50,6 @@ application-dev.yml
 # JVM 堆转储 / 崩溃分析（勿提交）
 *.hprof
 *.dump
+
+# 测试基建（含 JWT，勿提交）
+.test-tokens.json

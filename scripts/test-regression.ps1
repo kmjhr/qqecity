@@ -1,4 +1,53 @@
-﻿# 修复回归验证：D2/D3/D5/D7 + chat
+﻿# ---- 中文显示/读写统一 UTF-8（避免终端乱码）----
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+cmd /c chcp 65001 | Out-Null
+# ---- UTF-8 响应解码修复：遮蔽 Invoke-RestMethod，改用 curl.exe（PS5.1 按 Latin-1 误解码 UTF-8 响应 + 双引号参数丢失 的根治方案）----
+function Invoke-RestMethod {
+    param(
+        [Parameter(Mandatory = $true)][string]$Uri,
+        [string]$Method = 'GET',
+        [hashtable]$Headers = @{},
+        [object]$Body,
+        [string]$ContentType = 'application/json; charset=utf-8',
+        [int]$TimeoutSec = 0
+    )
+    $Method = $Method.ToUpperInvariant()
+    $bodyStr = $null
+    if ($null -ne $Body) {
+        if ($Body -is [byte[]]) { $bodyStr = [Text.Encoding]::UTF8.GetString($Body) }
+        elseif ($Body -is [string]) { $bodyStr = $Body }
+        else { $bodyStr = $Body | ConvertTo-Json -Compress }
+    }
+    $argsList = @('-s')
+    if ($null -ne $bodyStr) {
+        $argsList += @('-d', '@-')
+    } elseif ($Method -eq 'POST') {
+        $argsList += @('-X', 'POST')
+    }
+    if ($TimeoutSec -gt 0) { $argsList += @('--max-time', "$TimeoutSec") }
+    $argsList += @('-H', 'Content-Type: application/json; charset=utf-8')
+    foreach ($k in $Headers.Keys) {
+        $argsList += @('-H', ($k + ': ' + $Headers[$k]))
+    }
+    $argsList += $Uri
+    if ($null -ne $bodyStr) {
+        $raw = ($bodyStr | & curl.exe @argsList) -join ''
+    } else {
+        $raw = (& curl.exe @argsList) -join ''
+    }
+    if ([string]::IsNullOrWhiteSpace($raw)) { return $null }
+    if ($raw -match '\u00e5|Ã|â€|æ') {
+        try {
+            $bytes = [Text.Encoding]::GetEncoding(28591).GetBytes($raw)
+            $fixed = [Text.Encoding]::UTF8.GetString($bytes)
+            if ($fixed -notmatch '\uFFFD') { $raw = $fixed }
+        } catch {}
+    }
+    return ($raw | ConvertFrom-Json)
+}
+
+# 修复回归验证：D2/D3/D5/D7 + chat
 $base='http://localhost:8080/api'
 $t = Get-Content D:\codex\codex-data\qingqi-ecity\.test-tokens.json -Raw | ConvertFrom-Json
 # 重新登录拿最新 token（后端已重建，旧 token 仍有效但保险起见）
@@ -15,7 +64,7 @@ function Call($n,$m,$u,$h,$b){
     $p=@{Uri=$base+$u;Method=$m;Headers=$h;ContentType='application/json; charset=utf-8';TimeoutSec=12}
     if($b){$p.Body=$b}
     $r=Invoke-RestMethod @p
-    $d=($r.data|ConvertTo-Json -Depth 4 -Compress)
+    $d = if ($null -ne $r.data) { $r.data | ConvertTo-Json -Depth 4 -Compress } else { '(data=null)' }
     "{0,-40} code={1,-5} {2}" -f $n,$r.code,$d.Substring(0,[Math]::Min(150,$d.Length))
   } catch { "{0,-40} ERR {1}" -f $n,$_.Exception.Message }
 }
@@ -48,3 +97,5 @@ Call 'profile.get'                    GET '/v1/profile' $H
 Call 'policy.match'                   GET '/v1/policy/match' $He
 Call 'loan.credit(entrepreneur)'      GET '/v1/loan/credit' $He
 Call 'finance.recommend'              GET '/v1/consumption/finance-product/recommend' $H
+
+

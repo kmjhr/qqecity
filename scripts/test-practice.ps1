@@ -2,6 +2,53 @@
 # 覆盖：开始/回合（识破、被诱骗、中性）/结束/历史/回放 + 异常（未登录/越权/类型错/重复提交/空参）
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+cmd /c chcp 65001 | Out-Null
+# ---- UTF-8 响应解码修复：遮蔽 Invoke-RestMethod，改用 curl.exe（PS5.1 按 Latin-1 误解码 UTF-8 响应 + 双引号参数丢失 的根治方案）----
+function Invoke-RestMethod {
+    param(
+        [Parameter(Mandatory = $true)][string]$Uri,
+        [string]$Method = 'GET',
+        [hashtable]$Headers = @{},
+        [object]$Body,
+        [string]$ContentType = 'application/json; charset=utf-8',
+        [int]$TimeoutSec = 0
+    )
+    $Method = $Method.ToUpperInvariant()
+    $bodyStr = $null
+    if ($null -ne $Body) {
+        if ($Body -is [byte[]]) { $bodyStr = [Text.Encoding]::UTF8.GetString($Body) }
+        elseif ($Body -is [string]) { $bodyStr = $Body }
+        else { $bodyStr = $Body | ConvertTo-Json -Compress }
+    }
+    $argsList = @('-s')
+    if ($null -ne $bodyStr) {
+        $argsList += @('-d', '@-')
+    } elseif ($Method -eq 'POST') {
+        $argsList += @('-X', 'POST')
+    }
+    if ($TimeoutSec -gt 0) { $argsList += @('--max-time', "$TimeoutSec") }
+    $argsList += @('-H', 'Content-Type: application/json; charset=utf-8')
+    foreach ($k in $Headers.Keys) {
+        $argsList += @('-H', ($k + ': ' + $Headers[$k]))
+    }
+    $argsList += $Uri
+    if ($null -ne $bodyStr) {
+        $raw = ($bodyStr | & curl.exe @argsList) -join ''
+    } else {
+        $raw = (& curl.exe @argsList) -join ''
+    }
+    if ([string]::IsNullOrWhiteSpace($raw)) { return $null }
+    if ($raw -match '\u00e5|Ã|â€|æ') {
+        try {
+            $bytes = [Text.Encoding]::GetEncoding(28591).GetBytes($raw)
+            $fixed = [Text.Encoding]::UTF8.GetString($bytes)
+            if ($fixed -notmatch '\uFFFD') { $raw = $fixed }
+        } catch {}
+    }
+    return ($raw | ConvertFrom-Json)
+}
+
 $base = 'http://localhost:8080/api'
 
 function Post-Json($url, $token, $body) {
@@ -86,3 +133,5 @@ $r5 = Post-Json "$base/v1/safety/scenario/practice/$prac/turn" $token @{ content
 Write-Host "== 已结束再 turn: code=$($r5.code) (期望 3001)"
 $r6 = Post-Json "$base/v1/safety/scenario/practice/$prac10/turn" $token @{ content = '' }
 Write-Host "== 空发言: code=$($r6.code) (期望 1001)"
+
+

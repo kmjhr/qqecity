@@ -1,3 +1,52 @@
+﻿# ---- 中文显示/读写统一 UTF-8（避免终端乱码）----
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+cmd /c chcp 65001 | Out-Null
+# ---- UTF-8 响应解码修复：遮蔽 Invoke-RestMethod，改用 curl.exe（PS5.1 按 Latin-1 误解码 UTF-8 响应 + 双引号参数丢失 的根治方案）----
+function Invoke-RestMethod {
+    param(
+        [Parameter(Mandatory = $true)][string]$Uri,
+        [string]$Method = 'GET',
+        [hashtable]$Headers = @{},
+        [object]$Body,
+        [string]$ContentType = 'application/json; charset=utf-8',
+        [int]$TimeoutSec = 0
+    )
+    $Method = $Method.ToUpperInvariant()
+    $bodyStr = $null
+    if ($null -ne $Body) {
+        if ($Body -is [byte[]]) { $bodyStr = [Text.Encoding]::UTF8.GetString($Body) }
+        elseif ($Body -is [string]) { $bodyStr = $Body }
+        else { $bodyStr = $Body | ConvertTo-Json -Compress }
+    }
+    $argsList = @('-s')
+    if ($null -ne $bodyStr) {
+        $argsList += @('-d', '@-')
+    } elseif ($Method -eq 'POST') {
+        $argsList += @('-X', 'POST')
+    }
+    if ($TimeoutSec -gt 0) { $argsList += @('--max-time', "$TimeoutSec") }
+    $argsList += @('-H', 'Content-Type: application/json; charset=utf-8')
+    foreach ($k in $Headers.Keys) {
+        $argsList += @('-H', ($k + ': ' + $Headers[$k]))
+    }
+    $argsList += $Uri
+    if ($null -ne $bodyStr) {
+        $raw = ($bodyStr | & curl.exe @argsList) -join ''
+    } else {
+        $raw = (& curl.exe @argsList) -join ''
+    }
+    if ([string]::IsNullOrWhiteSpace($raw)) { return $null }
+    if ($raw -match '\u00e5|Ã|â€|æ') {
+        try {
+            $bytes = [Text.Encoding]::GetEncoding(28591).GetBytes($raw)
+            $fixed = [Text.Encoding]::UTF8.GetString($bytes)
+            if ($fixed -notmatch '\uFFFD') { $raw = $fixed }
+        } catch {}
+    }
+    return ($raw | ConvertFrom-Json)
+}
+
 # 冒烟测试：只读 GET 接口批量探测
 $ErrorActionPreference = 'Continue'
 $base = 'http://localhost:8080/api'
@@ -104,3 +153,5 @@ Write-Host "===== 基础 ====="
 Probe 'user.profile' GET '/v1/user/profile' $H
 Probe 'bookkeeping.records' GET '/v1/bookkeeping/records' $He
 Probe 'bookkeeping.cashflow' GET '/v1/bookkeeping/cashflow-report' $He
+
+
