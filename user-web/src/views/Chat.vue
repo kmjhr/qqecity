@@ -68,6 +68,21 @@
         </div>
       </div>
 
+      <!-- 常见疑问推荐（淘宝客服风：点击即发送） -->
+      <div v-if="!sending && messages.length <= 2" class="quick-asks">
+        <div class="quick-title">猜你想问</div>
+        <div class="quick-list">
+          <el-tag
+            v-for="q in quickQuestions"
+            :key="q"
+            class="quick-tag"
+            :type="'info'"
+            effect="plain"
+            @click="quickAsk(q)"
+          >{{ q }}</el-tag>
+        </div>
+      </div>
+
       <!-- 输入区 -->
       <div class="input-area">
         <el-input
@@ -95,6 +110,16 @@ const sending = ref(false)
 const historyLoading = ref(false)
 const engineStatus = ref(null)
 const selectedMode = ref('local')
+const quickQuestions = [
+  '如何申请保函？费率是多少？',
+  '我是大学生，能申请青创e贷吗？',
+  '租房押金可以转理财吗？',
+  '收到中奖短信要交手续费，是诈骗吗？',
+  '怎么查看我的征信报告？',
+  '有哪些创业补贴政策？',
+  '预算记账怎么分类？',
+  '保险怎么买？',
+]
 const engineOptions = [
   { label: '本地模式', value: 'local' },
   { label: 'AI 增强', value: 'agent' },
@@ -156,6 +181,25 @@ async function handleSend() {
     const reply = await sendMessage(text, selectedMode.value)
     messages.value.push(reply)
     await scrollBottom()
+  } catch (e) {
+    ElMessage.error('发送失败，请稍后重试')
+  } finally {
+    sending.value = false
+  }
+}
+
+// 快捷问题：点击直接发送
+async function quickAsk(q) {
+  if (sending.value) return
+  messages.value.push({ role: 'user', content: q, timestamp: new Date().toISOString().replace('Z', '') })
+  sending.value = true
+  await scrollBottom()
+  try {
+    const reply = await sendMessage(q, selectedMode.value)
+    messages.value.push(reply)
+    await scrollBottom()
+  } catch (e) {
+    ElMessage.error('发送失败，请稍后重试')
   } finally {
     sending.value = false
   }
@@ -272,6 +316,29 @@ onMounted(async () => {
   margin-top: 4px;
   font-size: 11px;
   color: #c0c4cc;
+}
+.quick-asks {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #f5f7fa;
+  border-radius: 8px;
+}
+.quick-title {
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 8px;
+}
+.quick-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.quick-tag {
+  cursor: pointer;
+}
+.quick-tag:hover {
+  color: #409eff;
+  border-color: #409eff;
 }
 .input-area {
   display: flex;
