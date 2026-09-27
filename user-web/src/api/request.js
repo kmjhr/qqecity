@@ -13,7 +13,8 @@ import router from '@/router'
 
 const request = axios.create({
   baseURL: '/api',
-  timeout: 15000
+  // 60s：agent 模式下 LLM 在本地 CPU 推理可能超过 15s（7B 模型首次可达 30-60s）
+  timeout: 60000
 })
 
 // 请求拦截器：注入 Token

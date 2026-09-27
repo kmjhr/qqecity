@@ -99,8 +99,8 @@ public class ChatService {
             answer = ragEngine.buildLocalAnswer(userMsg, sources);
         }
 
-        // 3. 写入历史
-        historyStore.appendAndTrim(userId, userMsg, answer);
+        // 3. 写入历史（带实际引擎模式，供 history 接口恢复真实标签）
+        historyStore.appendAndTrim(userId, userMsg, answer, activeEngine);
 
         // 4. 构造返回 VO
         ChatMessageVO vo = new ChatMessageVO();
@@ -114,17 +114,18 @@ public class ChatService {
     }
 
     /**
-     * 查询历史（按 user/assistant 交替返回）
+     * 查询历史（按 user/assistant 交替返回，assistant 恢复真实引擎模式）
      */
     public List<ChatMessageVO> history(Long userId) {
-        List<String> raw = historyStore.loadHistory(userId);
-        java.util.List<ChatMessageVO> result = new java.util.ArrayList<>(raw.size());
-        for (int i = 0; i < raw.size(); i++) {
+        List<ChatHistoryStore.HistoryEntry> entries = historyStore.loadHistoryEntries(userId);
+        List<ChatMessageVO> result = new java.util.ArrayList<>(entries.size());
+        for (int i = 0; i < entries.size(); i++) {
+            ChatHistoryStore.HistoryEntry e = entries.get(i);
             ChatMessageVO m = new ChatMessageVO();
             m.setRole(i % 2 == 0 ? "user" : "assistant");
-            m.setContent(raw.get(i));
+            m.setContent(e.content());
             m.setSimulated(true);
-            m.setEngineMode(i % 2 == 0 ? null : "local");
+            m.setEngineMode(i % 2 == 0 ? null : e.mode());
             result.add(m);
         }
         return result;

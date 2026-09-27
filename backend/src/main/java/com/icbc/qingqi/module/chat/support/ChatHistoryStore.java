@@ -17,6 +17,7 @@ import java.util.List;
  * <p>
  * Key: chat:history:{userId}
  * Value: JSON 数组，交替 [user, assistant, user, assistant, ...]
+ * 存储格式 "内容@@@MODE"（user 固定 MODE=USER，assistant 为实际引擎 local/agent/fallback）
  * 仅保留最近 20 条（10 轮对话）
  */
 @Slf4j
@@ -24,6 +25,7 @@ import java.util.List;
 public class ChatHistoryStore {
 
     private static final int MAX_MESSAGES = 20;
+    private static final String META_SEP = "@@@";
 
     private final StringRedisTemplate redis;
     private final ObjectMapper mapper = new ObjectMapper();
@@ -35,16 +37,45 @@ public class ChatHistoryStore {
         this.redis = redis;
     }
 
+    /** 历史条目：内容 + 实际引擎模式（user 消息模式为 null） */
+    public record HistoryEntry(String content, String mode) {}
+
     /**
-     * 读取历史（返回交替 user/assistant 字符串列表）
+     * 读取历史（返回交替 user/assistant 字符串列表，剥离模式后缀；供 LLM 上下文使用）
      */
     public List<String> loadHistory(Long userId) {
+        List<HistoryEntry> entries = loadHistoryEntries(userId);
+        List<String> out = new ArrayList<>(entries.size());
+        for (HistoryEntry e : entries) {
+            out.add(e.content());
+        }
+        return out;
+    }
+
+    /**
+     * 读取历史（含模式；供 history 接口恢复真实引擎标签）
+     */
+    public List<HistoryEntry> loadHistoryEntries(Long userId) {
         try {
             String key = key(userId);
             String json = redis.opsForValue().get(key);
             if (json == null || json.isBlank()) return Collections.emptyList();
             List<String> list = mapper.readValue(json, new TypeReference<List<String>>() {});
-            return list != null ? list : Collections.emptyList();
+            if (list == null) return Collections.emptyList();
+            List<HistoryEntry> entries = new ArrayList<>(list.size());
+            for (int i = 0; i < list.size(); i++) {
+                String raw = list.get(i);
+                int idx = raw.lastIndexOf(META_SEP);
+                if (idx > 0) {
+                    String content = raw.substring(0, idx);
+                    String mode = raw.substring(idx + META_SEP.length());
+                    entries.add(new HistoryEntry(content, i % 2 == 0 ? null : mode));
+                } else {
+                    // 兼容旧数据（无模式后缀）
+                    entries.add(new HistoryEntry(raw, i % 2 == 0 ? null : "local"));
+                }
+            }
+            return entries;
         } catch (Exception e) {
             log.warn("[ChatHistory] 读取历史失败 userId={}：{}", userId, e.getMessage());
             return Collections.emptyList();
@@ -52,14 +83,14 @@ public class ChatHistoryStore {
     }
 
     /**
-     * 追加 user + assistant 消息，超长截断
+     * 追加 user + assistant 消息（assistantMsg 带实际引擎模式），超长截断
      */
-    public void appendAndTrim(Long userId, String userMsg, String assistantMsg) {
+    public void appendAndTrim(Long userId, String userMsg, String assistantMsg, String engineMode) {
         try {
             String key = key(userId);
-            List<String> list = new ArrayList<>(loadHistory(userId));
-            list.add(userMsg);
-            list.add(assistantMsg);
+            List<String> list = new ArrayList<>(loadRawList(key));
+            list.add(userMsg + META_SEP + "USER");
+            list.add(assistantMsg + META_SEP + (engineMode == null ? "local" : engineMode));
             while (list.size() > MAX_MESSAGES) {
                 list.remove(0);
                 list.remove(0);
@@ -76,6 +107,18 @@ public class ChatHistoryStore {
             redis.delete(key(userId));
         } catch (Exception e) {
             log.warn("[ChatHistory] 清空失败 userId={}：{}", userId, e.getMessage());
+        }
+    }
+
+    private List<String> loadRawList(String key) {
+        try {
+            String json = redis.opsForValue().get(key);
+            if (json == null || json.isBlank()) return new ArrayList<>();
+            List<String> list = mapper.readValue(json, new TypeReference<List<String>>() {});
+            return list != null ? list : new ArrayList<>();
+        } catch (Exception e) {
+            log.warn("[ChatHistory] 读取原始列表失败 key={}：{}", key, e.getMessage());
+            return new ArrayList<>();
         }
     }
 
