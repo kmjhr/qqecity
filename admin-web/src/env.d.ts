@@ -37,7 +37,7 @@ interface UserInfo {
   phone: string
   email: string
   avatar: string
-  role: 'USER' | 'ADMIN'
+  role: 'USER' | 'ADMIN' | 'BANK_OPERATOR' | 'LANDLORD'
   status: number
   createTime: string
 }

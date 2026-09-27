@@ -69,17 +69,18 @@ INSERT IGNORE INTO `biz_rental_contract` (`id`, `contract_no`, `house_id`, `land
 (1, 'HT202401001', 1, 1, 2, 2800.00, 2800.00, '2024-01-15', '2025-01-14', 'MONTHLY', 'SIGNED', '2024-01-10'),
 (2, 'HT202402001', 2, 1, 3, 4200.00, 4200.00, '2024-02-01', '2025-01-31', 'QUARTERLY', 'SIGNED', '2024-01-20');
 
--- 9. biz_guarantee_application 保函申请
-INSERT IGNORE INTO `biz_guarantee_application` (`id`, `apply_no`, `tenant_id`, `house_id`, `contract_id`, `landlord_id`, `deposit_amount`, `guarantee_rate`, `guarantee_fee`, `guarantee_period_months`, `applicant_name`, `applicant_phone`, `landlord_name`, `landlord_phone`, `apply_status`, `ai_review_result`, `ai_review_score`, `submit_time`, `landlord_confirm_time`, `review_time`) VALUES
-(1, 'GBA202401001', 2, 1, 1, 1, 2800.00, 0.0100, 28.00, 12, '张青年', '13900000001', '王建国', '13900000003', 'APPROVED', 'PASS', 92, '2024-01-10 10:30:00', '2024-01-11 09:00:00', '2024-01-11 14:00:00'),
-(2, 'GBA202402001', 3, 2, 2, 1, 4200.00, 0.0120, 50.40, 12, '李创业', '13900000002', '王建国', '13900000003', 'LANDLORD_CONFIRM', NULL, NULL, '2024-02-01 14:00:00', NULL, NULL);
+-- 9. biz_guarantee_application 保函申请（含电子签名字段）
+INSERT IGNORE INTO `biz_guarantee_application` (`id`, `apply_no`, `tenant_id`, `house_id`, `contract_id`, `landlord_id`, `deposit_amount`, `guarantee_rate`, `guarantee_fee`, `guarantee_period_months`, `applicant_name`, `applicant_phone`, `landlord_name`, `landlord_phone`, `apply_status`, `ai_review_result`, `ai_review_score`, `submit_time`, `landlord_confirm_time`, `sign_content`, `sign_time`, `review_time`) VALUES
+(1, 'GBA202401001', 2, 1, 1, 1, 2800.00, 0.0100, 28.00, 12, '张青年', '13900000001', '王建国', '13900000003', 'APPROVED', 'PASS', 92, '2024-01-10 10:30:00', '2024-01-11 09:00:00', 'CLICK_CONFIRM', '2024-01-11 09:00:00', '2024-01-11 14:00:00'),
+(2, 'GBA202402001', 3, 2, 2, 1, 4200.00, 0.0120, 50.40, 12, '李创业', '13900000002', '王建国', '13900000003', 'LANDLORD_CONFIRM', NULL, NULL, '2024-02-01 14:00:00', NULL, NULL, NULL, NULL);
 
 -- 10. biz_guarantee 保函主表
 INSERT IGNORE INTO `biz_guarantee` (`id`, `guarantee_no`, `application_id`, `tenant_id`, `landlord_id`, `house_id`, `guarantee_amount`, `guarantee_fee`, `effective_date`, `expire_date`, `guarantee_status`, `pay_status`, `pay_time`, `issue_time`) VALUES
 (1, 'GB2024010001', 1, 2, 1, 1, 2800.00, 28.00, '2024-01-15', '2025-01-14', 'ACTIVE', 'PAID', '2024-01-12 10:00:00', '2024-01-12 10:00:00');
 
--- 11. biz_guarantee_claim 索赔表（空数据，演示无索赔案例）
--- 暂无演示索赔数据
+-- 11. biz_guarantee_claim 索赔表（演示数据）
+INSERT IGNORE INTO `biz_guarantee_claim` (`id`, `claim_no`, `guarantee_id`, `guarantee_no`, `claimant_id`, `claimant_name`, `tenant_id`, `claim_amount`, `claim_reason`, `evidence_files`, `claim_status`, `ai_review_result`, `ai_review_detail`, `reject_reason`, `defense_content`, `payout_amount`, `submit_time`, `review_time`, `close_time`) VALUES
+(1, 'CLM202405001', 1, 'GB2024010001', 4, '王建国', 2, 1500.00, '租客欠缴2个月租金，经多次沟通未果', '["欠租记录2个月","沟通记录微信截图"]', 'CLOSED', 'MANUAL_REVIEW', '{"confidence":40,"evidenceCount":2,"hitRules":["无法比对交接清单，损坏是否为入住前已存在无法确认"],"remark":"AI初审（模拟）"}', NULL, '已按时缴纳租金，有银行转账记录为证，仅因出差忘记通知房东', 800.00, '2024-05-10 10:00:00', '2024-05-12 14:00:00', '2024-05-15 16:00:00');
 
 -- =============================================================
 -- 三、青创e贷（4张表）
@@ -90,16 +91,18 @@ INSERT IGNORE INTO `biz_merchant` (`id`, `merchant_name`, `merchant_type`, `cont
 (1, '杭州文创物料供应商', 'MATERIAL', '陈经理', '0571-88881234', '杭州市拱墅区祥园路1号', '91330100MA2XXXXXX', '6222021234567890456', '中国工商银行杭州拱宸支行', 'VERIFIED', 1),
 (2, '梦想市集摊位管理方', 'STALL', '周主管', '0571-88885678', '杭州市西湖区文三路478号', '91330100MA2YYYYYY', '6222021234567890789', '中国工商银行杭州文三路支行', 'VERIFIED', 1),
 (3, '小红书推广服务中心', 'PROMOTION', '吴专员', '0571-88889012', '杭州市滨江区网商路599号', '91330100MA2ZZZZZZ', '6222021234567890012', '中国工商银行杭州滨江支行', 'VERIFIED', 1),
-(4, '青年创业孵化基地', 'OTHER', '孙老师', '0571-88883456', '杭州市余杭区梦想小镇', '91330100MA2AAAAAA', '6222021234567890345', '中国工商银行杭州余杭支行', 'VERIFIED', 1);
+(4, '青年创业孵化基地', 'OTHER', '孙老师', '0571-88883456', '杭州市余杭区梦想小镇', '91330100MA2AAAAAA', '6222021234567890345', '中国工商银行杭州余杭支行', 'VERIFIED', 1),
+(5, '速速达物流配送', 'OTHER', '刘经理', '0571-88887777', '杭州市萧山区市心北路100号', '91330100MA2BBBBBB', '6222021234567890567', '中国工商银行杭州萧山支行', 'PENDING', 1);
 
 -- 13. biz_loan_application 贷款申请
 INSERT IGNORE INTO `biz_loan_application` (`id`, `apply_no`, `user_id`, `loan_type`, `apply_amount`, `purpose`, `business_plan`, `crowd_type`, `pre_check_result`, `pre_check_min_amount`, `pre_check_max_amount`, `apply_status`, `approve_amount`, `submit_time`, `approve_time`) VALUES
 (1, 'LA202402001', 3, 'B_TYPE', 20000.00, '进货采购文创产品', '计划在梦想市集开设文创摊位，主营手工艺品，预计月营收8000-15000元。', 'ENTREPRENEUR', 'ELIGIBLE', 10000.00, 20000.00, 'APPROVED', 20000.00, '2024-02-05 10:00:00', '2024-02-06 14:00:00'),
 (2, 'LA202403001', 2, 'B_TYPE', NULL, NULL, '在校大学生，计划毕业创业，先做免费预审了解额度。', 'STUDENT', 'ELIGIBLE', 5000.00, 10000.00, 'PRE_CHECK', NULL, '2024-03-10 16:00:00', NULL);
 
--- 14. biz_credit_limit 授信额度
-INSERT IGNORE INTO `biz_credit_limit` (`id`, `user_id`, `credit_type`, `total_limit`, `used_limit`, `available_limit`, `interest_rate`, `status`, `effective_date`, `expire_date`) VALUES
-(1, 3, 'B_TYPE', 20000.00, 15000.00, 5000.00, 0.0435, 'ACTIVE', '2024-02-10', '2025-02-09');
+-- 14. biz_credit_limit 授信额度（B类含观察期字段，A类循环贷额度）
+INSERT IGNORE INTO `biz_credit_limit` (`id`, `user_id`, `credit_type`, `total_limit`, `used_limit`, `available_limit`, `interest_rate`, `status`, `effective_date`, `expire_date`, `observation_status`, `observation_start`, `observation_months`, `observation_score`) VALUES
+(1, 3, 'B_TYPE', 20000.00, 15000.00, 5000.00, 0.0435, 'ACTIVE', '2024-02-10', '2025-02-09', 'OBSERVING', '2024-02-10', 2, 35),
+(2, 3, 'A_TYPE', 50000.00, 0.00, 50000.00, 0.0385, 'ACTIVE', '2024-06-01', '2025-06-01', NULL, NULL, 0, 0);
 
 -- 15. biz_entrust_payment 受托支付
 INSERT IGNORE INTO `biz_entrust_payment` (`id`, `payment_no`, `user_id`, `loan_application_id`, `merchant_id`, `merchant_name`, `amount`, `purpose`, `payment_status`, `payment_time`) VALUES
@@ -170,7 +173,10 @@ INSERT IGNORE INTO `biz_anti_fraud_content` (`id`, `title`, `content_type`, `cat
 (1, '警惕"征信修复"骗局：花钱就能洗白征信？', 'ARTICLE', '征信修复', '凡是声称可以"征信修复""征信洗白""征信铲单"的，全是诈骗！', '## 什么是征信修复骗局？\n\n不法分子谎称可以通过"内部渠道""特殊关系"帮你消除征信不良记录，收取高额手续费后消失无踪。\n\n## 常见套路：\n1. 散布"征信修复"广告，精准定位有逾期记录的人群\n2. 声称有"内部人脉"可以"铲单"\n3. 收取高额费用，少则几千多则几万\n4. 拉黑消失，或者教你伪造材料（反而违法）\n\n## 防范要点：\n- 征信领域无"修复"概念，只有"异议申请"的法定渠道\n- 正规异议申请不收费，可通过人民银行征信中心办理\n- 凡是提前收费的都是诈骗', 1280, 1, 1, '2024-01-15 10:00:00'),
 (2, '大学生必看：校园贷的十大套路', 'ARTICLE', '套路贷', '校园贷变种繁多，零门槛、低利息背后是万丈深渊。', '## 校园贷常见套路：\n\n1. "零门槛、秒到账"——实际利率远超法定上限\n2. "裸条借贷"——用不雅照片做抵押\n3. "培训贷"——以招聘培训为名诱导贷款\n4. "美容贷"——医美机构联合放款\n5. "回租贷"——手机抵押变相高利贷\n6. "刷单贷"——先刷单后骗贷\n7. "传销贷"——拉人头做贷款\n8. "套路贷"——故意制造违约逼债\n9. "考证贷"——以考证为名骗取贷款\n10. "创业贷"——虚假创业项目骗贷\n\n## 如何防范：\n- 树立正确消费观，不攀比不超前消费\n- 确有资金需求找正规金融机构\n- 遇到可疑情况及时告诉老师家长', 2156, 2, 1, '2024-01-20 10:00:00'),
 (3, '租房诈骗高发期！这些套路要警惕', 'ARTICLE', '电信诈骗', '租房季来临，虚假房源、押金诈骗层出不穷。', '## 租房常见诈骗套路：\n\n1. **虚假房源**：网上图片精美、价格低廉，实际根本不存在，骗你交"看房费""定金"\n2. **二房东骗局**：冒充房东出租，收了房租就跑路\n3. **黑中介**：收取高额中介费后不办事，或诱导签霸王合同\n4. **租金贷陷阱**：看似月付房租，实际是办理了分期贷款\n5. **退租套路**：以各种理由克扣押金\n\n## 防范建议：\n- 选择正规中介平台\n- 看房前不要交任何费用\n- 核实房东房产证和身份证\n- 合同条款逐条看清，特别是退租条款\n- 凡是要求贷款付房租的，坚决拒绝', 980, 3, 1, '2024-02-01 10:00:00'),
-(4, '反诈小测试：你能识别这些诈骗话术吗？', 'ARTICLE', '电信诈骗', '快来测测你的反诈意识等级！', '## 测试题：\n\n1. "您好，我是公安局的，您涉嫌洗钱犯罪，请将资金转入安全账户接受核查。"\n   → 假！公检法从无"安全账户"概念\n\n2. "恭喜您中奖了，奖品是一台手机，只需缴纳299元税费即可领取。"\n   → 假！正规中奖不收费\n\n3. "您的快递丢失了，我们可以双倍赔偿，请点击链接填写收款信息。"\n   → 假！这是钓鱼链接，套取你的银行卡信息\n\n4. "学长推荐的兼职，日赚300不是梦，只需先交押金入职。"\n   → 假！先交钱的兼职都是诈骗\n\n5. "老师/领导让你加QQ，有急事需要你帮忙转账。"\n   → 假！这是冒充领导熟人诈骗\n\n## 记住"三不一多"原则：\n- 未知链接不点击\n- 陌生来电不轻信\n- 个人信息不透露\n- 转账汇款多核实', 3420, 4, 1, '2024-02-10 10:00:00');
+(4, '反诈小测试：你能识别这些诈骗话术吗？', 'ARTICLE', '电信诈骗', '快来测测你的反诈意识等级！', '## 测试题：\n\n1. "您好，我是公安局的，您涉嫌洗钱犯罪，请将资金转入安全账户接受核查。"\n   → 假！公检法从无"安全账户"概念\n\n2. "恭喜您中奖了，奖品是一台手机，只需缴纳299元税费即可领取。"\n   → 假！正规中奖不收费\n\n3. "您的快递丢失了，我们可以双倍赔偿，请点击链接填写收款信息。"\n   → 假！这是钓鱼链接，套取你的银行卡信息\n\n4. "学长推荐的兼职，日赚300不是梦，只需先交押金入职。"\n   → 假！先交钱的兼职都是诈骗\n\n5. "老师/领导让你加QQ，有急事需要你帮忙转账。"\n   → 假！这是冒充领导熟人诈骗\n\n## 记住"三不一多"原则：\n- 未知链接不点击\n- 陌生来电不轻信\n- 个人信息不透露\n- 转账汇款多核实', 3420, 4, 1, '2024-02-10 10:00:00'),
+(5, '情景模拟·刷单诈骗识别', 'SCENARIO_SIM', '刷单诈骗', '互动问答：识别刷单诈骗的关键话术与陷阱', '{"background":"你在校园群里收到一条兼职广告：『学长推荐，刷单兼职，日赚200元，只需先交100元押金入职，一周保证回本。』对方还展示了多个群友「返利截图」。你需要根据情景回答下列问题，选出最正确的判断。","questions":[{"questionNo":1,"stem":"面对「先交押金入职」的兼职邀请，你的第一反应是？","options":[{"key":"A","text":"学长推荐可信度高，先付100元试试"},{"key":"B","text":"凡是要求先交钱的兼职都是诈骗，拒绝并拉黑"},{"key":"C","text":"先问清楚押金能否退还再决定"},{"key":"D","text":"要求对方先发任务，做完再付押金"}],"correctAnswer":"B","explanation":"所有要求先交钱的兼职都是诈骗，刷单本身也是违法行为，切勿参与。"},{"questionNo":2,"stem":"对方发来「日赚数百、零门槛、秒到账」的兼职广告，这套话术最可能是什么？","options":[{"key":"A","text":"正常兼职广告，可以尝试"},{"key":"B","text":"正经兼职不会承诺如此高薪，是典型刷单/虚假兼职话术"},{"key":"C","text":"大平台广告，可信"},{"key":"D","text":"可以转发给同学一起赚"}],"correctAnswer":"B","explanation":"「日赚数百、零门槛」是典型刷单话术，正经兼职不会承诺如此高薪；任何高额回报都伴随高风险或诈骗。"},{"questionNo":3,"stem":"你已经付了100元押金，对方要求你再追加300元「升级任务」才能返利，你应当？","options":[{"key":"A","text":"继续追加，否则100元拿不回来"},{"key":"B","text":"要求对方先返利再追加"},{"key":"C","text":"立即停止操作，保留聊天记录与转账凭证并报警"},{"key":"D","text":"找同学借钱继续刷单"}],"correctAnswer":"C","explanation":"一旦发现是诈骗应立即停止操作、保留证据并报警，继续转账只会扩大损失。"}]}', 0, 10, 1, '2024-03-01 10:00:00'),
+(6, '情景模拟·冒充公检法', 'SCENARIO_SIM', '冒充公检法', '互动问答：识别冒充公检法诈骗的话术与陷阱', '{"background":"你接到一个电话，对方自称是「XX市公安局民警」，说你名下银行卡涉嫌洗钱犯罪，要求你立即将资金转入「安全账户」接受核查，并通过QQ发来了一张「拘捕令」图片。你需要识别这是诈骗还是真实办案。","questions":[{"questionNo":1,"stem":"对方提到「安全账户」，你怎么判断？","options":[{"key":"A","text":"公检法有「安全账户」，按指示转账即可"},{"key":"B","text":"公检法绝无「安全账户」概念，要求转账100%是诈骗"},{"key":"C","text":"先核实对方身份再决定"},{"key":"D","text":"问对方警号确认"}],"correctAnswer":"B","explanation":"公检法机关绝无「安全账户」概念，也不会通过电话/微信办案；要求转账到「安全账户」100% 是诈骗。"},{"questionNo":2,"stem":"对方通过QQ发送「拘捕令」图片并要求你点击链接查案卷，你应该？","options":[{"key":"A","text":"点开链接核实是否真有案卷"},{"key":"B","text":"正规办案不会通过QQ/微信发送「拘捕令」，不点击陌生链接，直接挂断"},{"key":"C","text":"下载对方指定的「办案APP」配合调查"},{"key":"D","text":"先添加对方QQ好友"}],"correctAnswer":"B","explanation":"正规办案流程不会通过 QQ/微信发送「拘捕令」；任何要求点击陌生链接的都是钓鱼。"},{"questionNo":3,"stem":"你怀疑这是诈骗，最合适的处置方式是？","options":[{"key":"A","text":"按对方指示转账避免被抓"},{"key":"B","text":"继续与对方辩论，证明自己清白"},{"key":"C","text":"立即挂断电话并拨打 110 核实，绝不在对方指示下转账"},{"key":"D","text":"告诉对方自己的银行卡密码以证清白"}],"correctAnswer":"C","explanation":"遇到疑似公检法诈骗，应立即挂断电话并拨打 110 核实，绝不在对方指示下转账。"}]}', 0, 11, 1, '2024-03-01 10:00:00'),
+(7, '情景模拟·征信洗白骗局', 'SCENARIO_SIM', '征信洗白', '互动问答：识别「征信修复/洗白」骗局话术', '{"background":"你因一笔逾期记录影响了贷款申请，在网上看到广告：『内部渠道，专业修复征信不良记录，5000元包洗白，不成功不收费。』对方还展示了多个「成功案例」截图。你需要识别这是否是诈骗。","questions":[{"questionNo":1,"stem":"对方声称可以通过「内部渠道」花钱消除逾期记录，这说法对吗？","options":[{"key":"A","text":"征信可以花钱修复，5000元值得"},{"key":"B","text":"征信领域不存在「修复」「洗白」「铲单」概念，凡收费消除记录都是诈骗"},{"key":"C","text":"先付定金试一下"},{"key":"D","text":"可以让他先操作再付款"}],"correctAnswer":"B","explanation":"征信领域不存在「修复」「洗白」「铲单」概念，任何声称可以花钱消除不良记录的都是诈骗。"},{"questionNo":2,"stem":"正规的征信异议申请渠道是？","options":[{"key":"A","text":"通过QQ找内部人"},{"key":"B","text":"找中介代办，付几千元手续费"},{"key":"C","text":"向人民银行征信中心提出异议申请，正规渠道不收费"},{"key":"D","text":"找银行客户经理塞红包"}],"correctAnswer":"C","explanation":"正规异议申请不收费，可通过人民银行征信中心办理，处理结果由金融机构根据事实判定。"},{"questionNo":3,"stem":"对方建议你伪造生病证明、离职证明等材料来「异议申请」，你应该？","options":[{"key":"A","text":"按要求伪造材料"},{"key":"B","text":"只伪造部分材料"},{"key":"C","text":"拒绝，伪造材料属违法行为，可能构成伪造印章罪、诈骗罪"},{"key":"D","text":"让朋友帮忙伪造"}],"correctAnswer":"C","explanation":"伪造材料「修复」征信属违法行为，可能构成伪造印章罪、诈骗罪，切勿轻信。"}]}', 0, 12, 1, '2024-03-01 10:00:00');
 
 -- 23. biz_fraud_detection_log 骗局甄别记录（演示数据）
 INSERT IGNORE INTO `biz_fraud_detection_log` (`id`, `user_id`, `input_text`, `detect_result`, `risk_level`, `matched_rules`, `warning_content`, `detect_time`) VALUES
@@ -181,7 +187,9 @@ INSERT IGNORE INTO `biz_fraud_detection_log` (`id`, `user_id`, `input_text`, `de
 -- 24. biz_credit_report 征信报告（演示数据）
 INSERT IGNORE INTO `biz_credit_report` (`id`, `user_id`, `report_no`, `report_type`, `credit_score`, `credit_level`, `total_loan_count`, `overdue_count`, `total_credit_limit`, `used_credit_limit`, `query_count`, `report_summary`, `query_time`, `source`) VALUES
 (1, 2, 'CR20240301001', 'SIMPLE', 720, 'GOOD', 0, 0, 15000.00, 0.00, 3, '信用状况良好，无逾期记录，建议保持良好的信用习惯。', '2024-03-01 10:00:00', 'SIMULATED'),
-(2, 3, 'CR20240301002', 'DETAIL', 680, 'FAIR', 2, 0, 25000.00, 15000.00, 8, '信用状况一般，有两笔经营类贷款，使用率较高，建议适度控制负债水平。', '2024-03-01 11:00:00', 'SIMULATED');
+(2, 3, 'CR20240301002', 'DETAIL', 680, 'FAIR', 2, 0, 25000.00, 15000.00, 8, '信用状况一般，有两笔经营类贷款，使用率较高，建议适度控制负债水平。', '2024-03-01 11:00:00', 'SIMULATED'),
+(3, 2, 'CR20240301003', 'DETAIL', 782, 'EXCELLENT', 1, 0, 50000.00, 8000.00, 2, '【良好示例·模拟】信用分782、无逾期、负债率16%、查询2次。近6个月按时足额还款，信用状况良好，可获更优融资利率。', '2024-03-05 10:00:00', 'SIMULATED'),
+(4, 2, 'CR20240301004', 'DETAIL', 588, 'FAIR', 3, 1, 30000.00, 24000.00, 7, '【有瑕疵示例·模拟】信用分588、1笔逾期（已结清待滚动）、负债率80%、查询7次。近期短周期多次申贷，被部分机构风控规则限制，建议暂停新申请。', '2024-03-05 11:00:00', 'SIMULATED');
 
 -- 25. biz_risk_warning 风险预警（演示数据）
 INSERT IGNORE INTO `biz_risk_warning` (`id`, `user_id`, `warning_type`, `warning_level`, `warning_title`, `warning_content`, `related_module`, `is_read`, `is_handled`, `warning_time`) VALUES
@@ -191,12 +199,29 @@ INSERT IGNORE INTO `biz_risk_warning` (`id`, `user_id`, `warning_type`, `warning
 (4, 3, 'HIGH_FREQ_BORROW', 'MEDIUM', '信贷使用率偏高', '您的B类授信额度使用率已达75%，建议适度控制融资规模，避免负债过高。', 'loan', 0, 0, '2024-03-20 10:00:00');
 
 -- =============================================================
+-- 七、补充计划新增表演示数据
+-- =============================================================
+
+-- 26. biz_policy 政策库（8条：人才安居4 + 创业贴息4）
+-- 注：biz_policy 的 INSERT 已在 schema.sql 中执行（建表后紧跟 INSERT）
+
+-- 27. biz_credit_txn 循环贷交易流水
+-- 注：空表，演示时通过 POST /v1/loan/withdraw 和 /v1/loan/repay 生成
+
+-- =============================================================
 -- 数据导入完成
 -- 密码：123456（所有演示账号统一密码）
 -- 账号列表：
 --   admin / 123456        系统管理员
 --   testuser / 123456     演示青年用户（在校生）
---   entrepreneur / 123456 青年创业者
+--   entrepreneur / 123456 青年创业者（已开通A类5万循环贷 + B类观察期中）
 --   landlord01 / 123456   房东账号
 --   banker01 / 123456     银行运营岗
+--
+-- 演示账号功能对照：
+--   testuser      → 保函申请、预算消费、记账、反诈、政策匹配(STUDENT)
+--   entrepreneur  → 贷款预审、循环贷提还款、B转A观察期、政策匹配(ENTREPRENEUR)
+--   landlord01    → 房东确认、电子签约、发起索赔
+--   banker01      → 人工复审保函申请、人工复核索赔、审核商户白名单
+--   admin         → 管理端全部功能
 -- =============================================================

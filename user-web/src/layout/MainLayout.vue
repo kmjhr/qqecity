@@ -37,6 +37,32 @@
             <el-icon><Shield /></el-icon>
             <span>金融安全</span>
           </el-menu-item>
+          <el-sub-menu index="/intelligence">
+            <template #title>
+              <el-icon><ChatLineSquare /></el-icon>
+              <span>智能中台</span>
+            </template>
+            <el-menu-item index="/policy">
+              <el-icon><Document /></el-icon>
+              <span>政策匹配</span>
+            </el-menu-item>
+            <el-menu-item index="/credit-profile">
+              <el-icon><DataLine /></el-icon>
+              <span>信用画像</span>
+            </el-menu-item>
+            <el-menu-item index="/chat">
+              <el-icon><ChatLineSquare /></el-icon>
+              <span>智能对话</span>
+            </el-menu-item>
+            <el-menu-item index="/risk">
+              <el-icon><Warning /></el-icon>
+              <span>风险预警</span>
+            </el-menu-item>
+            <el-menu-item index="/teaching">
+              <el-icon><Reading /></el-icon>
+              <span>反诈教学</span>
+            </el-menu-item>
+          </el-sub-menu>
         </el-menu>
 
         <div class="user-area">

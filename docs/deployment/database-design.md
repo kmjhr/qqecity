@@ -1,7 +1,10 @@
 # 青启e城 · 数据库 ER 关系说明
 
-> 共 25 张表，分 7 大模块。本文档用文字描述各表之间的实体关系与核心外键关联。
+> 共 30 张表，分 7 大模块 + 5 张补充计划新增表。本文档用文字描述各表之间的实体关系与核心外键关联。
 > 表命名：`sys_*` 系统公共表，`biz_*` 业务模块表。
+>
+> **初始化方式**：执行 `backend/sql/init-database.sql`（内部按序 SOURCE schema.sql + data.sql）
+> 或分步执行：`mysql -u root -p < schema.sql && mysql -u root -p < data.sql`
 
 ---
 
@@ -16,6 +19,53 @@
 | 经营赋能 | 2 | biz_bookkeeping_record, biz_cashflow_report |
 | 预算消费 | 4 | biz_budget_category, biz_budget_setting, biz_transaction, biz_saving_goal |
 | 金融安全 | 4 | biz_anti_fraud_content, biz_fraud_detection_log, biz_credit_report, biz_risk_warning |
+| 补充计划新增表 | 5 | biz_policy, biz_credit_txn, biz_insurance_product, biz_finance_product, biz_risk_assessment |
+
+---
+
+## 补充计划新增表说明
+
+### biz_policy 政策库
+
+- **用途**：人才安居政策 + 创业贴息政策智能匹配
+- **核心字段**：`policy_type`（HOUSING/ENTREPRENEUR）、`target_crowd`（逗号分隔人群标签）、`max_amount`、`subsidy_rate`、`conditions`、`apply_url`
+- **匹配规则**：按 `sys_user.user_type` 匹配 `biz_policy.target_crowd`
+- **演示数据**：8 条（人才安居 4 + 创业贴息 4）
+- **关联接口**：`GET /api/v1/policy/match`、`POST /api/v1/policy/push`
+
+### biz_credit_txn 循环贷交易流水
+
+- **用途**：A 类 5 万循环贷的提款/还款流水记录
+- **核心字段**：`txn_type`（WITHDRAW/REPAY）、`principal_amount`、`interest_amount`、`borrow_days`、`balance_after`
+- **关联**：`credit_limit_id` → `biz_credit_limit.id`
+- **计息规则**：`interest = principal × 3.85% × days / 365`（模拟年化）
+- **关联接口**：`POST /api/v1/loan/withdraw`、`POST /api/v1/loan/repay`、`GET /api/v1/loan/credit-txns`
+
+### biz_insurance_product 保险代销产品表（模拟）
+
+- **用途**：履约保证保险 / 知识产权保险 / 财产综合险 按经营场景推荐
+- **核心字段**：`insurance_type`（PERFORMANCE_BOND/IP_PATENT/IP_INFRINGEMENT/PROPERTY）、`scene`（CONTRACT/IP/PROPERTY/EMPLOYER）、`target_crowd`、`premium_rate`、`coverage_amount`、`insurer`、`product_elements`、`apply_url`
+- **匹配规则**：按 `sys_user.user_type` 匹配 `biz_insurance_product.target_crowd`
+- **演示数据**：4 条（履约保证 1 + 知识产权 2 + 财产综合 1）
+- **合规口径**：工行仅代销、不承保；演示用，不构成真实投保邀约
+- **关联接口**：`GET /api/v1/insurance/match`、`POST /api/v1/insurance/{id}/apply-demo`
+
+### biz_finance_product 理财产品表（模拟）
+
+- **用途**：低风险理财产品池（仅 R1/R2），配合风险测评结果推荐
+- **核心字段**：`product_type`（SAVING_GOAL/CASH_MANAGEMENT/SHORT_BOND/FUND_DCA/GOLD_ACCUM）、`risk_level`（R1/R2）、`expected_return`、`min_amount`、`period`、`target_risk_level`（CONSERVATIVE/STEADY/BALANCED 逗号分隔）、`risk_disclosure`、`apply_url`
+- **匹配规则**：按 `biz_risk_assessment.risk_level` 匹配 `biz_finance_product.target_risk_level`
+- **演示数据**：5 条（心愿储蓄/现金管理/短债/基金定投/积存金）
+- **合规口径**：理财非存款、产品有风险、工行仅代销；演示用，不构成投资建议、不发起真实购买
+- **关联接口**：`GET /api/v1/consumption/finance-product/recommend`、`POST /api/v1/consumption/finance-product/{id}/apply-demo`
+
+### biz_risk_assessment 风险测评表
+
+- **用途**：用户风险测评问卷作答记录（10 题 → 风险等级）
+- **核心字段**：`assess_no`（测评编号）、`answers`（JSON：题号→选项）、`total_score`（10-40）、`risk_level`（CONSERVATIVE/STEADY/BALANCED）、`risk_level_name`、`valid_until`（1 年有效期）、`is_latest`（同一用户仅 1 条为 1）
+- **评分规则**：10 题 × 1-4 分 = 10-40 分；≤18 CONSERVATIVE，19-30 STEADY，31-40 BALANCED
+- **使用约束**：未完成测评不允许进入理财推荐；测评过期需重新测评
+- **关联接口**：`GET /api/v1/consumption/risk-assessment/questionnaire`、`POST /api/v1/consumption/risk-assessment/submit`、`GET /api/v1/consumption/risk-assessment/latest`
 
 ---
 
@@ -80,6 +130,8 @@ sys_user（房东） ─┘        │
    - `application.contract_id` → `biz_rental_contract.id`（对应租赁合同）
    - `application.landlord_id` → `biz_landlord.id`（房东）
    - 状态流转：SUBMITTED → LANDLORD_CONFIRM → AI_REVIEW → MANUAL_REVIEW → PENDING_PAY → APPROVED / REJECTED
+   - **电子签约字段**（补充计划）：`sign_content`（Canvas base64 或 CLICK_CONFIRM）、`sign_time`
+   - **AI 复审增强**（补充计划）：置信度 < 60% 时停在 MANUAL_REVIEW，需 banker 通过 `PUT /v1/guarantee/{id}/manual-review` 放行
 
 5. **biz_guarantee（保函主表）**：申请通过后生成正式保函
    - `guarantee.application_id` → `biz_guarantee_application.id`（一对一，申请通过后生成）
@@ -115,6 +167,8 @@ sys_user  ───1:N───  biz_loan_application  ───1:1───  bi
    - 一个用户可有多类授信（A类+B类），通过 `credit_type` 区分
    - 唯一约束：`(user_id, credit_type)` 联合唯一
    - 额度字段：total_limit / used_limit / available_limit
+   - **B 转 A 观察期字段**（补充计划）：`observation_status`（OBSERVING/PROMOTED/EXITED）、`observation_start`、`observation_months`、`observation_score`
+   - **A 类循环贷**（补充计划）：年化 3.85%，随借随还，提还款流水记录在 `biz_credit_txn`
 
 3. **biz_entrust_payment（受托支付）**：
    - `payment.user_id` → `sys_user.id`（借款人）
@@ -131,7 +185,11 @@ sys_user  ───1:N───  biz_loan_application  ───1:1───  bi
 ```
 sys_user  ───1:N───  biz_bookkeeping_record
    │
-   └───1:N───  biz_cashflow_report
+   ├───1:N───  biz_cashflow_report
+   │
+   ├───1:N───  biz_risk_warning (warning_type=CASHFLOW_WARNING，现金流风险预警)
+   │
+   └───1:N───  biz_insurance_product（保险代销产品，无强用户关联，按人群标签匹配）
 ```
 
 **关系说明：**
@@ -140,13 +198,31 @@ sys_user  ───1:N───  biz_bookkeeping_record
    - `record.user_id` → `sys_user.id`
    - 类型：INCOME（收入）、EXPENSE（支出）
    - 来源：AUTO（自动识别）、MANUAL（手动录入）、IMPORT（导入）
-   - `is_confirmed`：模糊交易待确认标记
+   - `is_confirmed`：模糊交易待确认标记（现金流预警中作为"应收未收"识别依据）
 
 2. **biz_cashflow_report（现金流报表）**：
    - `report.user_id` → `sys_user.id`
    - 按月生成：`(user_id, report_period)` 联合唯一
    - 字段：总收入/总支出/净现金流/利润/利润率
    - 预警等级：NORMAL / WARNING / CRITICAL
+
+3. **biz_risk_warning（现金流预警，补充计划步骤4）**：
+   - `warning.user_id` → `sys_user.id`
+   - 触发规则：近 3 月结余率 < 10% **且** 存在 > 7 天应收未收（INCOME + `isConfirmed=0`）
+   - `warning_type=CASHFLOW_WARNING`，`warning_level=HIGH`
+   - 7 天内同用户不重复触发（去重）
+   - 同步发站内信 `sys_message`（type=SAFETY, bizType=CASHFLOW_WARNING）
+
+4. **biz_insurance_product（保险代销产品，补充计划步骤4）**：
+   - 与 `sys_user` 无强外键关联，通过 `target_crowd` 标签与 `sys_user.user_type` 软匹配
+   - 险种：`PERFORMANCE_BOND`（履约保证）/ `IP_PATENT`（专利执行）/ `IP_INFRINGEMENT`（侵权责任）/ `PROPERTY`（财产综合）
+   - 经营场景：`CONTRACT`（合同履约）/ `IP`（知识产权）/ `PROPERTY`（财产）/ `EMPLOYER`（雇主）
+   - 合规口径：工行仅代销、不承保；`apply_url` 为模拟跳转链接
+   - 关联接口：`GET /api/v1/insurance/match`、`POST /api/v1/insurance/{id}/apply-demo`
+
+5. **财税科普与个转企引导（补充计划步骤4，无独立表）**：
+   - 内容硬编码返回（轻量化，不新增表），符合 §1.3 简化原则
+   - 关联接口：`GET /api/v1/operation/finance/content`、`POST /api/v1/operation/finance/individual-to-company/self-check`
 
 ### 2.6 预算消费模块（核心链路：预算设置 → 交易扣减 → 转储蓄）
 
@@ -218,6 +294,52 @@ biz_anti_fraud_content（内容表，无用户关联）
    - 预警等级：LOW / MEDIUM / HIGH / CRITICAL
    - 可关联具体业务模块和业务ID：`related_module` + `related_id`
 
+### 2.8 消费治理模块（补充计划步骤5）
+
+```
+sys_user  ───1:N───  biz_risk_warning (warning_type=HIGH_FREQ_BORROW，高频借贷预警)
+   │
+   ├───1:N───  biz_risk_warning (warning_type=CREDIT_ABNORMAL，征信异常预警)
+   │
+   ├───1:N───  biz_credit_report (source=SIMULATED，软查询模拟)
+   │
+   ├───1:N───  biz_risk_assessment（风险测评，仅 1 条 is_latest=1）
+   │                └── 匹配 ── biz_finance_product（target_risk_level 软匹配）
+   │
+   └── 三层消费引导（无独立表，复用 biz_transaction / biz_budget_setting / sys_message）
+```
+
+**关系说明：**
+
+1. **高频借贷/非理性负债预警（HIGH_FREQ_BORROW）**：
+   - 复用 `biz_risk_warning` 表，`warning_type=HIGH_FREQ_BORROW`
+   - 数据来源：`biz_loan_application`（近 30 天申请数 + APPROVED 未结清数）+ `biz_bookkeeping_record`（月度收入与还款支出）
+   - 触发规则（任一命中即预警）：
+     - 近 30 天申请数 ≥ 3 → HIGH
+     - APPROVED 未结清 ≥ 2 且新增申请 → HIGH
+     - 月度负债率 > 50% → CRITICAL
+   - 7 天内同用户不重复触发（去重）
+   - 同步发站内信 `sys_message`（type=SAFETY, bizType=HIGH_FREQ_BORROW）
+
+2. **常态化征信监测（CREDIT_ABNORMAL）**：
+   - 复用 `biz_credit_report` 表，`source=SIMULATED`（不产生硬查询）
+   - 评分公式：`credit_score = 750 - loanCount*10 - overdue*30`（clamp [350, 850]）
+   - 异常判定：6 个月贷款笔数 ≥ 4 或 逾期 > 0
+   - 异常转 `biz_risk_warning`（`warning_type=CREDIT_ABNORMAL`，`warning_level=HIGH`），7 天去重
+   - 同步发站内信
+
+3. **三层消费引导（无独立表，复用现有表）**：
+   - 第一层 交易后即时推送：复用 `biz_transaction` + `biz_budget_setting`，单笔金额 > 月度预算总额 30% 时触发 `sys_message`
+   - 第二层 月度账单分析：复用 `biz_transaction` 聚合当月收入/支出/净现金流/储蓄率/负债预警
+   - 第三层 支付前提醒：演示页，复用 `biz_budget_setting` 检查剩余预算，标注"仅工行自有支付场景"
+
+4. **理财匹配与风险测评**：
+   - `biz_risk_assessment.user_id` → `sys_user.id`
+   - 同一用户仅 1 条 `is_latest=1`，新测评提交时旧记录置 0
+   - 评分映射：≤18 CONSERVATIVE（R1）/ 19-30 STEADY（R1+R2）/ 31-40 BALANCED（R1+R2）
+   - `biz_finance_product` 与 `sys_user` 无强外键，通过 `target_risk_level` 与用户 `risk_level` 软匹配
+   - 合规口径：理财非存款、产品有风险、工行仅代销；未测评不可推荐；演示不发起真实购买、不扣款
+
 ---
 
 ## 三、跨模块关系汇总
@@ -248,7 +370,10 @@ sys_user ────┬───────────┼── sys_login_log
              │
              ├── biz_fraud_detection_log
              ├── biz_credit_report
-             └── biz_risk_warning
+             ├── biz_risk_warning
+             │
+             ├── biz_risk_assessment ──（匹配）── biz_finance_product
+             │
 ```
 
 ### 3.2 主链路串联关系

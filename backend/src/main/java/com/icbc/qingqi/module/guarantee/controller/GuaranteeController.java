@@ -5,6 +5,7 @@ import com.icbc.qingqi.common.Result;
 import com.icbc.qingqi.module.guarantee.dto.GuaranteeApplyDTO;
 import com.icbc.qingqi.module.guarantee.dto.GuaranteeApplicationVO;
 import com.icbc.qingqi.module.guarantee.dto.GuaranteeVO;
+import com.icbc.qingqi.module.guarantee.dto.LandlordSignDTO;
 import com.icbc.qingqi.module.guarantee.service.GuaranteeService;
 import com.icbc.qingqi.security.UserContext;
 import io.swagger.v3.oas.annotations.Operation;
@@ -52,12 +53,33 @@ public class GuaranteeController {
     // ============================================================
 
     @Operation(summary = "G-2 房东在线确认与电子签署",
-            description = "房东（演示账号 landlord01）确认保函申请并电子签署，确认后自动触发 AI 合同复审。")
+            description = "房东（演示账号 landlord01）确认保函申请并电子签署（Canvas 手写或点击确认），签署时间/签名入库。确认后自动触发 AI 合同复审。")
     @PutMapping("/{id}/landlord-confirm")
     public Result<GuaranteeApplicationVO> landlordConfirm(
-            @Parameter(description = "保函申请 ID") @PathVariable Long id) {
+            @Parameter(description = "保函申请 ID") @PathVariable Long id,
+            @Valid @RequestBody(required = false) LandlordSignDTO signDTO) {
         Long userId = UserContext.getUserId();
-        return Result.success(guaranteeService.landlordConfirm(userId, id));
+        // 若未传签名，默认点击确认
+        LandlordSignDTO dto = signDTO != null ? signDTO : new LandlordSignDTO();
+        if (dto.getSignContent() == null || dto.getSignContent().isBlank()) {
+            dto.setSignContent("CLICK_CONFIRM");
+        }
+        return Result.success(guaranteeService.landlordConfirm(userId, id, dto));
+    }
+
+    // ============================================================
+    //  G-3-补 人工复审（banker 对 AI 转人工的申请做出裁决）
+    // ============================================================
+
+    @Operation(summary = "G-3-补 banker 人工复审保函申请",
+            description = "banker 对 AI 复审转人工（MANUAL_REVIEW）的申请做出裁决：APPROVED 放行至待缴费 / REJECTED 拒绝。")
+    @PutMapping("/{id}/manual-review")
+    public Result<GuaranteeApplicationVO> manualReview(
+            @Parameter(description = "保函申请 ID") @PathVariable Long id,
+            @RequestParam String decision,
+            @RequestParam(required = false) String rejectReason) {
+        Long userId = UserContext.getUserId();
+        return Result.success(guaranteeService.manualReviewApplication(userId, id, decision, rejectReason));
     }
 
     // ============================================================

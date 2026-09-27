@@ -20,6 +20,8 @@ REM ====== 后端配置 ======
 set BACKEND_PORT=8080
 set JAVA_HOME=
 set MAVEN_HOME=
+REM JWT 密钥（Base64，必填；后端缺少该变量会启动失败。本地演示用示例值，正式请改成自己的随机值）
+set JWT_SECRET=cWluZ3FpLWVjaXR5LWp3dC1zZWNyZXQta2V5LTIwMjQ=
 
 REM ====== 前端配置 ======
 set USER_WEB_PORT=5173

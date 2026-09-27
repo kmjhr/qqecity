@@ -80,6 +80,37 @@ const routes = [
         name: 'Profile',
         component: () => import('@/views/Profile.vue'),
         meta: { title: '个人中心', requiresAuth: true }
+      },
+      // 步骤 8 新增：智能中台与消费治理扩展页
+      {
+        path: 'policy',
+        name: 'Policy',
+        component: () => import('@/views/Policy.vue'),
+        meta: { title: '政策智能匹配', requiresAuth: true }
+      },
+      {
+        path: 'credit-profile',
+        name: 'CreditProfile',
+        component: () => import('@/views/CreditProfile.vue'),
+        meta: { title: '青年信用画像', requiresAuth: true }
+      },
+      {
+        path: 'chat',
+        name: 'Chat',
+        component: () => import('@/views/Chat.vue'),
+        meta: { title: '智能对话引擎', requiresAuth: true }
+      },
+      {
+        path: 'risk',
+        name: 'Risk',
+        component: () => import('@/views/Risk.vue'),
+        meta: { title: '风险预警总览', requiresAuth: true }
+      },
+      {
+        path: 'teaching',
+        name: 'Teaching',
+        component: () => import('@/views/Teaching.vue'),
+        meta: { title: '反诈情景教学', requiresAuth: true }
       }
     ]
   },

@@ -46,8 +46,9 @@ mybatis-plus:
 
 # JWT 配置
 jwt:
-  # 密钥（Base64编码，生产环境请通过环境变量注入）
-  secret: ${JWT_SECRET:cWluZ3FpLWVjaXR5LWp3dC1zZWNyZXQta2V5LTIwMjQ=}
+  # 密钥（Base64编码）——必填，通过环境变量 JWT_SECRET 注入，禁止在仓库中保留默认密钥；
+  # 本地演示：复制项目根 .env.example 为 .env 并填入示例值；缺失时应用启动即报错（fail-fast）
+  secret: ${JWT_SECRET}
   # 访问令牌有效期（秒）- 2小时
   access-token-ttl: 7200
   # 刷新令牌有效期（秒）- 7天
@@ -69,6 +70,23 @@ springdoc:
   swagger-ui:
     enabled: true
     path: /swagger-ui.html
+
+# 对话引擎（步骤 7·智能中台）
+# engine=local 仅本地规则引擎（离线可用）；engine=agent 启用 LLM 增强（需 API Key，Key 由项目根 .env 注入）
+# API Key 安全红线：代码仅读 ${CHAT_LLM_API_KEY:} 环境变量占位符；Key 为空时 agent 自动降级 local 并提示"AI 增强未开启"
+chat:
+  engine: ${CHAT_ENGINE:local}
+  history-ttl-hours: 24
+  rag:
+    faq-size: 50
+    max-snippets: 5
+  llm:
+    endpoint: ${CHAT_LLM_ENDPOINT:https://ark.cn-beijing.volces.com/api/v3/chat/completions}
+    model: ${CHAT_LLM_MODEL:doubao-pro-32k}
+    timeout-seconds: 15
+    max-tokens: 1024
+    api-key: ${CHAT_LLM_API_KEY:}
+    system-prompt: "你是工行智能客服，仅基于给定上下文回答，禁止编造利率/额度/政策数字，不承诺收益。所有回答标注'模拟对话引擎/仅供参考'。"
 
 # 日志
 logging:

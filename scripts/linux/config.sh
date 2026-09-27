@@ -20,6 +20,8 @@ export REDIS_PASSWORD=
 export BACKEND_PORT=8080
 export JAVA_HOME=
 export MAVEN_HOME=
+# JWT 密钥（Base64，必填；后端缺少该变量会启动失败。本地演示用示例值，正式请改成自己的随机值）
+export JWT_SECRET=cWluZ3FpLWVjaXR5LWp3dC1zZWNyZXQta2V5LTIwMjQ=
 
 # ====== 前端配置 ======
 export USER_WEB_PORT=5173

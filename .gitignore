@@ -35,3 +35,18 @@ logs/
 # Database
 *.db
 *.sqlite
+
+# 证书 / 密钥（勿提交）
+*.p12
+*.pfx
+*.jks
+*.pem
+*.key
+
+# 本地专属配置（勿提交）
+application-local.yml
+application-dev.yml
+
+# JVM 堆转储 / 崩溃分析（勿提交）
+*.hprof
+*.dump

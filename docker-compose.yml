@@ -51,6 +51,13 @@ services:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_DATA_REDIS_PASSWORD:
+      # JWT 密钥（必填）：从项目根 .env 读取（参考 .env.example），未配置则启动直接报错
+      JWT_SECRET: ${JWT_SECRET:?请在项目根目录的 .env 中配置 JWT_SECRET（参考 .env.example）}
+      # 对话引擎 LLM API Key（可选）：由项目根 .env 提供，未配置则对话引擎自动回退 local 模式
+      CHAT_LLM_API_KEY: ${CHAT_LLM_API_KEY:-}
+      CHAT_ENGINE: ${CHAT_ENGINE:-local}
+      CHAT_LLM_ENDPOINT: ${CHAT_LLM_ENDPOINT:-https://ark.cn-beijing.volces.com/api/v3/chat/completions}
+      CHAT_LLM_MODEL: ${CHAT_LLM_MODEL:-doubao-pro-32k}
     ports:
       - "8080:8080"
 

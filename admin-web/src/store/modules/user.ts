@@ -20,8 +20,8 @@ export const useUserStore = defineStore('user', {
   actions: {
     async login(form: { username: string; password: string }) {
       const data = await apiLogin(form)
-      // 管理端要求 ADMIN 角色
-      if (data.user.role !== 'ADMIN') {
+      // 管理端要求 ADMIN 或 BANK_OPERATOR 角色（banker01 银行运营岗可进审核台）
+      if (data.user.role !== 'ADMIN' && data.user.role !== 'BANK_OPERATOR') {
         throw new Error('该账号无管理权限')
       }
       this.token = data.accessToken

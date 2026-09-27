@@ -38,14 +38,46 @@ const routes: RouteRecordRaw[] = [
           }
           // 角色管理、菜单管理等在此扩展
         ]
+      },
+      // 步骤 8 新增：业务审核台 5 队列
+      {
+        path: 'business',
+        name: 'Business',
+        redirect: '/business/ai-review',
+        meta: { title: '业务审核', icon: 'Checked' },
+        children: [
+          {
+            path: 'ai-review',
+            name: 'AIReview',
+            component: () => import('@/views/business/ai-review/index.vue'),
+            meta: { title: 'AI 复审队列', icon: 'View', requiresAuth: true }
+          },
+          {
+            path: 'claim-review',
+            name: 'ClaimReview',
+            component: () => import('@/views/business/claim-review/index.vue'),
+            meta: { title: '索赔复核队列', icon: 'Document', requiresAuth: true }
+          },
+          {
+            path: 'loan-review',
+            name: 'LoanReview',
+            component: () => import('@/views/business/loan-review/index.vue'),
+            meta: { title: '贷款审批', icon: 'Money', requiresAuth: true }
+          },
+          {
+            path: 'merchant-audit',
+            name: 'MerchantAudit',
+            component: () => import('@/views/business/merchant-audit/index.vue'),
+            meta: { title: '商户白名单', icon: 'Shop', requiresAuth: true }
+          },
+          {
+            path: 'risk-overview',
+            name: 'RiskOverview',
+            component: () => import('@/views/business/risk-overview/index.vue'),
+            meta: { title: '风险预警总览', icon: 'Warning', requiresAuth: true }
+          }
+        ]
       }
-      // 业务模块在此添加，例如：
-      // {
-      //   path: 'guarantee',
-      //   name: 'Guarantee',
-      //   component: () => import('@/views/business/guarantee/index.vue'),
-      //   meta: { title: '保函管理', icon: 'Wallet', requiresAuth: true }
-      // }
     ]
   },
   {

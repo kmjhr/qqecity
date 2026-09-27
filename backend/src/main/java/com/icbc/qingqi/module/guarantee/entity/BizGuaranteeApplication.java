@@ -87,6 +87,12 @@ public class BizGuaranteeApplication {
     /** 房东确认时间 */
     private LocalDateTime landlordConfirmTime;
 
+    /** 电子签名内容（Canvas base64 或 CLICK_CONFIRM） */
+    private String signContent;
+
+    /** 电子签署时间 */
+    private LocalDateTime signTime;
+
     /** 审核时间 */
     private LocalDateTime reviewTime;
 

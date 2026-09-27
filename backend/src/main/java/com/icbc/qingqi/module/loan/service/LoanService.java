@@ -5,17 +5,23 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.icbc.qingqi.common.BizException;
 import com.icbc.qingqi.common.ErrorCode;
+import com.icbc.qingqi.module.bookkeeping.entity.BizBookkeepingRecord;
+import com.icbc.qingqi.module.bookkeeping.mapper.BizBookkeepingRecordMapper;
 import com.icbc.qingqi.module.loan.dto.*;
 import com.icbc.qingqi.module.loan.entity.*;
 import com.icbc.qingqi.module.loan.mapper.*;
+import com.icbc.qingqi.module.message.entity.SysMessage;
+import com.icbc.qingqi.module.message.mapper.SysMessageMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 /**
@@ -36,6 +42,9 @@ public class LoanService {
     private final BizLoanApplicationMapper applicationMapper;
     private final BizCreditLimitMapper creditLimitMapper;
     private final BizEntrustPaymentMapper paymentMapper;
+    private final BizCreditTxnMapper creditTxnMapper;
+    private final BizBookkeepingRecordMapper bookkeepingMapper;
+    private final SysMessageMapper messageMapper;
 
     // 贷款类型
     private static final String TYPE_A = "A_TYPE";
@@ -73,11 +82,17 @@ public class LoanService {
     public LoanService(BizMerchantMapper merchantMapper,
                        BizLoanApplicationMapper applicationMapper,
                        BizCreditLimitMapper creditLimitMapper,
-                       BizEntrustPaymentMapper paymentMapper) {
+                       BizEntrustPaymentMapper paymentMapper,
+                       BizCreditTxnMapper creditTxnMapper,
+                       BizBookkeepingRecordMapper bookkeepingMapper,
+                       SysMessageMapper messageMapper) {
         this.merchantMapper = merchantMapper;
         this.applicationMapper = applicationMapper;
         this.creditLimitMapper = creditLimitMapper;
         this.paymentMapper = paymentMapper;
+        this.creditTxnMapper = creditTxnMapper;
+        this.bookkeepingMapper = bookkeepingMapper;
+        this.messageMapper = messageMapper;
     }
 
     // ============================================================
@@ -221,6 +236,7 @@ public class LoanService {
 
     /**
      * 确保 B 类授信额度存在（预审通过时调用）
+     * B 类预审通过后进入 6 个月观察期（缺口 #11）
      */
     private void ensureBCreditLimit(Long userId, BigDecimal total) {
         BizCreditLimit existing = creditLimitMapper.selectOne(
@@ -228,7 +244,18 @@ public class LoanService {
                         .eq(BizCreditLimit::getUserId, userId)
                         .eq(BizCreditLimit::getCreditType, TYPE_B));
         if (existing == null) {
-            createCreditLimit(userId, TYPE_B, total, B_TYPE_RATE);
+            BizCreditLimit b = createCreditLimit(userId, TYPE_B, total, B_TYPE_RATE);
+            // 启动观察期
+            b.setObservationStatus("OBSERVING");
+            b.setObservationStart(LocalDate.now());
+            b.setObservationMonths(0);
+            b.setObservationScore(0);
+            creditLimitMapper.updateById(b);
+
+            // 站内信：观察期开始
+            sendInternalMessage(userId, "B类授信观察期已开始",
+                    "您的B类预审已通过，进入6个月观察期。观察期内通过受托支付、记账等积累信用，达标可转A类循环贷并提额。【模拟】",
+                    "LOAN", b.getId());
         }
     }
 
@@ -260,6 +287,12 @@ public class LoanService {
         BizMerchant merchant = merchantMapper.selectById(dto.getMerchantId());
         if (merchant == null || merchant.getStatus() == null || merchant.getStatus() != 1) {
             throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "收款商户不存在或未启用");
+        }
+        // 白名单校验（缺口 #6）：仅白名单（VERIFIED）商户可受托支付
+        if (!"VERIFIED".equals(merchant.getVerifyStatus())) {
+            String statusName = "PENDING".equals(merchant.getVerifyStatus()) ? "灰名单审核中" : "未认证";
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET,
+                    "商户「" + merchant.getMerchantName() + "」当前为" + statusName + "，非白名单商户不可受托支付");
         }
 
         // 扣减额度（按申请类型对应的授信额度）
@@ -307,6 +340,355 @@ public class LoanService {
     public List<BizMerchant> listMerchants() {
         return merchantMapper.selectList(
                 new LambdaQueryWrapper<BizMerchant>().eq(BizMerchant::getStatus, 1));
+    }
+
+    // ============================================================
+    //  L-3-补 A 类循环贷随借随还（缺口 #10）
+    // ============================================================
+
+    /**
+     * A 类循环贷提款
+     * <p>
+     * 从 A 类 5 万循环额度中分次提款，按日计息（年化 3.85% 模拟）
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public CreditTxnVO withdraw(Long userId, WithdrawDTO dto) {
+        BizCreditLimit limit = getActiveACreditLimit(userId);
+        if (limit.getAvailableLimit().compareTo(dto.getAmount()) < 0) {
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET,
+                    "可用额度不足（可用：¥" + limit.getAvailableLimit() + "）");
+        }
+
+        // 扣减额度
+        limit.setUsedLimit(limit.getUsedLimit().add(dto.getAmount()));
+        limit.setAvailableLimit(limit.getAvailableLimit().subtract(dto.getAmount()));
+        creditLimitMapper.updateById(limit);
+
+        // 生成提款流水
+        BizCreditTxn txn = new BizCreditTxn();
+        txn.setTxnNo(generateNo("CW"));
+        txn.setUserId(userId);
+        txn.setCreditLimitId(limit.getId());
+        txn.setTxnType("WITHDRAW");
+        txn.setPrincipalAmount(dto.getAmount());
+        txn.setInterestAmount(BigDecimal.ZERO);
+        txn.setBorrowDays(0);
+        txn.setBalanceAfter(limit.getAvailableLimit());
+        txn.setRemark(dto.getPurpose() != null ? dto.getPurpose() : "循环贷提款（模拟）");
+        txn.setTxnTime(LocalDateTime.now());
+        creditTxnMapper.insert(txn);
+
+        log.info("[A类提款] 用户={}, 金额={}, 可用余额={}", userId, dto.getAmount(), limit.getAvailableLimit());
+        return toTxnVO(txn);
+    }
+
+    /**
+     * A 类循环贷还款
+     * <p>
+     * 归还后额度自动恢复，按实际用款天数和利率计息（年化 3.85% 模拟）
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public CreditTxnVO repay(Long userId, RepayDTO dto) {
+        BizCreditLimit limit = getActiveACreditLimit(userId);
+        if (limit.getUsedLimit().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "当前无待还本金");
+        }
+
+        // 找最早一笔未还完的提款记录计算计息天数
+        BizCreditTxn earliestWithdraw = creditTxnMapper.selectOne(
+                new LambdaQueryWrapper<BizCreditTxn>()
+                        .eq(BizCreditTxn::getUserId, userId)
+                        .eq(BizCreditTxn::getTxnType, "WITHDRAW")
+                        .orderByAsc(BizCreditTxn::getTxnTime)
+                        .last("LIMIT 1"));
+
+        int borrowDays = 1;
+        if (earliestWithdraw != null && earliestWithdraw.getTxnTime() != null) {
+            borrowDays = (int) ChronoUnit.DAYS.between(earliestWithdraw.getTxnTime().toLocalDate(), LocalDate.now());
+            if (borrowDays < 1) borrowDays = 1;
+        }
+
+        // 计息：本金 × 年化利率 × 天数 / 365
+        BigDecimal repayPrincipal = dto.getAmount().min(limit.getUsedLimit());
+        BigDecimal interest = repayPrincipal
+                .multiply(A_TYPE_RATE)
+                .multiply(new BigDecimal(borrowDays))
+                .divide(new BigDecimal("365"), 2, RoundingMode.HALF_UP);
+
+        // 恢复额度（本金+利息都归还）
+        BigDecimal totalRepay = repayPrincipal.add(interest);
+        limit.setUsedLimit(limit.getUsedLimit().subtract(repayPrincipal));
+        limit.setAvailableLimit(limit.getAvailableLimit().add(repayPrincipal));
+        creditLimitMapper.updateById(limit);
+
+        // 生成还款流水
+        BizCreditTxn txn = new BizCreditTxn();
+        txn.setTxnNo(generateNo("CR"));
+        txn.setUserId(userId);
+        txn.setCreditLimitId(limit.getId());
+        txn.setTxnType("REPAY");
+        txn.setPrincipalAmount(repayPrincipal);
+        txn.setInterestAmount(interest);
+        txn.setBorrowDays(borrowDays);
+        txn.setBalanceAfter(limit.getAvailableLimit());
+        txn.setRemark("循环贷还款，利息¥" + interest + "（" + borrowDays + "天，年化3.85%模拟）");
+        txn.setTxnTime(LocalDateTime.now());
+        creditTxnMapper.insert(txn);
+
+        log.info("[A类还款] 用户={}, 本金={}, 利息={}, 天数={}, 可用余额={}",
+                userId, repayPrincipal, interest, borrowDays, limit.getAvailableLimit());
+        return toTxnVO(txn);
+    }
+
+    /**
+     * 查询循环贷流水
+     */
+    public List<CreditTxnVO> listCreditTxns(Long userId) {
+        List<BizCreditTxn> txns = creditTxnMapper.selectList(
+                new LambdaQueryWrapper<BizCreditTxn>()
+                        .eq(BizCreditTxn::getUserId, userId)
+                        .orderByDesc(BizCreditTxn::getTxnTime));
+        return txns.stream().map(this::toTxnVO).toList();
+    }
+
+    // ============================================================
+    //  B 转 A 观察期（缺口 #11）
+    // ============================================================
+
+    /**
+     * 查询观察期状态
+     */
+    public ObservationVO getObservationStatus(Long userId) {
+        BizCreditLimit bLimit = creditLimitMapper.selectOne(
+                new LambdaQueryWrapper<BizCreditLimit>()
+                        .eq(BizCreditLimit::getUserId, userId)
+                        .eq(BizCreditLimit::getCreditType, TYPE_B));
+        if (bLimit == null) {
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "暂无B类授信，需先完成B类预审");
+        }
+
+        ObservationVO vo = new ObservationVO();
+        vo.setCreditLimitId(bLimit.getId());
+        vo.setCreditType(TYPE_B);
+        vo.setObservationStatus(bLimit.getObservationStatus() != null ? bLimit.getObservationStatus() : "NONE");
+        vo.setObservationStatusName(observationStatusName(bLimit.getObservationStatus()));
+        vo.setObservationMonths(bLimit.getObservationMonths() != null ? bLimit.getObservationMonths() : 0);
+        vo.setObservationScore(bLimit.getObservationScore() != null ? bLimit.getObservationScore() : 0);
+        vo.setMonthsRemaining(Math.max(0, 6 - vo.getObservationMonths()));
+        vo.setPromotionThreshold(60);
+        vo.setTotalLimit(bLimit.getTotalLimit());
+        vo.setAvailableLimit(bLimit.getAvailableLimit());
+        vo.setPromoted("PROMOTED".equals(bLimit.getObservationStatus()));
+
+        // 查A类额度（如已转A）
+        if (vo.getPromoted()) {
+            BizCreditLimit aLimit = creditLimitMapper.selectOne(
+                    new LambdaQueryWrapper<BizCreditLimit>()
+                            .eq(BizCreditLimit::getUserId, userId)
+                            .eq(BizCreditLimit::getCreditType, TYPE_A));
+            if (aLimit != null) {
+                vo.setPromotedLimit(aLimit.getTotalLimit());
+            }
+        }
+        return vo;
+    }
+
+    /**
+     * 模拟月份推进（加速观察）
+     * <p>
+     * 每次调用推进 1 个月，根据受托支付+记账+还款数据计算月度评分。
+     * 6 个月后达标（累计分≥60）→ 转A类+提额；不达标 → 维持小额或退出。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public ObservationVO advanceObservation(Long userId) {
+        BizCreditLimit bLimit = creditLimitMapper.selectOne(
+                new LambdaQueryWrapper<BizCreditLimit>()
+                        .eq(BizCreditLimit::getUserId, userId)
+                        .eq(BizCreditLimit::getCreditType, TYPE_B));
+        if (bLimit == null) {
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "暂无B类授信，需先完成B类预审");
+        }
+        if (!"OBSERVING".equals(bLimit.getObservationStatus())) {
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET,
+                    "观察期状态为" + observationStatusName(bLimit.getObservationStatus()) + "，不可推进");
+        }
+
+        int currentMonth = (bLimit.getObservationMonths() != null ? bLimit.getObservationMonths() : 0) + 1;
+
+        // 月度评分
+        int monthScore = calculateMonthScore(userId);
+        int totalScore = (bLimit.getObservationScore() != null ? bLimit.getObservationScore() : 0) + monthScore;
+
+        bLimit.setObservationMonths(currentMonth);
+        bLimit.setObservationScore(totalScore);
+        String detail = "第" + currentMonth + "月评分" + monthScore + "分，累计" + totalScore + "分（阈值60）。";
+
+        if (currentMonth >= 6) {
+            // 观察期结束，评估
+            if (totalScore >= 60) {
+                // 达标 → 转A类+提额
+                bLimit.setObservationStatus("PROMOTED");
+                detail += "观察期结束，累计评分达标，已转A类循环贷并提额至5万。";
+
+                // 创建/升级 A 类额度
+                BizCreditLimit aLimit = creditLimitMapper.selectOne(
+                        new LambdaQueryWrapper<BizCreditLimit>()
+                                .eq(BizCreditLimit::getUserId, userId)
+                                .eq(BizCreditLimit::getCreditType, TYPE_A));
+                if (aLimit == null) {
+                    aLimit = createCreditLimit(userId, TYPE_A, A_TYPE_TOTAL, A_TYPE_RATE);
+                } else {
+                    aLimit.setTotalLimit(A_TYPE_TOTAL);
+                    aLimit.setAvailableLimit(A_TYPE_TOTAL.subtract(aLimit.getUsedLimit()));
+                    aLimit.setStatus("ACTIVE");
+                    creditLimitMapper.updateById(aLimit);
+                }
+
+                sendInternalMessage(userId, "观察期达标 - 已转A类循环贷",
+                        "恭喜！6个月观察期累计评分" + totalScore + "分（≥60），已升级为A类5万循环额度（年化3.85%），支持随借随还。【模拟】",
+                        "LOAN", bLimit.getId());
+            } else {
+                // 不达标 → 退出
+                bLimit.setObservationStatus("EXITED");
+                detail += "观察期结束，累计评分未达标，维持B类小额授信。";
+
+                sendInternalMessage(userId, "观察期结束 - 维持B类授信",
+                        "6个月观察期累计评分" + totalScore + "分（<60），暂未达到A类升级标准，维持B类小额授信。建议持续经营积累信用。【模拟】",
+                        "LOAN", bLimit.getId());
+            }
+        } else {
+            detail += "剩余" + (6 - currentMonth) + "个月观察期。";
+        }
+
+        creditLimitMapper.updateById(bLimit);
+        log.info("[观察期推进] 用户={}, 第{}月, 月度分={}, 累计分={}, 状态={}",
+                userId, currentMonth, monthScore, totalScore, bLimit.getObservationStatus());
+
+        ObservationVO vo = getObservationStatus(userId);
+        vo.setCurrentMonthDetail(detail);
+        return vo;
+    }
+
+    /**
+     * 计算月度评分（满分100）
+     * - 受托支付活跃度（max 30）：每笔+10
+     * - 记账收入记录（max 30）：每笔+5
+     * - 循环贷还款行为（max 20）：有还款+20
+     * - 预算合规（max 20）：基础分20
+     */
+    private int calculateMonthScore(Long userId) {
+        // 受托支付笔数
+        long paymentCount = paymentMapper.selectCount(
+                new LambdaQueryWrapper<BizEntrustPayment>()
+                        .eq(BizEntrustPayment::getUserId, userId)
+                        .eq(BizEntrustPayment::getPaymentStatus, PAY_SUCCESS));
+        int usageScore = (int) Math.min(paymentCount * 10, 30);
+
+        // 记账收入记录数
+        long incomeCount = bookkeepingMapper.selectCount(
+                new LambdaQueryWrapper<BizBookkeepingRecord>()
+                        .eq(BizBookkeepingRecord::getUserId, userId)
+                        .eq(BizBookkeepingRecord::getRecordType, "INCOME"));
+        int incomeScore = (int) Math.min(incomeCount * 5, 30);
+
+        // 循环贷还款笔数
+        long repayCount = creditTxnMapper.selectCount(
+                new LambdaQueryWrapper<BizCreditTxn>()
+                        .eq(BizCreditTxn::getUserId, userId)
+                        .eq(BizCreditTxn::getTxnType, "REPAY"));
+        int repayScore = repayCount > 0 ? 20 : 0;
+
+        // 基础分
+        int baseScore = 20;
+
+        return Math.min(usageScore + incomeScore + repayScore + baseScore, 100);
+    }
+
+    // ============================================================
+    //  商户白名单管理（缺口 #6）
+    // ============================================================
+
+    /**
+     * 按认证状态筛选商户列表
+     */
+    public List<BizMerchant> listMerchantsByVerifyStatus(String verifyStatus) {
+        LambdaQueryWrapper<BizMerchant> wrapper = new LambdaQueryWrapper<BizMerchant>()
+                .eq(BizMerchant::getStatus, 1)
+                .orderByAsc(BizMerchant::getId);
+        if (verifyStatus != null && !verifyStatus.isEmpty()) {
+            wrapper.eq(BizMerchant::getVerifyStatus, verifyStatus);
+        }
+        return merchantMapper.selectList(wrapper);
+    }
+
+    /**
+     * banker 审核商户白名单
+     *
+     * @param merchantId   商户 ID
+     * @param verifyStatus VERIFIED-白名单 / REJECTED-拒绝
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public BizMerchant auditMerchant(Long merchantId, String verifyStatus) {
+        BizMerchant merchant = merchantMapper.selectById(merchantId);
+        if (merchant == null) {
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "商户不存在");
+        }
+        if (!"VERIFIED".equals(verifyStatus) && !"REJECTED".equals(verifyStatus)) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "审核结论只能为 VERIFIED 或 REJECTED");
+        }
+        merchant.setVerifyStatus(verifyStatus);
+        merchantMapper.updateById(merchant);
+
+        log.info("[商户审核] 商户={}, 审核结果={}", merchant.getMerchantName(), verifyStatus);
+        return merchant;
+    }
+
+    // ============================================================
+    //  工具方法
+    // ============================================================
+
+    private BizCreditLimit getActiveACreditLimit(Long userId) {
+        BizCreditLimit limit = creditLimitMapper.selectOne(
+                new LambdaQueryWrapper<BizCreditLimit>()
+                        .eq(BizCreditLimit::getUserId, userId)
+                        .eq(BizCreditLimit::getCreditType, TYPE_A));
+        if (limit == null) {
+            // 自动创建 A 类额度
+            limit = createCreditLimit(userId, TYPE_A, A_TYPE_TOTAL, A_TYPE_RATE);
+        }
+        if (!"ACTIVE".equals(limit.getStatus())) {
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "A类额度状态为" + limit.getStatus() + "，不可操作");
+        }
+        return limit;
+    }
+
+    private CreditTxnVO toTxnVO(BizCreditTxn txn) {
+        CreditTxnVO vo = new CreditTxnVO();
+        BeanUtil.copyProperties(txn, vo);
+        vo.setTxnTypeName("WITHDRAW".equals(txn.getTxnType()) ? "提款" : "还款");
+        return vo;
+    }
+
+    private String observationStatusName(String status) {
+        if (status == null) return "未开始";
+        return switch (status) {
+            case "OBSERVING" -> "观察中";
+            case "PROMOTED" -> "已转A类";
+            case "EXITED" -> "观察期退出";
+            default -> status;
+        };
+    }
+
+    private void sendInternalMessage(Long userId, String title, String content, String bizType, Long bizId) {
+        SysMessage msg = new SysMessage();
+        msg.setUserId(userId);
+        msg.setTitle(title);
+        msg.setContent(content);
+        msg.setType("BUSINESS");
+        msg.setBizType(bizType);
+        msg.setBizId(bizId);
+        msg.setIsRead(0);
+        messageMapper.insert(msg);
     }
 
     public Page<BizLoanApplication> pageApplications(Long userId, int pageNum, int pageSize, String status) {

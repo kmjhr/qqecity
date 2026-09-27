@@ -49,6 +49,18 @@ public class BizCreditLimit {
     /** 到期日期 */
     private LocalDate expireDate;
 
+    /** 观察期状态：OBSERVING/PROMOTED/EXITED（B转A专用） */
+    private String observationStatus;
+
+    /** 观察期开始日期 */
+    private LocalDate observationStart;
+
+    /** 已观察月数 */
+    private Integer observationMonths;
+
+    /** 观察期累计评分 */
+    private Integer observationScore;
+
     @TableLogic
     private Integer deleted;
 

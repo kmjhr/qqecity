@@ -117,6 +117,18 @@ const menuList = [
     icon: 'DataAnalysis'
   },
   {
+    path: '/business',
+    title: '业务审核',
+    icon: 'Checked',
+    children: [
+      { path: '/business/ai-review', title: 'AI 复审队列', icon: 'View' },
+      { path: '/business/claim-review', title: '索赔复核队列', icon: 'Document' },
+      { path: '/business/loan-review', title: '贷款审批', icon: 'Money' },
+      { path: '/business/merchant-audit', title: '商户白名单', icon: 'Shop' },
+      { path: '/business/risk-overview', title: '风险预警总览', icon: 'Warning' }
+    ]
+  },
+  {
     path: '/system',
     title: '系统管理',
     icon: 'Setting',

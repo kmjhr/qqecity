@@ -122,6 +122,21 @@ qingqi-ecity/
 
 ---
 
+## 🔐 环境变量（首次运行必看）
+
+复制 `.env.example` 为 `.env` 并填写（`.env` 已被 `.gitignore` 忽略，不会提交）：
+
+| 变量 | 必填 | 说明 |
+| --- | --- | --- |
+| `JWT_SECRET` | ✅ 必填 | JWT 签名密钥（Base64）。后端启动时缺失会**直接报错**；本地演示可用 `.env.example` 示例值，正式使用请换成自己的随机值 |
+| `CHAT_LLM_API_KEY` | 可选 | 对话引擎 Agent 模式 API Key（豆包/DeepSeek），留空则自动使用本地规则模式（local） |
+
+- **Docker 方式**：`docker compose up -d --build` 会自动读取项目根 `.env`；
+- **脚本方式**：JWT 密钥从 `scripts/windows/config.bat` / `scripts/linux/config.sh` 读取（已带演示默认值，可自行修改）；
+- **手动/IDE 方式**：在启动前设置环境变量 `JWT_SECRET`（IDEA：Run Configuration → Environment variables）。
+
+---
+
 ## 🚀 快速启动
 
 ### ⚡ 方式一：脚本一键启动（推荐，新手首选）

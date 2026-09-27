@@ -8,8 +8,11 @@ import com.icbc.qingqi.common.ErrorCode;
 import com.icbc.qingqi.module.guarantee.dto.GuaranteeApplyDTO;
 import com.icbc.qingqi.module.guarantee.dto.GuaranteeApplicationVO;
 import com.icbc.qingqi.module.guarantee.dto.GuaranteeVO;
+import com.icbc.qingqi.module.guarantee.dto.LandlordSignDTO;
 import com.icbc.qingqi.module.guarantee.entity.*;
 import com.icbc.qingqi.module.guarantee.mapper.*;
+import com.icbc.qingqi.module.message.entity.SysMessage;
+import com.icbc.qingqi.module.message.mapper.SysMessageMapper;
 import com.icbc.qingqi.module.user.entity.SysUser;
 import com.icbc.qingqi.module.user.mapper.SysUserMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +49,7 @@ public class GuaranteeService {
     private final BizGuaranteeApplicationMapper applicationMapper;
     private final BizGuaranteeMapper guaranteeMapper;
     private final SysUserMapper userMapper;
+    private final SysMessageMapper messageMapper;
 
     // 申请状态
     private static final String STATUS_SUBMITTED = "SUBMITTED";
@@ -77,13 +81,15 @@ public class GuaranteeService {
                             BizRentalContractMapper contractMapper,
                             BizGuaranteeApplicationMapper applicationMapper,
                             BizGuaranteeMapper guaranteeMapper,
-                            SysUserMapper userMapper) {
+                            SysUserMapper userMapper,
+                            SysMessageMapper messageMapper) {
         this.landlordMapper = landlordMapper;
         this.houseMapper = houseMapper;
         this.contractMapper = contractMapper;
         this.applicationMapper = applicationMapper;
         this.guaranteeMapper = guaranteeMapper;
         this.userMapper = userMapper;
+        this.messageMapper = messageMapper;
     }
 
     // ============================================================
@@ -146,6 +152,11 @@ public class GuaranteeService {
 
         log.info("[保函申请] 申请编号={}, 租客={}, 房东={}, 押金={}, 费率={}, 保函费={}",
                 app.getApplyNo(), tenantId, landlord.getId(), dto.getDepositAmount(), rate, fee);
+
+        // 站内信：申请已提交
+        sendInternalMessage(tenantId, "保函申请已提交",
+                "您的保函申请（编号" + app.getApplyNo() + "）已提交成功，等待房东确认。保函费¥" + fee + "（费率" + rate + "）。【模拟】",
+                "GUARANTEE", app.getId());
 
         return toApplicationVO(app, house, contract, null);
     }
@@ -252,10 +263,11 @@ public class GuaranteeService {
      * 房东在线确认与电子签署
      * <p>
      * 校验当前登录用户为该申请的房东，状态由 SUBMITTED → LANDLORD_CONFIRM，
-     * 随后自动触发 AI 合同复审（G-3），复审通过后流转至 PENDING_PAY。
+     * 记录电子签名内容与签署时间，随后自动触发 AI 合同复审（G-3）。
+     * 复审通过后流转至 PENDING_PAY；置信度不足则停在 MANUAL_REVIEW 等待人工复核。
      */
     @Transactional(rollbackFor = Exception.class)
-    public GuaranteeApplicationVO landlordConfirm(Long currentUserId, Long applicationId) {
+    public GuaranteeApplicationVO landlordConfirm(Long currentUserId, Long applicationId, LandlordSignDTO signDTO) {
         BizGuaranteeApplication app = getApplication(applicationId);
 
         // 校验当前用户是否为该申请的房东
@@ -271,28 +283,38 @@ public class GuaranteeService {
                     "当前申请状态为" + statusName(app.getApplyStatus()) + "，不可重复确认");
         }
 
-        // G-2 房东确认
+        // G-2 房东确认 + 电子签约
         app.setApplyStatus(STATUS_LANDLORD_CONFIRM);
         app.setLandlordConfirmTime(LocalDateTime.now());
+        app.setSignContent(signDTO.getSignContent());
+        app.setSignTime(LocalDateTime.now());
         applicationMapper.updateById(app);
 
-        log.info("[房东确认] 申请编号={}, 房东={} 已确认并电子签署（模拟）", app.getApplyNo(), landlord.getId());
+        log.info("[房东确认] 申请编号={}, 房东={} 已确认并电子签署，签名方式={}（模拟）",
+                app.getApplyNo(), landlord.getId(),
+                "CLICK_CONFIRM".equals(signDTO.getSignContent()) ? "点击确认" : "Canvas手写");
+
+        // 站内信：房东已确认
+        sendInternalMessage(app.getTenantId(), "房东已确认保函申请",
+                "房东已确认并电子签署保函申请（编号" + app.getApplyNo() + "），系统正在进行AI复审。【模拟】",
+                "GUARANTEE", app.getId());
 
         // G-3 自动触发 AI 合同复审
         return aiReview(app);
     }
 
     /**
-     * G-3 AI 合同复审（规则引擎）
+     * G-3 AI 合同复审（规则引擎 + 置信度阈值）
      * <p>
      * 风险判定规则：
      * - 合同条款文本命中"租金贷"/"霸王条款"关键词
      * - 押金异常：押金 > 3 倍月租 或 押金 <= 0
      * - 租期矛盾：租期结束日 <= 开始日
      * <p>
-     * 命中风险词 → ai_review_result=MANUAL_REVIEW，演示系统自动通过并标注"模拟人工复审通过"，
-     * 仍流转至 PENDING_PAY（不阻塞演示闭环）。
-     * 未命中 → ai_review_result=PASS，流转至 PENDING_PAY。
+     * 置信度阈值（缺口 #17）：
+     * - 未命中风险规则 → 置信度 95 → PASS，流转至 PENDING_PAY
+     * - 命中风险规则 → 置信度 < 60 → MANUAL_REVIEW，停在人工复审等待 banker 处理（不自动 PASS）
+     * banker 可通过 /v1/guarantee/{id}/manual-review 端点审核后放行或拒绝。
      */
     private GuaranteeApplicationVO aiReview(BizGuaranteeApplication app) {
         app.setApplyStatus(STATUS_AI_REVIEW);
@@ -329,37 +351,98 @@ public class GuaranteeService {
             hitRules.add("租期矛盾（结束日不晚于开始日）");
         }
 
-        // 复审结论
+        // 复审结论（置信度阈值 60，缺口 #17）
         String result;
         int score;
         if (hitRules.isEmpty()) {
             result = AI_PASS;
             score = 95;
-            detail.append("AI合同复审通过：未命中风险规则。【模拟】");
+            detail.append("AI合同复审通过：未命中风险规则，置信度95%。【模拟】");
         } else {
-            // 演示口径：命中风险转人工，但人工复审自动通过并标注"模拟"
+            // 命中风险规则 → 置信度 < 60 → 转 MANUAL_REVIEW，不自动 PASS
             result = AI_MANUAL_REVIEW;
-            score = 60;
+            score = 45;
             detail.append("命中风险规则：").append(String.join("、", hitRules))
-                    .append("。已转人工复核，人工复核自动通过（模拟）。【模拟】");
+                    .append("。置信度").append(score).append("%<60%，已转人工复核，等待banker审核。【模拟】");
         }
 
         app.setAiReviewResult(result);
         app.setAiReviewScore(score);
         app.setAiReviewDetail(detail.toString());
         app.setReviewTime(LocalDateTime.now());
-        // 流转至待缴费
-        app.setApplyStatus(STATUS_PENDING_PAY);
+
+        if (AI_PASS.equals(result)) {
+            // 置信度达标，流转至待缴费
+            app.setApplyStatus(STATUS_PENDING_PAY);
+            // 站内信：AI复审通过
+            sendInternalMessage(app.getTenantId(), "AI复审通过",
+                    "保函申请（编号" + app.getApplyNo() + "）AI复审通过，置信度" + score + "%，请缴纳保函费¥" + app.getGuaranteeFee() + "。【模拟】",
+                    "GUARANTEE", app.getId());
+        } else {
+            // 置信度不足，停在人工复审
+            app.setApplyStatus(STATUS_MANUAL_REVIEW);
+            // 站内信：AI复审转人工
+            sendInternalMessage(app.getTenantId(), "AI复审转人工复核",
+                    "保函申请（编号" + app.getApplyNo() + "）AI复审置信度" + score + "%<60%，已转人工复核，等待banker审核。【模拟】",
+                    "GUARANTEE", app.getId());
+        }
         applicationMapper.updateById(app);
 
-        log.info("[AI复审] 申请编号={}, 结果={}, 评分={}, 命中规则={}",
-                app.getApplyNo(), result, score, hitRules);
+        log.info("[AI复审] 申请编号={}, 结果={}, 置信度={}, 命中规则={}, 流转至={}",
+                app.getApplyNo(), result, score, hitRules, app.getApplyStatus());
 
         BizHouse h = houseMapper.selectById(app.getHouseId());
         BizRentalContract c = contractMapper.selectById(app.getContractId());
         BizGuarantee g = guaranteeMapper.selectOne(
                 new LambdaQueryWrapper<BizGuarantee>().eq(BizGuarantee::getApplicationId, app.getId()));
         return toApplicationVO(app, h, c, g);
+    }
+
+    // ============================================================
+    //  G-3-补 人工复审（banker 对 MANUAL_REVIEW 状态的申请做出裁决）
+    // ============================================================
+
+    /**
+     * banker 人工复审保函申请
+     * <p>
+     * 对 AI 复审转人工（MANUAL_REVIEW）的申请做出裁决：
+     * - APPROVED → 流转至 PENDING_PAY，租客可缴费
+     * - REJECTED → 终止申请
+     *
+     * @param currentUserId 当前操作 banker ID
+     * @param applicationId 申请 ID
+     * @param decision      APPROVED 或 REJECTED
+     * @param rejectReason  拒绝原因（REJECTED 时必填）
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public GuaranteeApplicationVO manualReviewApplication(Long currentUserId, Long applicationId,
+                                                           String decision, String rejectReason) {
+        BizGuaranteeApplication app = getApplication(applicationId);
+
+        // 状态校验
+        if (!STATUS_MANUAL_REVIEW.equals(app.getApplyStatus())) {
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET,
+                    "当前申请状态为" + statusName(app.getApplyStatus()) + "，不可人工复审");
+        }
+
+        if ("APPROVED".equals(decision)) {
+            // 人工复审通过，流转至待缴费
+            app.setApplyStatus(STATUS_PENDING_PAY);
+            app.setAiReviewDetail((app.getAiReviewDetail() != null ? app.getAiReviewDetail() : "")
+                    + " | banker(" + currentUserId + ")人工复审通过，放行至待缴费。【模拟】");
+            applicationMapper.updateById(app);
+            log.info("[人工复审-通过] 申请编号={}, banker={}", app.getApplyNo(), currentUserId);
+        } else if ("REJECTED".equals(decision)) {
+            // 人工复审拒绝
+            app.setApplyStatus(STATUS_REJECTED);
+            app.setRejectReason(rejectReason != null ? rejectReason : "人工复审未通过");
+            applicationMapper.updateById(app);
+            log.info("[人工复审-拒绝] 申请编号={}, banker={}, 原因={}", app.getApplyNo(), currentUserId, rejectReason);
+        } else {
+            throw new BizException(ErrorCode.PARAM_ERROR, "复审结论只能为 APPROVED 或 REJECTED");
+        }
+
+        return toApplicationVO(app);
     }
 
     // ============================================================
@@ -412,6 +495,12 @@ public class GuaranteeService {
 
         log.info("[缴费出函] 申请编号={}, 保函编号={}, 保函金额={}, 保函费={}（模拟缴费成功）",
                 app.getApplyNo(), guarantee.getGuaranteeNo(), guarantee.getGuaranteeAmount(), guarantee.getGuaranteeFee());
+
+        // 站内信：保函已开立
+        sendInternalMessage(app.getTenantId(), "电子保函已开立",
+                "保函申请（编号" + app.getApplyNo() + "）缴费成功，电子保函已开立。保函编号：" + guarantee.getGuaranteeNo()
+                        + "，保函金额¥" + guarantee.getGuaranteeAmount() + "，有效期至" + guarantee.getExpireDate() + "。【模拟】",
+                "GUARANTEE", guarantee.getId());
 
         return toGuaranteeVO(guarantee, app);
     }
@@ -584,5 +673,20 @@ public class GuaranteeService {
             vo.setHouseAddress(house.getAddress());
         }
         return vo;
+    }
+
+    /**
+     * 发送站内信
+     */
+    private void sendInternalMessage(Long userId, String title, String content, String bizType, Long bizId) {
+        SysMessage msg = new SysMessage();
+        msg.setUserId(userId);
+        msg.setTitle(title);
+        msg.setContent(content);
+        msg.setType("BUSINESS");
+        msg.setBizType(bizType);
+        msg.setBizId(bizId);
+        msg.setIsRead(0);
+        messageMapper.insert(msg);
     }
 }

@@ -1,0 +1,59 @@
+-- =============================================================
+-- 青启e城 数据库一键初始化脚本
+-- =============================================================
+--
+-- 文件说明：
+--   本脚本是数据库初始化的入口文件，按顺序执行建表和演示数据导入。
+--   schema.sql  — 30 张表 DDL + biz_policy / biz_insurance_product / biz_finance_product 演示数据
+--   data.sql    — 全部演示数据（用户/房东/房屋/保函/贷款/预算/反诈/政策等）
+--
+-- 使用方法：
+--   方法1（MySQL 命令行）:
+--     cd backend/sql
+--     mysql -u root -p < init-database.sql
+--
+--   方法2（MySQL 客户端 / Workbench）:
+--     打开本文件，全选执行（需在 schema.sql / data.sql 同目录下）
+--
+--   方法3（分步执行）:
+--     mysql -u root -p < schema.sql
+--     mysql -u root -p < data.sql
+--
+-- 环境要求：
+--   MySQL 8.0+，字符集 utf8mb4，引擎 InnoDB
+--
+-- 演示账号（密码统一 123456）:
+--   admin / 123456        系统管理员
+--   testuser / 123456     演示青年用户（在校生 STUDENT）
+--   entrepreneur / 123456 青年创业者（ENTREPRENEUR，已开通A类循环贷）
+--   landlord01 / 123456   房东账号
+--   banker01 / 123456     银行运营岗
+--
+-- 表数量：30 张（原 25 + biz_policy + biz_credit_txn + biz_insurance_product + biz_finance_product + biz_risk_assessment）
+-- =============================================================
+
+-- =============================================================
+-- Step 1: 建库 + 建表 + biz_policy / biz_insurance_product / biz_finance_product 演示数据
+-- =============================================================
+SOURCE schema.sql;
+
+-- =============================================================
+-- Step 2: 全部演示数据
+-- =============================================================
+SOURCE data.sql;
+
+-- =============================================================
+-- 初始化完成
+-- 验证方式：
+--   USE qingqi;
+--   SELECT COUNT(*) FROM sys_user;               -- 预期 5
+--   SELECT COUNT(*) FROM biz_policy;              -- 预期 8
+--   SELECT COUNT(*) FROM biz_insurance_product;   -- 预期 4（履约保证1+知识产权2+财产综合1）
+--   SELECT COUNT(*) FROM biz_finance_product;     -- 预期 5（心愿储蓄/现金管理/短债/基金定投/积存金）
+--   SELECT COUNT(*) FROM biz_risk_assessment;     -- 预期 0（用户提交测评后写入）
+--   SELECT COUNT(*) FROM biz_merchant;            -- 预期 5（含1条灰名单）
+--   SELECT COUNT(*) FROM biz_credit_limit;        -- 预期 2（A类+B类）
+--   SELECT COUNT(*) FROM biz_guarantee_claim;     -- 预期 1（已结案演示）
+--   SELECT credit_type, observation_status FROM biz_credit_limit WHERE user_id=3;
+--   -- 预期: B_TYPE|OBSERVING, A_TYPE|NULL
+-- =============================================================

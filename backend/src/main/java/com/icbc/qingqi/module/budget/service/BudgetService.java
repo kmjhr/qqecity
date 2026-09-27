@@ -9,6 +9,10 @@ import com.icbc.qingqi.module.budget.dto.TransactionDTO;
 import com.icbc.qingqi.module.budget.dto.TransferSavingDTO;
 import com.icbc.qingqi.module.budget.entity.*;
 import com.icbc.qingqi.module.budget.mapper.*;
+import com.icbc.qingqi.module.message.entity.SysMessage;
+import com.icbc.qingqi.module.message.mapper.SysMessageMapper;
+import com.icbc.qingqi.module.risk.entity.BizRiskWarning;
+import com.icbc.qingqi.module.risk.mapper.BizRiskWarningMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +41,8 @@ public class BudgetService {
     private final BizBudgetSettingMapper settingMapper;
     private final BizTransactionMapper transactionMapper;
     private final BizSavingGoalMapper savingGoalMapper;
+    private final SysMessageMapper messageMapper;
+    private final BizRiskWarningMapper riskWarningMapper;
 
     // MCC → 分类编码 映射
     private static final Map<String, String> MCC_TO_CATEGORY = Map.ofEntries(
@@ -61,11 +67,15 @@ public class BudgetService {
     public BudgetService(BizBudgetCategoryMapper categoryMapper,
                          BizBudgetSettingMapper settingMapper,
                          BizTransactionMapper transactionMapper,
-                         BizSavingGoalMapper savingGoalMapper) {
+                         BizSavingGoalMapper savingGoalMapper,
+                         SysMessageMapper messageMapper,
+                         BizRiskWarningMapper riskWarningMapper) {
         this.categoryMapper = categoryMapper;
         this.settingMapper = settingMapper;
         this.transactionMapper = transactionMapper;
         this.savingGoalMapper = savingGoalMapper;
+        this.messageMapper = messageMapper;
+        this.riskWarningMapper = riskWarningMapper;
     }
 
     // ============================================================
@@ -169,6 +179,18 @@ public class BudgetService {
                 // C-3 三级提醒判定
                 remindLevel = calcRemindLevel(percent, setting);
                 remindMessage = buildRemindMessage(remindLevel, category.getCategoryName(), newRemaining, percent);
+
+                // 站内信 + 风险预警双通道触达（去重：每档仅首次触发）
+                boolean shouldSend = shouldSendRemind(setting, remindLevel);
+                if (shouldSend && remindLevel > 0) {
+                    // 站内信
+                    sendBudgetMessage(userId, remindLevel, remindMessage, setting.getId());
+                    // 超支同步落 biz_risk_warning
+                    if (remindLevel == 3) {
+                        saveBudgetRiskWarning(userId, category.getCategoryName(),
+                                newRemaining, percent, setting.getId());
+                    }
+                }
 
                 // 标记提醒已发送（去重）
                 markRemindSent(setting, remindLevel);
@@ -390,6 +412,58 @@ public class BudgetService {
         if (level >= 3 && (setting.getRemindOverSent() == null || setting.getRemindOverSent() == 0)) {
             setting.setRemindOverSent(1);
         }
+    }
+
+    /**
+     * 判断当前提醒级别是否需要发送（每档仅首次触发）
+     */
+    private boolean shouldSendRemind(BizBudgetSetting setting, int level) {
+        return switch (level) {
+            case 1 -> setting.getRemind50Sent() == null || setting.getRemind50Sent() == 0;
+            case 2 -> setting.getRemind20Sent() == null || setting.getRemind20Sent() == 0;
+            case 3 -> setting.getRemindOverSent() == null || setting.getRemindOverSent() == 0;
+            default -> false;
+        };
+    }
+
+    /**
+     * 发送预算提醒站内信
+     */
+    private void sendBudgetMessage(Long userId, int level, String message, Long settingId) {
+        String title = switch (level) {
+            case 1 -> "预算温和提醒";
+            case 2 -> "预算紧张提醒";
+            case 3 -> "预算超支预警";
+            default -> "预算提醒";
+        };
+        SysMessage msg = new SysMessage();
+        msg.setUserId(userId);
+        msg.setTitle(title);
+        msg.setContent(message + " 【模拟】");
+        msg.setType("BUDGET");
+        msg.setBizType("BUDGET");
+        msg.setBizId(settingId);
+        msg.setIsRead(0);
+        messageMapper.insert(msg);
+    }
+
+    /**
+     * 超支写入 biz_risk_warning（warning_type=BUDGET_OVER）
+     */
+    private void saveBudgetRiskWarning(Long userId, String categoryName,
+                                        BigDecimal remaining, BigDecimal percent, Long settingId) {
+        BizRiskWarning warning = new BizRiskWarning();
+        warning.setUserId(userId);
+        warning.setWarningType("BUDGET_OVER");
+        warning.setWarningLevel("HIGH");
+        warning.setWarningTitle("预算超支预警 - " + categoryName);
+        warning.setWarningContent(categoryName + "预算已超支" + remaining.abs() + "元（使用率" + percent + "%），请及时调整消费计划。【模拟】");
+        warning.setRelatedModule("BUDGET");
+        warning.setRelatedId(settingId);
+        warning.setIsRead(0);
+        warning.setIsHandled(0);
+        warning.setWarningTime(LocalDateTime.now());
+        riskWarningMapper.insert(warning);
     }
 
     private String generateNo(String prefix) {

@@ -98,4 +98,72 @@ public class LoanController {
         Long userId = UserContext.getUserId();
         return Result.success(loanService.getApplication(userId, id));
     }
+
+    // ============================================================
+    //  L-补1 A类循环贷随借随还（缺口 #10）
+    // ============================================================
+
+    @Operation(summary = "A类循环贷提款",
+            description = "从A类5万循环额度中分次提款，按日计息（年化3.85%模拟）。")
+    @PostMapping("/withdraw")
+    public Result<CreditTxnVO> withdraw(@Valid @RequestBody WithdrawDTO dto) {
+        Long userId = UserContext.getUserId();
+        return Result.success(loanService.withdraw(userId, dto));
+    }
+
+    @Operation(summary = "A类循环贷还款",
+            description = "归还后额度自动恢复，按实际用款天数和利率计息（年化3.85%模拟）。")
+    @PostMapping("/repay")
+    public Result<CreditTxnVO> repay(@Valid @RequestBody RepayDTO dto) {
+        Long userId = UserContext.getUserId();
+        return Result.success(loanService.repay(userId, dto));
+    }
+
+    @Operation(summary = "查询循环贷流水", description = "提款/还款流水列表")
+    @GetMapping("/credit-txns")
+    public Result<List<CreditTxnVO>> creditTxns() {
+        Long userId = UserContext.getUserId();
+        return Result.success(loanService.listCreditTxns(userId));
+    }
+
+    // ============================================================
+    //  L-补2 B转A观察期（缺口 #11）
+    // ============================================================
+
+    @Operation(summary = "查询B转A观察期状态",
+            description = "查询B类授信的观察期进度、评分、剩余月数。")
+    @GetMapping("/observation")
+    public Result<ObservationVO> observationStatus() {
+        Long userId = UserContext.getUserId();
+        return Result.success(loanService.getObservationStatus(userId));
+    }
+
+    @Operation(summary = "模拟月份推进（加速观察）",
+            description = "每次调用推进1个月，根据受托支付+记账+还款数据计算月度评分。6个月后达标（≥60分）转A类+提额，不达标维持B类。")
+    @PostMapping("/observation/advance")
+    public Result<ObservationVO> advanceObservation() {
+        Long userId = UserContext.getUserId();
+        return Result.success(loanService.advanceObservation(userId));
+    }
+
+    // ============================================================
+    //  L-补3 商户白名单管理（缺口 #6）
+    // ============================================================
+
+    @Operation(summary = "按认证状态筛选商户列表",
+            description = "verifyStatus: VERIFIED-白名单 / PENDING-灰名单 / REJECTED-已拒绝，不传则返回全部。")
+    @GetMapping("/merchants/by-status")
+    public Result<List<BizMerchant>> merchantsByStatus(
+            @RequestParam(required = false) String verifyStatus) {
+        return Result.success(loanService.listMerchantsByVerifyStatus(verifyStatus));
+    }
+
+    @Operation(summary = "banker审核商户白名单",
+            description = "banker01对商户进行白名单审核：VERIFIED-加入白名单 / REJECTED-拒绝。")
+    @PutMapping("/merchants/{id}/audit")
+    public Result<BizMerchant> auditMerchant(
+            @PathVariable Long id,
+            @RequestParam String verifyStatus) {
+        return Result.success(loanService.auditMerchant(id, verifyStatus));
+    }
 }

@@ -24,12 +24,12 @@ import java.io.IOException;
  * 4. 放行 / 拦截
  * <p>
  * 白名单：登录、注册、swagger 文档等接口直接放行
- * 管理端接口（/admin/**）要求 ADMIN 角色
- * 用户端接口（/v1/**）要求 USER 或 ADMIN 角色
+ * 管理端接口（/admin/**）要求 ADMIN 或 BANK_OPERATOR 角色
+ * 用户端接口（/v1/**）要求已登录
  * <p>
  * 错误码对齐文档定义：
  * - 未登录/Token 无效：1002
- * - 越权访问（非管理员访问管理端）：4001
+ * - 越权访问（非后台角色访问管理端）：4001
  */
 @Slf4j
 @Component
@@ -87,8 +87,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         String username = jwtUtil.getUsername(token);
         String role = jwtUtil.getRole(token);
 
-        // 管理端接口需要 ADMIN 角色，越权返回 4001
-        if (isAdminPath(uri) && !"ADMIN".equals(role)) {
+        // 管理端接口需要 ADMIN 或 banker 角色，越权返回 4001
+        if (isAdminPath(uri) && !isBackOffice(role)) {
             writeError(response, ErrorCode.FORBIDDEN);
             return;
         }
@@ -130,6 +130,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
      */
     private boolean isAdminPath(String uri) {
         return uri.contains("/admin/");
+    }
+
+    /**
+     * 判断是否为后台角色（ADMIN 系统管理员 / BANK_OPERATOR 银行运营岗）
+     * 管理端审核台允许两类角色进入（补充计划书 §8）
+     */
+    private boolean isBackOffice(String role) {
+        return "ADMIN".equals(role) || "BANK_OPERATOR".equals(role);
     }
 
     /**
