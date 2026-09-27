@@ -49,7 +49,7 @@ public class ScenarioTeachingService {
      */
     public List<BizAntiFraudContent> listScenarios(String category) {
         LambdaQueryWrapper<BizAntiFraudContent> wrapper = new LambdaQueryWrapper<BizAntiFraudContent>()
-                .eq(BizAntiFraudContent::getContentType, CONTENT_TYPE_SCENARIO)
+                .in(BizAntiFraudContent::getContentType, CONTENT_TYPE_SCENARIO, "SCENARIO_DIALOG")
                 .eq(BizAntiFraudContent::getStatus, 1)
                 .orderByAsc(BizAntiFraudContent::getSortOrder);
         if (category != null && !category.isEmpty()) {

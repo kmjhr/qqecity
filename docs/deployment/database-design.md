@@ -1,6 +1,6 @@
 # 青启e城 · 数据库 ER 关系说明
 
-> 共 30 张表，分 7 大模块 + 5 张补充计划新增表。本文档用文字描述各表之间的实体关系与核心外键关联。
+> 共 32 张表，分 7 大模块 + 7 张补充计划新增表。本文档用文字描述各表之间的实体关系与核心外键关联。
 > 表命名：`sys_*` 系统公共表，`biz_*` 业务模块表。
 >
 > **初始化方式**：执行 `backend/sql/init-database.sql`（内部按序 SOURCE schema.sql + data.sql）
@@ -19,7 +19,7 @@
 | 经营赋能 | 2 | biz_bookkeeping_record, biz_cashflow_report |
 | 预算消费 | 4 | biz_budget_category, biz_budget_setting, biz_transaction, biz_saving_goal |
 | 金融安全 | 4 | biz_anti_fraud_content, biz_fraud_detection_log, biz_credit_report, biz_risk_warning |
-| 补充计划新增表 | 5 | biz_policy, biz_credit_txn, biz_insurance_product, biz_finance_product, biz_risk_assessment |
+| 补充计划新增表 | 7 | biz_policy, biz_credit_txn, biz_insurance_product, biz_finance_product, biz_risk_assessment, biz_scenario_practice, biz_scenario_round |
 
 ---
 
@@ -67,6 +67,19 @@
 - **使用约束**：未完成测评不允许进入理财推荐；测评过期需重新测评
 - **关联接口**：`GET /api/v1/consumption/risk-assessment/questionnaire`、`POST /api/v1/consumption/risk-assessment/submit`、`GET /api/v1/consumption/risk-assessment/latest`
 
+
+### biz_scenario_practice 反诈对话演练记录表（L3 对话式演练，模拟）
+
+- **用途**：记录「对话式反诈演练」（AI 扮演诈骗分子，用户自由发言对抗）的完整演练记录；结果联动画像「反诈指数」与消息中心站内信
+- **核心字段**：`practice_no`（演练编号，唯一）、`user_id`、`scenario_id`（→ biz_anti_fraud_content.id，content_type=SCENARIO_DIALOG）、`round_count`、`result`（SAFE识破/LURED被诱骗/TIMEOUT超时/FINISHED主动结束）、`risk_score`（0-100 越低越安全）、`result_desc`（AI 复盘摘要）
+- **判定规则**：识破词库/危险词库双层打分；安全分≥70 识破、≤40 连续 2 回合被诱骗、≥10 回合超时；LLM 增强可配（缺 Key 自动降级本地剧本）
+- **关联接口**：`POST /api/v1/safety/scenario/{id}/practice/start`、`POST /api/v1/safety/scenario/practice/{practiceNo}/turn`、`POST /api/v1/safety/scenario/practice/{practiceNo}/finish`、`GET /api/v1/safety/scenario/practice/history`、`GET /api/v1/safety/scenario/practice/{practiceNo}`
+
+### biz_scenario_round 反诈对话演练回合明细表（L3 对话式演练，模拟）
+
+- **用途**：演练每一回合的发言明细（诈骗方话术 / 用户应对 + 该回合安全分），用于回放复盘
+- **核心字段**：`practice_id`（→ biz_scenario_practice.id）、`round_no`、`speaker`（FRAUD/USER）、`content`（发言内容）、`safe_score`（用户回合安全分 0-100）、`hit_words`（命中的词库标签，逗号分隔）
+- **关联接口**：`GET /api/v1/safety/scenario/practice/{practiceNo}`（回放时返回主表+回合明细）
 ---
 
 ## 二、核心 ER 关系详述
