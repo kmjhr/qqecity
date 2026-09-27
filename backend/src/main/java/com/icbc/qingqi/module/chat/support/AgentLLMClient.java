@@ -58,6 +58,13 @@ public class AgentLLMClient {
      * 返回 LLM 生成的回答
      */
     public String chat(String context, List<String> historyMessages, String userMessage) {
+        return chat(context, historyMessages, userMessage, systemPrompt);
+    }
+
+    /**
+     * 调用 LLM（可覆盖 system prompt，供反诈演练等场景使用角色人设而非客服人设）
+     */
+    public String chat(String context, List<String> historyMessages, String userMessage, String systemOverride) {
         if (!isAvailable()) {
             throw new IllegalStateException("LLM API Key 未配置，agent 模式不可用");
         }
@@ -68,10 +75,10 @@ public class AgentLLMClient {
             body.put("temperature", 0.3);
 
             ArrayNode messages = body.putArray("messages");
-            // 系统提示词
+            // 系统提示词（演练等场景可覆盖为角色人设）
             ObjectNode sysMsg = messages.addObject();
             sysMsg.put("role", "system");
-            sysMsg.put("content", systemPrompt + "\n\n【知识库上下文】\n" + context);
+            sysMsg.put("content", systemOverride + "\n\n【知识库上下文】\n" + context);
 
             // 历史对话
             for (int i = 0; i < historyMessages.size(); i += 2) {

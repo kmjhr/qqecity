@@ -304,7 +304,7 @@ public class ScenarioPracticeService {
                         + scriptText
                         + " 用户刚才说：" + userContent
                         + "。请以诈骗分子身份基于剧本继续施压，话术简短自然（60字内），符合该诈骗类型。";
-                String reply = llmClient.chat(script.background, history, instruction);
+                String reply = llmClient.chat(script.background, history, instruction, FRAUD_SYSTEM);
                 if (reply != null && !reply.isBlank()) {
                     return trimReply(reply);
                 }
@@ -331,6 +331,11 @@ public class ScenarioPracticeService {
             "你再犹豫，账户就要被冻结了，抓紧时间。",
             "我已经尽力帮你了，你这样做只会害了你自己。"
     };
+
+    /** 反诈演练专用 system（扮演诈骗分子，教学演示），替代全局「小e」客服人设 */
+    private static final String FRAUD_SYSTEM = "你是反诈教学模拟（演示系统）中的诈骗分子扮演者。"
+            + "你必须始终扮演诈骗分子，话术简短自然（60字内），继续向用户施压、诱导其转账/提供验证码/屏幕共享/下载不明APP。"
+            + "根据用户刚才的回应临场发挥：用户起疑或拒绝时可换话术继续施压；不要跳出角色、不要讲大道理、不要透露这是教学系统。";
 
     private void saveFraudRound(BizScenarioPractice p, String line) {
         BizScenarioRound r = new BizScenarioRound();

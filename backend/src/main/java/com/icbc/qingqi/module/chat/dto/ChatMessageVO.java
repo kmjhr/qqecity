@@ -26,5 +26,15 @@ public class ChatMessageVO {
     /** 来源引用（仅 assistant 返回） */
     private List<ChatSourceVO> sources;
 
+    /** 意图跳转动作（仅 assistant，如 {label:"去申请保函", url:"/pages/guarantee/apply"}） */
+    private ChatActionVO action;
+
     private LocalDateTime timestamp;
+
+    /** 意图跳转动作（前端可点跳转对应功能页） */
+    @Data
+    public static class ChatActionVO {
+        private String label;
+        private String url;
+    }
 }

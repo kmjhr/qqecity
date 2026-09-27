@@ -63,6 +63,9 @@
                 {{ sourceTypeName(s.sourceType) }}：{{ s.title }}
               </el-tag>
             </div>
+            <div v-if="m.action" class="msg-action">
+              <el-button size="small" type="primary" plain @click="goAction(m.action)">{{ m.action.label }}</el-button>
+            </div>
             <div class="msg-time">{{ formatTime(m.timestamp) }}</div>
           </div>
         </div>
@@ -101,6 +104,7 @@
 
 <script setup>
 import { ref, nextTick, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getEngineStatus, sendMessage, getChatHistory, clearChatHistory } from '@/api/chat'
 
@@ -131,6 +135,11 @@ function onModeChange(val) {
   }
 }
 const msgBoxRef = ref(null)
+const router = useRouter()
+
+function goAction(action) {
+  if (action?.url) router.push(action.url)
+}
 
 function engineModeName(mode) {
   return { local: '本地引擎', agent: 'AI 增强', fallback: 'AI 降级本地' }[mode] || mode
@@ -311,6 +320,9 @@ onMounted(async () => {
 }
 .src-tag {
   cursor: default;
+}
+.msg-action {
+  margin-top: 8px;
 }
 .msg-time {
   margin-top: 4px;
