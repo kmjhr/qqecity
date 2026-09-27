@@ -86,6 +86,12 @@ public class ChatService {
             List<String> history = historyStore.loadHistory(userId);
             try {
                 String llmAnswer = llmClient.chat(context, history, userMsg);
+                // 兜底清理：无论 LLM 在何处输出"（模拟对话引擎/仅供参考）"标注（行首/行尾/段尾），全部剥离，由系统统一前缀一次
+                llmAnswer = llmAnswer
+                        .replace("模拟对话引擎/仅供参考", "")
+                        .replaceAll("[（(][)）]", "")
+                        .replaceAll("\\n{3,}", "\n\n")
+                        .trim();
                 activeEngine = "agent";
                 answer = "（模拟对话引擎/仅供参考）\n" + llmAnswer;
             } catch (Exception e) {

@@ -53,3 +53,6 @@ application-dev.yml
 
 # 测试基建（含 JWT，勿提交）
 .test-tokens.json
+
+# Word 临时锁文件（打开文档时产生，不入库）
+~$*.docx
