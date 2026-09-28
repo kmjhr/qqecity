@@ -109,10 +109,10 @@
                     </div>
                     <div class="repay-remark">{{ repayPreview.remark }}</div>
                   </el-col>
-                  <!-- 右列：借款明细 + 还款操作 -->
-                  <el-col :xs="24" :md="15">
+                  <!-- 右列：借款明细 + 还款操作（固定表格高度 + 操作区贴底） -->
+                  <el-col :xs="24" :md="15" class="repay-right">
                     <div class="loan-table-title">未结清借款明细（按笔计息 · 先进先出冲抵）</div>
-                    <el-table :data="repayPreview.loans || []" size="small" max-height="200" style="margin-bottom:8px">
+                    <el-table :data="repayPreview.loans || []" size="small" height="280" style="margin-bottom:8px">
                       <el-table-column label="借款日期" width="92">
                         <template #default="{ row }">{{ row.loanDate }}</template>
                       </el-table-column>
@@ -135,7 +135,8 @@
                         </template>
                       </el-table-column>
                     </el-table>
-                    <div class="repay-form">
+                    <div class="repay-ops">
+                      <div class="repay-form">
                       <div class="repay-form-label" v-if="repayLoanNo">
                         本次操作：结清借款 <b style="color:#e6a23c">{{ repayLoanNo }}</b>（本息合计，一次付清）
                       </div>
@@ -155,6 +156,7 @@
                           还款保障金一键还款<template v-if="repayGuard">（可用 ¥{{ repayGuard.balance }}，覆盖 {{ repayGuard.coverage }}% 待还）</template>
                         </el-button>
                       </div>
+                    </div>
                     </div>
                   </el-col>
                 </el-row>
@@ -466,10 +468,10 @@
                     </div>
                     <div class="repay-remark">{{ repayPreview.remark }}</div>
                   </el-col>
-                  <!-- 右列：借款明细 + 还款操作 -->
-                  <el-col :xs="24" :md="15">
+                  <!-- 右列：借款明细 + 还款操作（固定表格高度 + 操作区贴底） -->
+                  <el-col :xs="24" :md="15" class="repay-right">
                     <div class="loan-table-title">未结清借款明细（按笔计息 · 先进先出冲抵）</div>
-                    <el-table :data="repayPreview.loans || []" size="small" max-height="200" style="margin-bottom:8px">
+                    <el-table :data="repayPreview.loans || []" size="small" height="280" style="margin-bottom:8px">
                       <el-table-column label="借款日期" width="92">
                         <template #default="{ row }">{{ row.loanDate }}</template>
                       </el-table-column>
@@ -492,7 +494,8 @@
                         </template>
                       </el-table-column>
                     </el-table>
-                    <div class="repay-form">
+                    <div class="repay-ops">
+                      <div class="repay-form">
                       <div class="repay-form-label" v-if="repayLoanNo">
                         本次操作：结清借款 <b style="color:#e6a23c">{{ repayLoanNo }}</b>（本息合计，一次付清）
                       </div>
@@ -512,6 +515,7 @@
                           还款保障金一键还款<template v-if="repayGuard">（可用 ¥{{ repayGuard.balance }}，覆盖 {{ repayGuard.coverage }}% 待还）</template>
                         </el-button>
                       </div>
+                    </div>
                     </div>
                   </el-col>
                 </el-row>
@@ -1086,7 +1090,10 @@ onMounted(() => { loadRules(); loadCredit(); loadMerchants(); loadApplications()
 .repay-form { margin-top: 4px; }
 .repay-form-label { font-size: 13px; color: #909399; margin-bottom: 6px; }
 .repay-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-.repay-btns .el-button { flex: 1; min-width: 150px; margin: 0; }
+.repay-btns .el-button { flex: 0 0 auto; min-width: 0; margin: 0; white-space: normal; }
+.repay-right { display: flex; flex-direction: column; min-width: 0; }
+.repay-ops { margin-top: auto; padding-top: 4px; }
+.repay-right :deep(.el-table__body-wrapper) { overflow-y: auto; }
 .obs-banner { margin-bottom: 16px; border-top: 3px solid #67c23a; }
 .obs-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 .obs-title { font-size: 15px; font-weight: 600; color: #303133; }
