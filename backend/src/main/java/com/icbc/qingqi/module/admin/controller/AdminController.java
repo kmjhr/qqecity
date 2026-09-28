@@ -8,13 +8,19 @@ import com.icbc.qingqi.module.admin.service.AdminService;
 import com.icbc.qingqi.module.guarantee.entity.BizGuaranteeApplication;
 import com.icbc.qingqi.module.loan.entity.BizCreditTxn;
 import com.icbc.qingqi.module.loan.entity.BizEntrustPayment;
+import com.icbc.qingqi.module.loan.entity.BizEntrustReview;
 import com.icbc.qingqi.module.loan.entity.BizLoanApplication;
+import com.icbc.qingqi.module.loan.entity.BizMerchant;
+import com.icbc.qingqi.module.loan.service.LoanService;
 import com.icbc.qingqi.module.risk.entity.BizRiskWarning;
+import com.icbc.qingqi.security.UserContext;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 /**
  * 管理端业务审核台（步骤 8·缺口 #22）
@@ -37,9 +43,11 @@ import org.springframework.web.bind.annotation.*;
 public class AdminController {
 
     private final AdminService adminService;
+    private final LoanService loanService;
 
-    public AdminController(AdminService adminService) {
+    public AdminController(AdminService adminService, LoanService loanService) {
         this.adminService = adminService;
+        this.loanService = loanService;
     }
 
     // ============================================================
@@ -101,6 +109,50 @@ public class AdminController {
             @Parameter(description = "支付状态：PENDING/PROCESSING/SUCCESS/FAILED")
             @RequestParam(required = false) String paymentStatus) {
         return Result.success(adminService.pageEntrustPayments(pageNum, pageSize, paymentStatus));
+    }
+
+    // ============================================================
+    //  ④ 商户白名单审核（自定义商户审查）
+    // ============================================================
+
+    @Operation(summary = "④ 商户白名单队列（按状态）",
+            description = "verifyStatus: PENDING待审（默认全量含灰名单）/ VERIFIED-白名单 / REJECTED-已拒绝。含用户自定义商户（来源USER_CUSTOM）与预置商户（SYSTEM）。")
+    @GetMapping("/merchants")
+    public Result<List<BizMerchant>> merchants(
+            @Parameter(description = "认证状态") @RequestParam(required = false) String verifyStatus) {
+        return Result.success(loanService.listMerchantsByVerifyStatus(verifyStatus));
+    }
+
+    @Operation(summary = "④-2 banker 审核商户白名单（含自定义商户）",
+            description = "对 PENDING 商户裁决：VERIFIED-加入白名单（用户端立即可选）/ REJECTED-拒绝（必须填 reason 驳回原因，用户端可见）。")
+    @PutMapping("/merchants/{id}/audit")
+    public Result<BizMerchant> auditMerchant(
+            @Parameter(description = "商户ID") @PathVariable Long id,
+            @Parameter(description = "审核结论：VERIFIED/REJECTED") @RequestParam String verifyStatus,
+            @Parameter(description = "审核意见/驳回原因") @RequestParam(required = false) String reason) {
+        return Result.success(loanService.auditMerchant(id, verifyStatus, reason, UserContext.getUserId()));
+    }
+
+    // ============================================================
+    //  ④-3 受托支付复核（自定义商户每单复核）
+    // ============================================================
+
+    @Operation(summary = "④-3 受托支付复核单队列（自定义商户每单复核）",
+            description = "用户自定义商户（USER_CUSTOM）每次受托支付提交后生成复核单（PENDING），banker 复核通过后才执行放款；status: PENDING/APPROVED/REJECTED。")
+    @GetMapping("/entrust-reviews")
+    public Result<List<BizEntrustReview>> entrustReviews(
+            @Parameter(description = "复核状态：PENDING/APPROVED/REJECTED") @RequestParam(required = false) String status) {
+        return Result.success(loanService.listEntrustReviews(status));
+    }
+
+    @Operation(summary = "④-3-2 banker 复核受托支付（自定义商户每单复核）",
+            description = "approve=true 复核通过并执行放款（扣额度+EP流水+商户收款入账）；approve=false 驳回，不放款、额度不动。")
+    @PutMapping("/entrust-reviews/{id}/audit")
+    public Result<BizEntrustReview> auditEntrustReview(
+            @Parameter(description = "复核单ID") @PathVariable Long id,
+            @Parameter(description = "复核结论：true通过并放款/false驳回") @RequestParam boolean approve,
+            @Parameter(description = "复核意见/驳回原因") @RequestParam(required = false) String reason) {
+        return Result.success(loanService.auditEntrustReview(id, approve, reason, UserContext.getUserId()));
     }
 
     // ============================================================

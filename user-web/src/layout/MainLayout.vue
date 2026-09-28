@@ -37,6 +37,14 @@
             <el-icon><Shield /></el-icon>
             <span>金融安全</span>
           </el-menu-item>
+          <el-menu-item index="/bookkeeping">
+            <el-icon><Notebook /></el-icon>
+            <span>创业经营</span>
+          </el-menu-item>
+          <el-menu-item index="/orders">
+            <el-icon><List /></el-icon>
+            <span>我的订单</span>
+          </el-menu-item>
           <el-sub-menu index="/intelligence">
             <template #title>
               <el-icon><ChatLineSquare /></el-icon>
@@ -61,10 +69,6 @@
             <el-menu-item index="/teaching">
               <el-icon><Reading /></el-icon>
               <span>反诈教学</span>
-            </el-menu-item>
-            <el-menu-item index="/orders">
-              <el-icon><List /></el-icon>
-              <span>订单中心</span>
             </el-menu-item>
           </el-sub-menu>
         </el-menu>

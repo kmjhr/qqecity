@@ -43,8 +43,26 @@ public class BizMerchant {
     /** 开户银行 */
     private String bankName;
 
-    /** 认证状态：VERIFIED 等 */
+    /** 认证状态：VERIFIED白名单 / PENDING待审 / REJECTED已拒绝 */
     private String verifyStatus;
+
+    /** 商户来源：SYSTEM预置 / USER_CUSTOM用户自定义 */
+    private String merchantSource;
+
+    /** 申请人用户ID（用户自定义商户） */
+    private Long applicantUserId;
+
+    /** 申请说明 */
+    private String applyRemark;
+
+    /** 审核意见/驳回原因 */
+    private String reviewRemark;
+
+    /** 审核人ID（banker） */
+    private Long reviewerId;
+
+    /** 审核时间 */
+    private LocalDateTime reviewTime;
 
     /** 状态：0-禁用，1-正常 */
     private Integer status;

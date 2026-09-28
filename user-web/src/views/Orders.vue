@@ -14,42 +14,6 @@
         </div>
       </template>
 
-      <!-- 青创集市消费（模拟下单 → 扫码支付） -->
-      <div class="consume-entry">
-        <el-button type="success" plain @click="consumeVisible = !consumeVisible">
-          <el-icon><ShoppingCart /></el-icon> 青创集市消费（模拟下单）
-        </el-button>
-        <div v-if="consumeVisible" class="consume-form">
-          <el-form :inline="true">
-            <el-form-item label="商户">
-              <el-select v-model="consume.merchantId" placeholder="选择商户" style="width:220px">
-                <el-option v-for="m in merchants" :key="m.id" :label="m.merchantName" :value="m.id" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="金额">
-              <el-input-number v-model="consume.amount" :min="1" :precision="2" style="width:130px" />
-            </el-form-item>
-            <el-form-item label="分类">
-              <el-select v-model="consume.categoryCode" style="width:110px">
-                <el-option label="餐饮" value="FOOD" />
-                <el-option label="购物" value="SHOPPING" />
-                <el-option label="出行" value="TRANSPORT" />
-                <el-option label="娱乐" value="ENTERTAINMENT" />
-                <el-option label="居住" value="HOUSING" />
-                <el-option label="其他" value="OTHER" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="商品">
-              <el-input v-model="consume.subject" placeholder="如：文创笔记本×2" style="width:180px" />
-            </el-form-item>
-            <el-form-item>
-              <el-button type="success" :loading="consuming" @click="submitConsume">下单并扫码支付</el-button>
-            </el-form-item>
-          </el-form>
-          <div class="consume-tip">模拟下单：生成订单 → 弹收银台扫码（微信/支付宝/云闪付/工行）→ 支付成功自动展示订单</div>
-        </div>
-      </div>
-
       <el-table :data="orders" v-loading="loading" style="width:100%">
         <el-table-column prop="orderNo" label="订单号" width="200" />
         <el-table-column label="类型" width="90">
@@ -78,7 +42,7 @@
               <el-button size="small" plain @click="closeOrder(row)">关闭</el-button>
             </template>
             <template v-else-if="row.status === 'PAID'">
-              <el-button size="small" type="warning" plain @click="handleRefund(row)">申请退款</el-button>
+              <span style="color:#c0c4cc;font-size:12px">已支付（不可退款）</span>
             </template>
             <span v-else style="color:#c0c4cc;font-size:12px">—</span>
           </template>
@@ -106,7 +70,7 @@
 <script setup>
 import { ref, watch, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getOrders, closeOrder as apiCloseOrder, refundOrder, consumeOrder, getPayMerchants } from '@/api/pay'
+import { getOrders, closeOrder as apiCloseOrder } from '@/api/pay'
 import PayCashier from '@/components/PayCashier.vue'
 
 const orders = ref([])
@@ -118,29 +82,6 @@ const statusFilter = ref('')
 
 const cashierVisible = ref(false)
 const cashierOrderNo = ref('')
-
-// 青创集市消费
-const consumeVisible = ref(false)
-const merchants = ref([])
-const consume = ref({ merchantId: null, amount: 88, categoryCode: 'SHOPPING', subject: '青创集市-物料采购' })
-const consuming = ref(false)
-const loadMerchants = async () => {
-  try {
-    merchants.value = await getPayMerchants()
-    // 默认选中第一个商户，方便快速演示下单
-    if (!consume.value.merchantId && merchants.value.length) consume.value.merchantId = merchants.value[0].id
-  } catch (e) {}
-}
-const submitConsume = async () => {
-  if (!consume.value.merchantId) { ElMessage.warning('请选择商户'); return }
-  if (!consume.value.subject) { ElMessage.warning('请填写商品名称'); return }
-  consuming.value = true
-  try {
-    const order = await consumeOrder(consume.value)
-    cashierOrderNo.value = order.orderNo
-    cashierVisible.value = true
-  } catch (e) {} finally { consuming.value = false }
-}
 
 const loadOrders = async (page = 1) => {
   pageNum.value = page
@@ -164,15 +105,6 @@ const closeOrder = async (row) => {
   } catch (e) { if (e !== 'cancel') {} }
 }
 
-const handleRefund = async (row) => {
-  try {
-    await ElMessageBox.confirm(`确认退款 ¥${row.amount}？（模拟即时到账，原路退回钱包）`, '申请退款', { type: 'warning' })
-    await refundOrder(row.orderNo, '用户主动申请退款')
-    ElMessage.success('退款成功（模拟，已原路退回）')
-    loadOrders(pageNum.value)
-  } catch (e) { if (e !== 'cancel') {} }
-}
-
 const bizTypeTag = (t) => {
   const map = { GUARANTEE_FEE: 'warning', LOAN_REPAY: 'danger', ENTRUST_PAY: 'info', MERCHANT_CONSUME: 'success', RECHARGE: 'primary', LOAN_WITHDRAW: 'primary' }
   return map[t] || 'info'
@@ -183,14 +115,11 @@ const statusTag = (s) => {
 }
 
 watch(statusFilter, () => loadOrders(1))
-onMounted(() => { loadOrders(1); loadMerchants() })
+onMounted(() => { loadOrders(1) })
 </script>
 
 <style scoped>
 .orders-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
 .section-title { font-weight: 600; color: #303133; }
 .pagination { display: flex; justify-content: flex-end; margin-top: 16px; }
-.consume-entry { margin-bottom: 14px; }
-.consume-form { background: #f5f7fa; border-radius: 8px; padding: 14px 14px 2px; margin-top: 10px; }
-.consume-tip { font-size: 12px; color: #909399; margin-bottom: 10px; }
 </style>

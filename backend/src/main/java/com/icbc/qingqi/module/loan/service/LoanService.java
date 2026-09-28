@@ -46,6 +46,7 @@ public class LoanService {
     private final BizLoanApplicationMapper applicationMapper;
     private final BizCreditLimitMapper creditLimitMapper;
     private final BizEntrustPaymentMapper paymentMapper;
+    private final com.icbc.qingqi.module.loan.mapper.BizEntrustReviewMapper entrustReviewMapper;
     private final BizCreditTxnMapper creditTxnMapper;
     private final BizBookkeepingRecordMapper bookkeepingMapper;
     private final SysMessageMapper messageMapper;
@@ -88,6 +89,7 @@ public class LoanService {
                        BizLoanApplicationMapper applicationMapper,
                        BizCreditLimitMapper creditLimitMapper,
                        BizEntrustPaymentMapper paymentMapper,
+                       com.icbc.qingqi.module.loan.mapper.BizEntrustReviewMapper entrustReviewMapper,
                        BizCreditTxnMapper creditTxnMapper,
                        BizBookkeepingRecordMapper bookkeepingMapper,
                        SysMessageMapper messageMapper,
@@ -96,6 +98,7 @@ public class LoanService {
         this.applicationMapper = applicationMapper;
         this.creditLimitMapper = creditLimitMapper;
         this.paymentMapper = paymentMapper;
+        this.entrustReviewMapper = entrustReviewMapper;
         this.creditTxnMapper = creditTxnMapper;
         this.bookkeepingMapper = bookkeepingMapper;
         this.messageMapper = messageMapper;
@@ -390,6 +393,13 @@ public class LoanService {
             throw new BizException(ErrorCode.BIZ_RULE_NOT_MET,
                     "商户「" + merchant.getMerchantName() + "」当前为" + statusName + "，非白名单商户不可受托支付");
         }
+        // 归属校验（用户自定义商户仅本人可用）
+        if ("USER_CUSTOM".equals(merchant.getMerchantSource())) {
+            if (merchant.getApplicantUserId() == null || !merchant.getApplicantUserId().equals(userId)) {
+                throw new BizException(ErrorCode.FORBIDDEN,
+                        "商户「" + merchant.getMerchantName() + "」为其他用户的自定义商户，不可使用");
+            }
+        }
 
         // 支付金额不得超过申请批准额度（用户看到"申请到能用的钱"）
         if (app.getApproveAmount() != null && dto.getAmount().compareTo(app.getApproveAmount()) > 0) {
@@ -397,6 +407,63 @@ public class LoanService {
                     "支付金额超过申请批准额度（批准额度：¥" + app.getApproveAmount() + "）");
         }
 
+        // 用户自定义商户：每单复核（两步式）→ 生成复核单，不放款，待管理端 banker 复核通过后执行放款
+        if ("USER_CUSTOM".equals(merchant.getMerchantSource())) {
+            BizCreditLimit limit = creditLimitMapper.selectOne(
+                    new LambdaQueryWrapper<BizCreditLimit>()
+                            .eq(BizCreditLimit::getUserId, userId)
+                            .eq(BizCreditLimit::getCreditType, app.getLoanType()));
+            if (limit == null) {
+                throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "无可用授信额度");
+            }
+            if (limit.getAvailableLimit().compareTo(dto.getAmount()) < 0) {
+                throw new BizException(ErrorCode.BIZ_RULE_NOT_MET,
+                        "可用额度不足（可用：" + limit.getAvailableLimit() + "）");
+            }
+            BizEntrustReview review = new BizEntrustReview();
+            review.setReviewNo(generateNo("ERR"));
+            review.setUserId(userId);
+            review.setLoanApplicationId(app.getId());
+            review.setMerchantId(merchant.getId());
+            review.setMerchantName(merchant.getMerchantName());
+            review.setAmount(dto.getAmount());
+            review.setPurpose(dto.getPurpose());
+            review.setTradeProof(dto.getTradeProof());
+            review.setStatus("PENDING");
+            entrustReviewMapper.insert(review);
+
+            EntrustPaymentVO vo = new EntrustPaymentVO();
+            vo.setId(review.getId());
+            vo.setPaymentNo(review.getReviewNo());
+            vo.setUserId(userId);
+            vo.setLoanApplicationId(app.getId());
+            vo.setMerchantId(merchant.getId());
+            vo.setMerchantName(merchant.getMerchantName());
+            vo.setAmount(dto.getAmount());
+            vo.setPurpose(dto.getPurpose());
+            vo.setPaymentStatus("PENDING_REVIEW");
+            vo.setPaymentStatusName("待银行复核");
+            vo.setPendingReview(Boolean.TRUE);
+            vo.setReviewNo(review.getReviewNo());
+            vo.setReviewStatus("PENDING");
+            vo.setReviewStatusName("待复核");
+            vo.setFundPath("自定义商户每单复核：复核通过后 100% 直付商户账户（不经过个人账户）【模拟】");
+            log.info("[受托支付-每单复核] 用户={}, 商户={}, 金额={}, 复核单={}, 待管理端复核放款【模拟】",
+                    userId, merchant.getMerchantName(), dto.getAmount(), review.getReviewNo());
+            return vo;
+        }
+
+        // 平台通用商户：直接放款（100% 受托支付）
+        return doEntrustPay(userId, app, merchant, dto.getAmount(), dto.getPurpose(), dto.getTradeProof());
+    }
+
+    /**
+     * 执行受托支付放款（平台商户直接调用；自定义商户复核通过后调用）
+     * 扣减额度 + 生成 EP 流水 + 商户收款入账（资金不经过个人账户）
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public EntrustPaymentVO doEntrustPay(Long userId, BizLoanApplication app, BizMerchant merchant,
+                                         BigDecimal amount, String purpose, String tradeProof) {
         // 扣减额度（按申请类型对应的授信额度）
         BizCreditLimit limit = creditLimitMapper.selectOne(
                 new LambdaQueryWrapper<BizCreditLimit>()
@@ -405,14 +472,13 @@ public class LoanService {
         if (limit == null) {
             throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "无可用授信额度");
         }
-        if (limit.getAvailableLimit().compareTo(dto.getAmount()) < 0) {
+        if (limit.getAvailableLimit().compareTo(amount) < 0) {
             throw new BizException(ErrorCode.BIZ_RULE_NOT_MET,
                     "可用额度不足（可用：" + limit.getAvailableLimit() + "）");
         }
 
-        // 扣减额度
-        limit.setUsedLimit(limit.getUsedLimit().add(dto.getAmount()));
-        limit.setAvailableLimit(limit.getAvailableLimit().subtract(dto.getAmount()));
+        limit.setUsedLimit(limit.getUsedLimit().add(amount));
+        limit.setAvailableLimit(limit.getAvailableLimit().subtract(amount));
         creditLimitMapper.updateById(limit);
 
         // 生成受托支付流水
@@ -422,20 +488,20 @@ public class LoanService {
         payment.setLoanApplicationId(app.getId());
         payment.setMerchantId(merchant.getId());
         payment.setMerchantName(merchant.getMerchantName());
-        payment.setAmount(dto.getAmount());
-        payment.setPurpose(dto.getPurpose());
-        payment.setTradeProof(dto.getTradeProof());
+        payment.setAmount(amount);
+        payment.setPurpose(purpose);
+        payment.setTradeProof(tradeProof);
         payment.setPaymentStatus(PAY_SUCCESS);
         payment.setPaymentTime(LocalDateTime.now());
         paymentMapper.insert(payment);
 
         // 支付中台记账：银行资金直付商户账户（不经过个人钱包）
-        payService.incomeToMerchant(merchant.getId(), dto.getAmount(), payment.getPaymentNo(),
+        payService.incomeToMerchant(merchant.getId(), amount, payment.getPaymentNo(),
                 PayService.BIZ_ENTRUST_PAY, payment.getPaymentNo(),
                 "受托支付（" + merchant.getMerchantName() + "）");
 
-        log.info("[受托支付] 用户={}, 商户={}, 金额={}, 授信类型={}, 资金定向打款至商户（不经过个人账户）【模拟】",
-                userId, merchant.getMerchantName(), dto.getAmount(), app.getLoanType());
+        log.info("[受托支付放款] 用户={}, 商户={}, 金额={}, 授信类型={}, 资金定向打款至商户（不经过个人账户）【模拟】",
+                userId, merchant.getMerchantName(), amount, app.getLoanType());
 
         return toPaymentVO(payment);
     }
@@ -444,9 +510,161 @@ public class LoanService {
     //  商户列表 / 申请列表 / 详情
     // ============================================================
 
-    public List<BizMerchant> listMerchants() {
+    public List<BizMerchant> listMerchants(Long userId) {
+        // 用户端只返回白名单商户：平台通用（SYSTEM，全部用户可选）+ 本人自定义（USER_CUSTOM，仅归属本人）
+        // 自定义商户其他用户不可见不可用（一对一归属）
         return merchantMapper.selectList(
-                new LambdaQueryWrapper<BizMerchant>().eq(BizMerchant::getStatus, 1));
+                new LambdaQueryWrapper<BizMerchant>()
+                        .eq(BizMerchant::getStatus, 1)
+                        .eq(BizMerchant::getVerifyStatus, "VERIFIED")
+                        .and(w -> w.eq(BizMerchant::getMerchantSource, "SYSTEM")
+                                .or(o -> o.eq(BizMerchant::getMerchantSource, "USER_CUSTOM")
+                                        .eq(BizMerchant::getApplicantUserId, userId))));
+    }
+
+    /**
+     * 用户提交自定义商户（B类受托支付收款方）
+     * 进入 PENDING 灰名单，由管理端 banker 审核通过（VERIFIED）后方可用于受托支付
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public BizMerchant applyMerchant(Long userId, MerchantApplyDTO dto) {
+        BizMerchant m = new BizMerchant();
+        m.setMerchantName(dto.getMerchantName());
+        m.setMerchantType(dto.getMerchantType());
+        m.setContactName(dto.getContactName());
+        m.setContactPhone(dto.getContactPhone());
+        m.setAddress(dto.getAddress());
+        m.setBusinessLicense(dto.getBusinessLicense());
+        m.setBankAccount(dto.getBankAccount());
+        m.setBankName(dto.getBankName());
+        m.setApplyRemark(dto.getApplyRemark());
+        m.setMerchantSource("USER_CUSTOM");
+        m.setApplicantUserId(userId);
+        m.setVerifyStatus("PENDING");
+        m.setStatus(1);
+        merchantMapper.insert(m);
+        log.info("[自定义商户申请] 用户={}, 商户={}, ID={}", userId, m.getMerchantName(), m.getId());
+        return m;
+    }
+
+    /**
+     * 我的自定义商户申请列表（含状态：PENDING待审 / VERIFIED已通过 / REJECTED已拒绝）
+     */
+    /**
+     * 打款记录（用户端）：受托支付成功流水（SUCCESS）+ 自定义商户复核单（PENDING_REVIEW / APPROVED / REJECTED）
+     */
+    public List<EntrustRecordVO> listEntrustRecords(Long userId) {
+        List<EntrustRecordVO> list = new ArrayList<>();
+        List<BizEntrustPayment> payments = paymentMapper.selectList(
+                new LambdaQueryWrapper<BizEntrustPayment>()
+                        .eq(BizEntrustPayment::getUserId, userId)
+                        .eq(BizEntrustPayment::getPaymentStatus, PAY_SUCCESS)
+                        .orderByDesc(BizEntrustPayment::getPaymentTime));
+        for (BizEntrustPayment p : payments) {
+            EntrustRecordVO vo = new EntrustRecordVO();
+            vo.setRecordNo(p.getPaymentNo());
+            vo.setRecordType("ENTRUST_PAY");
+            vo.setStatus("SUCCESS");
+            vo.setStatusName("打款成功");
+            vo.setMerchantId(p.getMerchantId());
+            vo.setMerchantName(p.getMerchantName());
+            BizMerchant m = merchantMapper.selectById(p.getMerchantId());
+            vo.setMerchantSource(m != null ? m.getMerchantSource() : "SYSTEM");
+            vo.setAmount(p.getAmount());
+            vo.setPurpose(p.getPurpose());
+            vo.setRecordTime(p.getPaymentTime());
+            vo.setFundPath("100%受托支付：银行直付商户账户（不经过个人账户）【模拟】");
+            list.add(vo);
+        }
+        List<BizEntrustReview> reviews = entrustReviewMapper.selectList(
+                new LambdaQueryWrapper<BizEntrustReview>()
+                        .eq(BizEntrustReview::getUserId, userId)
+                        .orderByDesc(BizEntrustReview::getId));
+        for (BizEntrustReview r : reviews) {
+            EntrustRecordVO vo = new EntrustRecordVO();
+            vo.setRecordNo(r.getReviewNo());
+            vo.setRecordType("ENTRUST_REVIEW");
+            vo.setMerchantId(r.getMerchantId());
+            vo.setMerchantName(r.getMerchantName());
+            vo.setMerchantSource("USER_CUSTOM");
+            vo.setAmount(r.getAmount());
+            vo.setPurpose(r.getPurpose());
+            vo.setReviewRemark(r.getReviewRemark());
+            if ("PENDING".equals(r.getStatus())) {
+                vo.setStatus("PENDING_REVIEW");
+                vo.setStatusName("待银行复核");
+            } else if ("APPROVED".equals(r.getStatus())) {
+                vo.setStatus("SUCCESS");
+                vo.setStatusName("已复核放款");
+            } else {
+                vo.setStatus("REJECTED");
+                vo.setStatusName("已驳回");
+            }
+            vo.setRecordTime(r.getCreateTime());
+            vo.setFundPath("自定义商户每单复核：复核通过后 100% 直付商户账户【模拟】");
+            list.add(vo);
+        }
+        list.sort((a, b) -> {
+            java.time.LocalDateTime ta = a.getRecordTime() == null ? java.time.LocalDateTime.MIN : a.getRecordTime();
+            java.time.LocalDateTime tb = b.getRecordTime() == null ? java.time.LocalDateTime.MIN : b.getRecordTime();
+            return tb.compareTo(ta);
+        });
+        return list;
+    }
+
+    /**
+     * 管理端：受托支付复核单列表（自定义商户每单复核）
+     */
+    public List<BizEntrustReview> listEntrustReviews(String status) {
+        return entrustReviewMapper.selectList(
+                new LambdaQueryWrapper<BizEntrustReview>()
+                        .eq(status != null && !status.isBlank(), BizEntrustReview::getStatus, status)
+                        .orderByAsc(BizEntrustReview::getStatus)
+                        .orderByDesc(BizEntrustReview::getId));
+    }
+
+    /**
+     * 管理端：受托支付复核（每单复核）——通过后执行放款；驳回不打款、额度不动
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public BizEntrustReview auditEntrustReview(Long id, boolean approve, String reason, Long reviewerId) {
+        BizEntrustReview review = entrustReviewMapper.selectById(id);
+        if (review == null) {
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "复核单不存在");
+        }
+        if (!"PENDING".equals(review.getStatus())) {
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "该复核单已处理（当前状态：" + review.getStatus() + "）");
+        }
+        review.setReviewerId(reviewerId);
+        review.setReviewRemark(reason);
+        review.setReviewTime(LocalDateTime.now());
+        if (!approve) {
+            review.setStatus("REJECTED");
+            entrustReviewMapper.updateById(review);
+            log.info("[受托支付复核-驳回] 复核单={}, 驳回原因={}, 复核人={}", review.getReviewNo(), reason, reviewerId);
+            return review;
+        }
+        // 通过 → 执行放款
+        BizLoanApplication app = applicationMapper.selectById(review.getLoanApplicationId());
+        BizMerchant merchant = merchantMapper.selectById(review.getMerchantId());
+        if (app == null || merchant == null || !"USER_CUSTOM".equals(merchant.getMerchantSource())) {
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "申请或商户不存在/已变更");
+        }
+        EntrustPaymentVO vo = doEntrustPay(review.getUserId(), app, merchant, review.getAmount(),
+                review.getPurpose(), review.getTradeProof());
+        review.setStatus("APPROVED");
+        review.setPaymentId(vo.getId());
+        entrustReviewMapper.updateById(review);
+        log.info("[受托支付复核-通过并放款] 复核单={}, EP流水={}, 金额={}, 复核人={}",
+                review.getReviewNo(), vo.getPaymentNo(), review.getAmount(), reviewerId);
+        return review;
+    }
+
+    public List<BizMerchant> myMerchantApplications(Long userId) {
+        return merchantMapper.selectList(
+                new LambdaQueryWrapper<BizMerchant>()
+                        .eq(BizMerchant::getApplicantUserId, userId)
+                        .orderByDesc(BizMerchant::getId));
     }
 
     // ============================================================
@@ -552,6 +770,8 @@ public class LoanService {
 
     /**
      * 两步式还款（扫码支付）：创建还款支付订单（LOAN_REPAY），支付成功后由 onLoanRepayPaid 执行还本付息
+     * <p>
+     * 金额口径（amountType）：PRINCIPAL=本金（默认，利息按笔自动结算）；TOTAL=本息合计（输入含息金额，自动拆分本金+利息）
      */
     @Transactional(rollbackFor = Exception.class)
     public PayOrderVO createRepayOrder(Long userId, String creditType, RepayDTO dto) {
@@ -561,31 +781,100 @@ public class LoanService {
             throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, aType ? "当前无待还本金" : "当前无 B类待还本金");
         }
         BigDecimal rate = aType ? A_TYPE_RATE : B_TYPE_RATE;
-        String remark = null;
+        boolean totalMode = dto.getAmountType() != null && "TOTAL".equalsIgnoreCase(dto.getAmountType());
+        String remark;
         String subject;
+        BigDecimal orderAmount;
+
         if (dto.getLoanNo() != null && !dto.getLoanNo().isBlank()) {
-            // 结清指定借款（按笔）：金额必须等于该笔剩余本金，利息在支付成功后按该笔天数自动结算
+            // 结清指定借款（按笔）：金额必须等于该笔剩余本金（PRINCIPAL）或本息合计（TOTAL），利息按该笔天数结算
             List<LoanItemVO> loans = buildLoanItems(userId, creditType, rate, limit);
             LoanItemVO target = loans.stream()
                     .filter(l -> dto.getLoanNo().equals(l.getLoanNo()))
                     .findFirst()
                     .orElseThrow(() -> new BizException(ErrorCode.BIZ_RULE_NOT_MET,
                             "未找到该笔借款（可能已结清）"));
-            if (dto.getAmount().compareTo(target.getRemainingPrincipal()) != 0) {
-                throw new BizException(ErrorCode.BIZ_RULE_NOT_MET,
-                        "结清借款「" + target.getLoanNo() + "」需还款本金 ¥" + target.getRemainingPrincipal());
+            if (totalMode) {
+                BigDecimal totalDue = target.getRemainingPrincipal().add(target.getInterestPreview());
+                if (dto.getAmount().compareTo(totalDue) != 0) {
+                    throw new BizException(ErrorCode.BIZ_RULE_NOT_MET,
+                            "结清借款「" + target.getLoanNo() + "」需支付本息合计 ¥" + totalDue
+                                    + "（本金 ¥" + target.getRemainingPrincipal() + "＋利息 ¥" + target.getInterestPreview() + "）");
+                }
+                orderAmount = totalDue;
+                remark = "TOTAL#LOAN#" + target.getLoanNo();
+                subject = (aType ? "青创e贷A类还款" : "青创e贷B类还款") + "（结清借款" + target.getLoanNo() + "，本息合计）";
+            } else {
+                if (dto.getAmount().compareTo(target.getRemainingPrincipal()) != 0) {
+                    throw new BizException(ErrorCode.BIZ_RULE_NOT_MET,
+                            "结清借款「" + target.getLoanNo() + "」需还款本金 ¥" + target.getRemainingPrincipal());
+                }
+                orderAmount = target.getRemainingPrincipal();
+                remark = "LOAN#" + target.getLoanNo();
+                subject = (aType ? "青创e贷A类还款" : "青创e贷B类还款") + "（结清借款" + target.getLoanNo() + "）";
             }
-            remark = "LOAN#" + target.getLoanNo();
-            subject = (aType ? "青创e贷A类还款" : "青创e贷B类还款") + "（结清借款" + target.getLoanNo() + "）";
+        } else if (totalMode) {
+            // 本息合计口径：FIFO 拆分为本金+利息，订单金额=实际本息合计（用户输入零头自动吸收）
+            List<LoanItemVO> loans = buildLoanItems(userId, creditType, rate, limit);
+            BigDecimal totalDueAll = loans.stream()
+                    .map(LoanItemVO::getTotalDue)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            if (dto.getAmount().compareTo(totalDueAll) > 0) {
+                throw new BizException(ErrorCode.BIZ_RULE_NOT_MET,
+                        "还款金额不能超过待还本息合计（待还本息：¥" + totalDueAll + "）");
+            }
+            BigDecimal[] split = splitRepay(dto.getAmount(), loans, rate);
+            if (split[0].compareTo(BigDecimal.ZERO) <= 0) {
+                throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "金额过小，至少需还本金 ¥0.01");
+            }
+            orderAmount = split[0].add(split[1]).setScale(2, RoundingMode.HALF_UP);
+            remark = "TOTAL#FIFO";
+            subject = aType ? "青创e贷A类还款（本息合计·扫码支付）" : "青创e贷B类还款（本息合计·扫码支付）";
         } else {
             if (dto.getAmount().compareTo(limit.getUsedLimit()) > 0) {
                 throw new BizException(ErrorCode.BIZ_RULE_NOT_MET,
                         "还款金额不能超过待还本金（待还：¥" + limit.getUsedLimit() + "）");
             }
+            orderAmount = dto.getAmount();
+            remark = null;
             subject = aType ? "青创e贷A类还款（扫码支付）" : "青创e贷B类还款（扫码支付）";
         }
-        log.info("[创建还款订单] 用户={}, 类型={}, 金额={}, 借款={}", userId, creditType, dto.getAmount(), remark);
-        return payService.createBizOrder(userId, "LOAN_REPAY", limit.getId(), subject, dto.getAmount(), null, remark);
+        log.info("[创建还款订单] 用户={}, 类型={}, 金额={}, 借款={}, 口径={}", userId, creditType, orderAmount, remark,
+                totalMode ? "TOTAL" : "PRINCIPAL");
+        return payService.createBizOrder(userId, "LOAN_REPAY", limit.getId(), subject, orderAmount, null, remark);
+    }
+
+    /**
+     * 本息合计拆分（FIFO，利随本清）：给定含息总金额，按时间序逐笔冲抵
+     * 每笔结清需本息=剩余本金+该笔利息；金额不足以结清某笔时，按 本金=金额/(1+日利率×天数) 拆出部分本金
+     *
+     * @return [本金, 利息]
+     */
+    private BigDecimal[] splitRepay(BigDecimal totalAmount, List<LoanItemVO> loans, BigDecimal rate) {
+        BigDecimal remain = totalAmount.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal principal = BigDecimal.ZERO;
+        BigDecimal interest = BigDecimal.ZERO;
+        BigDecimal daily = rate.divide(new BigDecimal("365"), 10, RoundingMode.HALF_UP);
+        for (LoanItemVO l : loans) {
+            if (remain.compareTo(BigDecimal.ZERO) <= 0) break;
+            BigDecimal settle = l.getTotalDue();
+            if (remain.compareTo(settle) >= 0) {
+                principal = principal.add(l.getRemainingPrincipal());
+                interest = interest.add(l.getInterestPreview());
+                remain = remain.subtract(settle);
+            } else {
+                BigDecimal factor = BigDecimal.ONE.add(daily.multiply(new BigDecimal(l.getBorrowDays())));
+                BigDecimal x = remain.divide(factor, 2, RoundingMode.HALF_UP);
+                if (x.compareTo(new BigDecimal("0.01")) >= 0) {
+                    BigDecimal li = x.multiply(rate).multiply(new BigDecimal(l.getBorrowDays()))
+                            .divide(new BigDecimal("365"), 2, RoundingMode.HALF_UP);
+                    principal = principal.add(x);
+                    interest = interest.add(li);
+                }
+                break; // 剩余零头忽略（金额口径以实际本息为准）
+            }
+        }
+        return new BigDecimal[]{principal, interest};
     }
 
     /**
@@ -610,7 +899,20 @@ public class LoanService {
         String remark = event.getRemark();
         List<LoanItemVO> loans = buildLoanItems(event.getUserId(), limit.getCreditType(), rate, limit);
 
-        if (remark != null && remark.startsWith("LOAN#")) {
+        if (remark != null && remark.startsWith("TOTAL#LOAN#")) {
+            // 本息合计口径 · 结清指定借款：金额=该笔剩余本金+该笔利息
+            String loanNo = remark.substring("TOTAL#LOAN#".length());
+            LoanItemVO t = loans.stream().filter(l -> loanNo.equals(l.getLoanNo())).findFirst().orElse(null);
+            if (t == null) {
+                log.warn("[还款回调] 指定借款不存在或已结清 loanNo={}", loanNo);
+                return;
+            }
+            repayPrincipal = t.getRemainingPrincipal();
+            interest = t.getInterestPreview();
+            maxDays = t.getBorrowDays();
+            detail = "结清借款" + t.getLoanNo() + "（本息合计）：本金¥" + repayPrincipal + "，利息¥" + interest
+                    + "（" + t.getBorrowDays() + "天，年化" + (aType ? "3.85" : "4.35") + "%按笔模拟）";
+        } else if (remark != null && remark.startsWith("LOAN#")) {
             String loanNo = remark.substring("LOAN#".length());
             LoanItemVO t = loans.stream().filter(l -> loanNo.equals(l.getLoanNo())).findFirst().orElse(null);
             if (t == null) {
@@ -622,7 +924,16 @@ public class LoanService {
             maxDays = t.getBorrowDays();
             detail = "结清借款" + t.getLoanNo() + "：本金¥" + repayPrincipal + "，利息¥" + interest
                     + "（" + t.getBorrowDays() + "天，年化" + (aType ? "3.85" : "4.35") + "%按笔模拟）";
+        } else if (remark != null && remark.startsWith("TOTAL#FIFO")) {
+            // 本息合计口径 · 先进先出：金额=本息合计，按 FIFO 拆分本金+利息
+            BigDecimal[] split = splitRepay(event.getAmount(), loans, rate);
+            repayPrincipal = split[0];
+            interest = split[1];
+            maxDays = loans.isEmpty() ? 0 : loans.get(0).getBorrowDays();
+            detail = "先进先出冲抵（本息合计 ¥" + event.getAmount() + "）：本金¥" + repayPrincipal
+                    + "，利息¥" + interest + "（按笔计息，模拟）";
         } else {
+            // 本金口径 · 先进先出：金额=本金，冲抵本金后按所在借款天数结息
             BigDecimal remain = event.getAmount();
             List<String> parts = new ArrayList<>();
             for (LoanItemVO l : loans) {
@@ -655,6 +966,8 @@ public class LoanService {
         txn.setBorrowDays(maxDays);
         if (remark != null && remark.startsWith("LOAN#")) {
             txn.setTargetLoanNo(remark.substring("LOAN#".length()));
+        } else if (remark != null && remark.startsWith("TOTAL#LOAN#")) {
+            txn.setTargetLoanNo(remark.substring("TOTAL#LOAN#".length()));
         }
         txn.setBalanceAfter(limit.getAvailableLimit());
         txn.setRemark((aType ? "A类" : "B类") + "扫码还款（订单" + event.getOrderNo() + "）：" + detail);
@@ -1043,18 +1356,28 @@ public class LoanService {
      * @param verifyStatus VERIFIED-白名单 / REJECTED-拒绝
      */
     @Transactional(rollbackFor = Exception.class)
-    public BizMerchant auditMerchant(Long merchantId, String verifyStatus) {
+    public BizMerchant auditMerchant(Long merchantId, String verifyStatus, String reason, Long reviewerId) {
         BizMerchant merchant = merchantMapper.selectById(merchantId);
         if (merchant == null) {
             throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "商户不存在");
         }
+        if (!"PENDING".equals(merchant.getVerifyStatus())) {
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "该商户不在待审队列（当前状态：" + merchant.getVerifyStatus() + "）");
+        }
         if (!"VERIFIED".equals(verifyStatus) && !"REJECTED".equals(verifyStatus)) {
             throw new BizException(ErrorCode.PARAM_ERROR, "审核结论只能为 VERIFIED 或 REJECTED");
         }
+        if ("REJECTED".equals(verifyStatus) && (reason == null || reason.isBlank())) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "拒绝时必须填写驳回原因");
+        }
         merchant.setVerifyStatus(verifyStatus);
+        merchant.setReviewRemark(reason);
+        merchant.setReviewerId(reviewerId);
+        merchant.setReviewTime(LocalDateTime.now());
         merchantMapper.updateById(merchant);
 
-        log.info("[商户审核] 商户={}, 审核结果={}", merchant.getMerchantName(), verifyStatus);
+        log.info("[商户审核] 商户={}, 审核结果={}, 原因={}, 审核人={}",
+                merchant.getMerchantName(), verifyStatus, reason, reviewerId);
         return merchant;
     }
 

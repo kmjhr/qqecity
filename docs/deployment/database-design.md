@@ -422,3 +422,30 @@ sys_user ────┬───────────┼── sys_login_log
 4. **冗余字段**：部分冗余设计（如保函表冗余 tenant_id、landlord_id），优化查询性能，避免多表 JOIN。
 5. **状态机**：申请类表均有完整的状态流转字段，便于业务流程追踪。
 6. **审计字段**：所有表均有 `create_time` / `update_time`，支持数据变更追踪。
+
+## 14.1 biz_entrust_review 受托支付复核单（新增，自定义商户每单复核）
+
+> **新增理由**：用户自定义商户（USER_CUSTOM）审核通过（VERIFIED）后仅归属本人可用，且**每次受托支付前须银行复核**（区别于平台通用商户直接放款）。复核单需独立记录（一商户可多次打款、多次复核），无法在 `biz_merchant` 单行内承载，故新增本表。
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| id | BIGINT PK | 主键 |
+| review_no | VARCHAR(50) UK | 复核单号（ERR+时间戳） |
+| user_id | BIGINT | 借款人ID |
+| loan_application_id | BIGINT | 贷款申请ID |
+| merchant_id | BIGINT | 收款商户ID（用户自定义商户） |
+| merchant_name | VARCHAR(200) | 商户名称快照 |
+| amount | DECIMAL(18,2) | 打款金额 |
+| purpose | VARCHAR(200) | 用途说明 |
+| trade_proof | VARCHAR(500) | 交易凭证说明 |
+| status | VARCHAR(20) | PENDING待复核 / APPROVED已通过 / REJECTED已驳回 |
+| reviewer_id | BIGINT | 复核人ID（banker） |
+| review_remark | VARCHAR(500) | 复核意见/驳回原因 |
+| review_time | DATETIME | 复核时间 |
+| payment_id | BIGINT | 放款流水ID（复核通过后生成的受托支付流水） |
+| create_time / update_time | DATETIME | 创建/更新时间 |
+
+**业务规则**：
+- 平台通用商户（merchant_source=SYSTEM，VERIFIED）：受托支付直接放款，不建复核单；
+- 用户自定义商户（USER_CUSTOM，VERIFIED 且归属本人）：每次受托支付提交即生成复核单（PENDING，不扣额度不放款）→ 管理端复核通过（APPROVED）才执行放款（扣额度 + EP 流水 + 商户收款入账）；驳回（REJECTED）不放款、额度不动。
+- 用户端「打款记录」= 受托支付成功流水（SUCCESS）+ 复核单（PENDING_REVIEW / REJECTED / APPROVED）。

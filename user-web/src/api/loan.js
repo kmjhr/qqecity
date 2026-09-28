@@ -31,6 +31,21 @@ export function getMerchants() {
   return request.get('/v1/loan/merchants')
 }
 
+/** 提交自定义商户申请（进入灰名单，管理端 banker 审核） */
+export function applyMerchant(data) {
+  return request.post('/v1/loan/merchants/apply', data)
+}
+
+/** 我的自定义商户申请列表（PENDING/VERIFIED/REJECTED） */
+export function getMyMerchants() {
+  return request.get('/v1/loan/merchants/my')
+}
+
+/** 打款记录（受托支付成功流水 + 自定义商户复核单） */
+export function getEntrustRecords() {
+  return request.get('/v1/loan/entrust-records')
+}
+
 /** 分页查询我的贷款申请 */
 export function getLoanApplications(params) {
   return request.get('/v1/loan/applications', { params })

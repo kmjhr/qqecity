@@ -46,4 +46,16 @@ public class EntrustPaymentVO {
 
     /** 资金路径说明（定向打款，不经过个人账户） */
     private String fundPath;
+
+    /** 是否待银行复核（自定义商户每单复核：true=已提交复核单，未放款） */
+    private Boolean pendingReview;
+
+    /** 复核单号（自定义商户提交后生成） */
+    private String reviewNo;
+
+    /** 复核状态：PENDING待复核 / APPROVED已通过 / REJECTED已驳回 */
+    private String reviewStatus;
+
+    /** 复核状态展示名 */
+    private String reviewStatusName;
 }

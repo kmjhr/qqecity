@@ -46,14 +46,28 @@ export function getEntrustPayments(params: {
 
 /** 商户白名单列表（按状态） */
 export function getMerchantsByStatus(verifyStatus?: string): Promise<any[]> {
-  return request.get('/v1/loan/merchants/by-status', {
+  return request.get('/v1/admin/merchants', {
     params: verifyStatus ? { verifyStatus } : {}
   })
 }
 
 /** banker 审核商户白名单 */
-export function auditMerchant(id: number, verifyStatus: 'VERIFIED' | 'REJECTED'): Promise<any> {
-  return request.put(`/v1/loan/merchants/${id}/audit`, null, {
-    params: { verifyStatus }
+export function auditMerchant(id: number, verifyStatus: 'VERIFIED' | 'REJECTED', reason?: string): Promise<any> {
+  return request.put(`/v1/admin/merchants/${id}/audit`, null, {
+    params: { verifyStatus, ...(reason ? { reason } : {}) }
+  })
+}
+
+/** 受托支付复核单队列（自定义商户每单复核） */
+export function getEntrustReviews(status?: string): Promise<any[]> {
+  return request.get('/v1/admin/entrust-reviews', {
+    params: status ? { status } : {}
+  })
+}
+
+/** banker 复核受托支付（通过并放款 / 驳回） */
+export function auditEntrustReview(id: number, approve: boolean, reason?: string): Promise<any> {
+  return request.put(`/v1/admin/entrust-reviews/${id}/audit`, null, {
+    params: { approve, ...(reason ? { reason } : {}) }
   })
 }

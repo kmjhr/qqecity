@@ -71,6 +71,12 @@ const routes: RouteRecordRaw[] = [
             meta: { title: '商户白名单', icon: 'Shop', requiresAuth: true }
           },
           {
+            path: 'entrust-review',
+            name: 'EntrustReview',
+            component: () => import('@/views/business/entrust-review/index.vue'),
+            meta: { title: '受托支付复核', icon: 'Money', requiresAuth: true }
+          },
+          {
             path: 'risk-overview',
             name: 'RiskOverview',
             component: () => import('@/views/business/risk-overview/index.vue'),

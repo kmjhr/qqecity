@@ -18,4 +18,7 @@ public class RepayDTO {
 
     @io.swagger.v3.oas.annotations.media.Schema(description = "指定结清的借款编号（A类=CW流水号/B类=EP受托支付号，不传则按先进先出冲抵）")
     private String loanNo;
+
+    @io.swagger.v3.oas.annotations.media.Schema(description = "金额口径：PRINCIPAL=本金（默认，利息按笔自动结算）/ TOTAL=本息合计（输入含息金额，自动拆分本金+利息）")
+    private String amountType;
 }

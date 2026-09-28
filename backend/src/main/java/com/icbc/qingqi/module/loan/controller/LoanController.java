@@ -86,10 +86,19 @@ public class LoanController {
     // ============================================================
 
     @Operation(summary = "查询受托支付商户列表",
-            description = "预置商户，受托支付定向打款目标。")
+            description = "平台通用白名单商户（SYSTEM，全部用户可选）+ 本人自定义且审核通过（USER_CUSTOM，仅归属本人可见可用）；灰名单不可选。")
     @GetMapping("/merchants")
     public Result<List<BizMerchant>> merchants() {
-        return Result.success(loanService.listMerchants());
+        Long userId = UserContext.getUserId();
+        return Result.success(loanService.listMerchants(userId));
+    }
+
+    @Operation(summary = "打款记录（受托支付流水 + 自定义商户复核单）",
+            description = "返回本人全部打款记录：受托支付成功（SUCCESS）+ 自定义商户复核单（PENDING_REVIEW待银行复核 / SUCCESS已复核放款 / REJECTED已驳回）。")
+    @GetMapping("/entrust-records")
+    public Result<List<EntrustRecordVO>> entrustRecords() {
+        Long userId = UserContext.getUserId();
+        return Result.success(loanService.listEntrustRecords(userId));
     }
 
     @Operation(summary = "分页查询我的贷款申请")
@@ -184,20 +193,19 @@ public class LoanController {
     //  L-补3 商户白名单管理（缺口 #6）
     // ============================================================
 
-    @Operation(summary = "按认证状态筛选商户列表",
-            description = "verifyStatus: VERIFIED-白名单 / PENDING-灰名单 / REJECTED-已拒绝，不传则返回全部。")
-    @GetMapping("/merchants/by-status")
-    public Result<List<BizMerchant>> merchantsByStatus(
-            @RequestParam(required = false) String verifyStatus) {
-        return Result.success(loanService.listMerchantsByVerifyStatus(verifyStatus));
+    @Operation(summary = "用户提交自定义商户（B类受托支付收款方）",
+            description = "提交后进入 PENDING 灰名单，由管理端 banker 审核通过（VERIFIED）后方可用于受托支付；审核接口见 /v1/admin/merchants。")
+    @PostMapping("/merchants/apply")
+    public Result<BizMerchant> merchantApply(@Valid @RequestBody MerchantApplyDTO dto) {
+        Long userId = UserContext.getUserId();
+        return Result.success(loanService.applyMerchant(userId, dto));
     }
 
-    @Operation(summary = "banker审核商户白名单",
-            description = "banker01对商户进行白名单审核：VERIFIED-加入白名单 / REJECTED-拒绝。")
-    @PutMapping("/merchants/{id}/audit")
-    public Result<BizMerchant> auditMerchant(
-            @PathVariable Long id,
-            @RequestParam String verifyStatus) {
-        return Result.success(loanService.auditMerchant(id, verifyStatus));
+    @Operation(summary = "我的自定义商户申请列表",
+            description = "返回本人提交的商户申请（PENDING待审 / VERIFIED已通过 / REJECTED已拒绝 及审核备注）。")
+    @GetMapping("/merchants/my")
+    public Result<List<BizMerchant>> myMerchants() {
+        Long userId = UserContext.getUserId();
+        return Result.success(loanService.myMerchantApplications(userId));
     }
 }
