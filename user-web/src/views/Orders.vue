@@ -3,7 +3,7 @@
     <el-card shadow="never">
       <template #header>
         <div class="orders-head">
-          <span class="section-title">我的订单（模拟支付中心）</span>
+          <span class="section-title">账单中心（模拟支付中心）</span>
           <el-radio-group v-model="statusFilter" size="small">
             <el-radio-button :value="''">全部</el-radio-button>
             <el-radio-button :value="'PENDING_PAY'">待支付</el-radio-button>

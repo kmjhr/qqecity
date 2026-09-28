@@ -1,23 +1,20 @@
 <template>
   <div class="guarantee-page">
     <!-- 模块头部 -->
-    <el-card shadow="never" class="module-header">
-      <div class="header-content">
-        <div class="module-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%)">
-          <el-icon :size="32" color="#fff"><Wallet /></el-icon>
-        </div>
-        <div class="module-info">
-          <h2>安居金融风控</h2>
-          <p>租房履约保函全流程 · AI合同复审 · 违约索赔</p>
-          <el-tag type="warning" size="small">演示系统 · 银行能力模拟</el-tag>
-        </div>
-        <div class="header-actions">
-          <el-button type="primary" @click="applyDialogVisible = true">
-            <el-icon><Plus /></el-icon>申请保函
-          </el-button>
-        </div>
-      </div>
-    </el-card>
+    <ModuleHeader
+      title="安居金融风控"
+      desc="租房履约保函全流程 · AI合同复审 · 违约索赔"
+      icon="guarantee"
+      color="#764ba2"
+      tag="演示系统 · 银行能力模拟"
+      tag-type="warning"
+    >
+      <template #action>
+        <el-button type="primary" @click="applyDialogVisible = true">
+          <el-icon><Plus /></el-icon>申请保函
+        </el-button>
+      </template>
+    </ModuleHeader>
 
     <!-- 状态流转说明 -->
     <el-card shadow="never" class="flow-card" v-if="statusFlow.length">
@@ -145,9 +142,10 @@
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Wallet, Plus, Refresh } from '@element-plus/icons-vue'
+import { Plus, Refresh } from '@element-plus/icons-vue'
 import { applyGuarantee, getGuaranteePage, getGuaranteeDetail, payGuarantee, getStatusFlow } from '@/api/guarantee'
 import PayCashier from '@/components/PayCashier.vue'
+import ModuleHeader from '@/components/ModuleHeader.vue'
 
 const loading = ref(false)
 const list = ref([])
@@ -272,13 +270,9 @@ onMounted(() => { loadFlow(); loadList() })
 </script>
 
 <style scoped>
-.module-header :deep(.el-card__body) { padding: 0; }
-.header-content { display: flex; align-items: center; gap: 20px; padding: 24px; }
-.module-icon { width: 72px; height: 72px; border-radius: 16px; display: flex; align-items: center; justify-content: center; }
-.module-info h2 { font-size: 22px; margin: 0 0 6px; color: #303133; }
-.module-info p { font-size: 14px; color: #909399; margin: 0 0 8px; }
-.header-actions { margin-left: auto; }
-.flow-card { margin-top: 16px; }
+.flow-card { margin-top: 20px; border-radius: var(--qq-radius-xl); }
+.flow-card :deep(.el-card__header) { padding: 18px 24px; }
+.flow-card :deep(.el-card__body) { padding: 24px; }
 .flow-title { font-weight: 600; margin-bottom: 12px; color: #303133; }
 /* 状态流转：完全静态展示，无任何交互指示——所有节点/连接线/文字统一灰色系
    （不区分完成/进行中/未完成；状态类在 .el-step__head 上，全状态覆盖）
@@ -300,8 +294,10 @@ onMounted(() => { loadFlow(); loadList() })
 }
 .flow-card :deep(.el-step__title) { color: #303133 !important; }
 .flow-card :deep(.el-step__description) { color: #909399; }
-.list-card { margin-top: 16px; }
+.list-card { margin-top: 20px; }
+.list-card :deep(.el-card__header) { padding: 16px 24px; }
 .card-header { display: flex; align-items: center; gap: 12px; }
+.card-header > span:first-child { font-size: 16px; font-weight: 700; color: var(--qq-text); }
 /* 状态筛选 radio 按钮选中态改灰色（交互指示不要蓝色） */
 .card-header :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
   background-color: #909399;

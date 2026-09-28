@@ -1,22 +1,19 @@
 <template>
   <div class="bookkeeping-page">
-    <el-card shadow="never" class="module-header">
-      <div class="header-content">
-        <div class="module-icon" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)">
-          <el-icon :size="32" color="#fff"><Notebook /></el-icon>
-        </div>
-        <div class="module-info">
-          <h2>创业经营赋能</h2>
-          <p>AI 简易记账 · 现金流报表 · 风险预警</p>
-          <el-tag type="warning" size="small">演示系统 · 模拟数据</el-tag>
-        </div>
-        <div class="header-actions">
-          <el-button type="primary" @click="addDialogVisible = true">
-            <el-icon><Plus /></el-icon>记一笔
-          </el-button>
-        </div>
-      </div>
-    </el-card>
+    <ModuleHeader
+      title="创业经营赋能"
+      desc="AI 简易记账 · 现金流报表 · 风险预警"
+      icon="business"
+      color="#11998e"
+      tag="演示系统 · 模拟数据"
+      tag-type="warning"
+    >
+      <template #action>
+        <el-button type="primary" @click="addDialogVisible = true">
+          <el-icon><Plus /></el-icon>记一笔
+        </el-button>
+      </template>
+    </ModuleHeader>
 
     <!-- 经营数据回流看板（模块3×贷款联动） -->
     <el-card shadow="never" class="linkage-card" v-loading="linkageLoading">
@@ -193,8 +190,9 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Notebook, Plus, Refresh, InfoFilled, Warning } from '@element-plus/icons-vue'
+import { Plus, Refresh, InfoFilled, Warning } from '@element-plus/icons-vue'
 import { getBookkeepingList, addBookkeepingRecord, getCashFlowReport, getLoanLinkedWarnings, getObservationProgress, applyPromotion } from '@/api/bookkeeping'
+import ModuleHeader from '@/components/ModuleHeader.vue'
 
 const listLoading = ref(false)
 const records = ref([])
@@ -282,12 +280,6 @@ onMounted(() => { loadRecords(); loadReport(); loadLinkage() })
 </script>
 
 <style scoped>
-.module-header :deep(.el-card__body) { padding: 0; }
-.header-content { display: flex; align-items: center; gap: 20px; padding: 24px; }
-.module-icon { width: 72px; height: 72px; border-radius: 16px; display: flex; align-items: center; justify-content: center; }
-.module-info h2 { font-size: 22px; margin: 0 0 6px; color: #303133; }
-.module-info p { font-size: 14px; color: #909399; margin: 0 0 8px; }
-.header-actions { margin-left: auto; }
 .report-card { min-height: 360px; }
 .card-header { display: flex; align-items: center; justify-content: space-between; }
 .report-row { display: flex; gap: 12px; margin-bottom: 12px; }

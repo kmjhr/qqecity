@@ -1,6 +1,10 @@
 <template>
   <div class="chat-panel">
-    <!-- 引擎提示 -->
+    <!-- 引擎模式选择 + 引擎提示 -->
+    <div class="panel-toolbar">
+      <el-segmented v-model="selectedMode" :options="engineOptions" size="small" @change="onModeChange" />
+      <el-tag type="warning" size="small">模拟对话引擎</el-tag>
+    </div>
     <el-alert
       v-if="engineStatus?.notice"
       :title="engineStatus.notice"
@@ -97,6 +101,20 @@ const quickQuestions = [
   '有哪些创业补贴政策？',
   '预算记账怎么分类？',
 ]
+const engineOptions = [
+  { label: '本地模式', value: 'local' },
+  { label: 'AI 增强', value: 'agent' },
+]
+
+function engineModeName(mode) {
+  return { local: '本地引擎', agent: 'AI 增强', fallback: 'AI 降级本地' }[mode] || mode
+}
+
+function onModeChange(val) {
+  if (val === 'agent' && engineStatus.value && !engineStatus.value.agentAvailable) {
+    ElMessage.warning('AI 增强暂不可用（未配置 LLM），回答将自动降级为本地引擎')
+  }
+}
 
 function goAction(action) {
   if (action?.url) router.push(action.url)
@@ -187,6 +205,13 @@ onMounted(async () => {
   flex-direction: column;
   height: 100%;
   min-height: 0;
+}
+.panel-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
 }
 .msg-box {
   flex: 1;

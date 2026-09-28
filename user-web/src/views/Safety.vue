@@ -1,23 +1,20 @@
 <template>
   <div class="safety-page">
     <!-- 模块头 -->
-    <el-card shadow="never" class="module-header">
-      <div class="header-content">
-        <div class="module-icon" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%)">
-          <el-icon :size="32" color="#fff"><Warning /></el-icon>
-        </div>
-        <div class="module-info">
-          <h2>数字安全守护 · 反诈学堂</h2>
-          <p>实时预警 · 典型案例 · 分类学习 · 情景教学 · 智能甄别</p>
-          <el-tag type="warning" size="small">演示系统 · 模拟数据</el-tag>
-        </div>
-        <div class="header-actions">
-          <el-button type="danger" @click="detectActive = true">
-            <el-icon><Search /></el-icon>骗局甄别
-          </el-button>
-        </div>
-      </div>
-    </el-card>
+    <ModuleHeader
+      title="数字安全守护 · 反诈学堂"
+      desc="实时预警 · 典型案例 · 分类学习 · 情景教学 · 智能甄别"
+      icon="safety"
+      color="#f39c12"
+      tag="演示系统 · 模拟数据"
+      tag-type="warning"
+    >
+      <template #action>
+        <el-button type="danger" @click="detectActive = true">
+          <el-icon><Search /></el-icon>骗局甄别
+        </el-button>
+      </template>
+    </ModuleHeader>
 
     <!-- ==================== ① 实时反诈预警 ==================== -->
     <el-card shadow="never" class="block-card">
@@ -87,7 +84,7 @@
           <div class="case-title">{{ c.title }}</div>
           <div class="case-summary">{{ c.summary }}</div>
           <div class="case-footer">
-            <el-button type="primary" link size="small">查看话术 / 手法 / 防范 →</el-button>
+            <el-button type="primary" link>查看话术 / 手法 / 防范 →</el-button>
           </div>
         </div>
         <el-empty v-if="!caseLoading && !cases.length" description="暂无案例" />
@@ -99,7 +96,7 @@
       <template #header>
         <div class="card-header">
           <span class="block-title">反诈情景教学</span>
-          <el-button size="small" text type="primary" @click="goTeaching">进入反诈学堂完整教学 →</el-button>
+          <el-button type="primary" @click="goTeaching">进入反诈学堂完整教学 →</el-button>
         </div>
       </template>
       <div v-loading="teachLoading" class="teach-grid">
@@ -113,7 +110,7 @@
           <div class="teach-title">{{ s.title }}</div>
           <div class="teach-summary">{{ s.summary }}</div>
           <div class="teach-footer">
-            <el-button type="danger" link size="small">去学习 →</el-button>
+            <el-button type="danger" link>去学习 →</el-button>
           </div>
         </div>
         <el-empty v-if="!teachLoading && !teachScenarios.length" description="暂无教学任务" />
@@ -147,7 +144,7 @@
             <div class="learn-title">{{ it.title }}</div>
             <div class="learn-summary">{{ it.summary }}</div>
             <div class="learn-footer">
-              <el-button type="primary" link size="small">学习 / 详情 →</el-button>
+              <el-button type="primary" link>学习 / 详情 →</el-button>
             </div>
           </div>
         </div>
@@ -201,9 +198,10 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Warning, Search } from '@element-plus/icons-vue'
+import { Search } from '@element-plus/icons-vue'
 import { getAntiFraudList, getAntiFraudDetail, detectFraud, getAlerts, getFeaturedCases } from '@/api/safety'
 import { getScenarioList } from '@/api/teaching'
+import ModuleHeader from '@/components/ModuleHeader.vue'
 
 const router = useRouter()
 const loading = ref(false)
@@ -396,15 +394,9 @@ onMounted(() => {
   max-width: 1400px;
   margin: 0 auto;
 }
-.module-header { margin-bottom: 16px; }
-.module-header :deep(.el-card__body) { padding: 0; }
-.header-content { display: flex; align-items: center; gap: 20px; padding: 24px; }
-.module-icon { width: 72px; height: 72px; border-radius: 16px; display: flex; align-items: center; justify-content: center; }
-.module-info h2 { font-size: 22px; margin: 0 0 6px; color: #303133; }
-.module-info p { font-size: 14px; color: #909399; margin: 0 0 8px; }
-.header-actions { margin-left: auto; }
 
-.block-card { margin-bottom: 16px; border-radius: 10px; }
+.block-card { margin-bottom: 20px; border-radius: var(--qq-radius-xl); }
+.block-card :deep(.el-card__header) { padding: 16px 24px; }
 .card-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 .block-title { font-weight: 600; font-size: 15px; display: inline-flex; align-items: center; gap: 8px; }
 .block-sub { font-size: 12px; color: #909399; }

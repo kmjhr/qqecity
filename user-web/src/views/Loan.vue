@@ -1,20 +1,19 @@
 <template>
   <div class="loan-page">
-    <el-card shadow="never" class="module-header">
-      <div class="header-content">
-        <div class="module-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%)">
-          <el-icon :size="32" color="#fff"><Money /></el-icon>
-        </div>
-        <div class="module-info">
-          <h2>青创e贷</h2>
-          <p>青年创业智能授信 · A/B 双轨 · 随借随还循环贷 · 两步式受托支付</p>
-          <el-tag type="warning" size="small">演示系统 · 银行能力模拟</el-tag>
-        </div>
-        <el-button class="risk-btn" type="danger" plain @click="riskDialog = true">
+    <ModuleHeader
+      title="青创e贷"
+      desc="青年创业智能授信 · A/B 双轨 · 随借随还循环贷 · 两步式受托支付"
+      icon="loan"
+      color="#f5576c"
+      tag="演示系统 · 银行能力模拟"
+      tag-type="warning"
+    >
+      <template #action>
+        <el-button type="danger" plain @click="riskDialog = true">
           查看完整风险揭示
         </el-button>
-      </div>
-    </el-card>
+      </template>
+    </ModuleHeader>
 
     <!-- ================= A/B 两大分区：介绍在流程图标下，同一步骤的功能左右并排 ================= -->
     <el-tabs v-model="activeTab" class="main-tabs">
@@ -92,7 +91,7 @@
               <template v-if="repayPreview && repayPreview.usedLimit > 0">
                 <el-row :gutter="20">
                   <!-- 左列：应还合计 + 还款规则 + 计息说明 -->
-                  <el-col :xs="24" :md="9">
+                  <el-col :xs="24" :md="9" class="repay-left">
                     <div class="bank-total">
                       <div class="bank-total-label">应还合计（元）<span class="bank-total-sub">本金 + 按笔累计利息 · 支持部分/按笔/全部结清</span></div>
                       <div class="bank-total-num">¥{{ repayPreview.totalDue }}</div>
@@ -112,7 +111,7 @@
                   <!-- 右列：借款明细 + 还款操作（固定表格高度 + 操作区贴底） -->
                   <el-col :xs="24" :md="15" class="repay-right">
                     <div class="loan-table-title">未结清借款明细（按笔计息 · 先进先出冲抵）</div>
-                    <el-table :data="repayPreview.loans || []" size="small" height="280" style="margin-bottom:8px">
+                    <el-table :data="repayPreview.loans || []" size="small" :height="repayTableHeight" style="margin-bottom:8px">
                       <el-table-column label="借款日期" width="92">
                         <template #default="{ row }">{{ row.loanDate }}</template>
                       </el-table-column>
@@ -149,7 +148,6 @@
                         <span class="repay-fee-sub">（输入含息金额，系统按先进先出自动拆分，利息随还）</span>
                       </div>
                       <div class="repay-btns">
-                        <el-button size="small" type="primary" plain @click="setFullRepay">全部结清（本息合计 ¥{{ repayPreview.totalDue }}）</el-button>
                         <el-button type="primary" :loading="repaySubmitting" @click="submitRepay('')">扫码支付还款（本息一并支付）</el-button>
                         <el-button type="success" :loading="repaySubmitting"
                           :disabled="!repayGuard || Number(repayGuard.balance) <= 0" @click="submitRepay('REPAY_GUARD')">
@@ -387,7 +385,7 @@
                   <template #header>
                     <div class="app-card-head">
                       <span>定向打款商户</span>
-                      <el-button size="small" type="primary" plain @click="merchantDialog = true">
+                      <el-button class="merchant-add-btn" @click="merchantDialog = true">
                         <el-icon><Money /></el-icon>&nbsp;添加自定义商户
                       </el-button>
                     </div>
@@ -451,7 +449,7 @@
               <template v-if="repayPreview && repayPreview.usedLimit > 0">
                 <el-row :gutter="20">
                   <!-- 左列：应还合计 + 还款规则 + 计息说明 -->
-                  <el-col :xs="24" :md="9">
+                  <el-col :xs="24" :md="9" class="repay-left">
                     <div class="bank-total">
                       <div class="bank-total-label">应还合计（元）<span class="bank-total-sub">本金 + 按笔累计利息 · 支持部分/按笔/全部结清</span></div>
                       <div class="bank-total-num">¥{{ repayPreview.totalDue }}</div>
@@ -471,7 +469,7 @@
                   <!-- 右列：借款明细 + 还款操作（固定表格高度 + 操作区贴底） -->
                   <el-col :xs="24" :md="15" class="repay-right">
                     <div class="loan-table-title">未结清借款明细（按笔计息 · 先进先出冲抵）</div>
-                    <el-table :data="repayPreview.loans || []" size="small" height="280" style="margin-bottom:8px">
+                    <el-table :data="repayPreview.loans || []" size="small" :height="repayTableHeight" style="margin-bottom:8px">
                       <el-table-column label="借款日期" width="92">
                         <template #default="{ row }">{{ row.loanDate }}</template>
                       </el-table-column>
@@ -508,7 +506,6 @@
                         <span class="repay-fee-sub">（输入含息金额，系统按先进先出自动拆分，利息随还）</span>
                       </div>
                       <div class="repay-btns">
-                        <el-button size="small" type="primary" plain @click="setFullRepay">全部结清（本息合计 ¥{{ repayPreview.totalDue }}）</el-button>
                         <el-button type="primary" :loading="repaySubmitting" @click="submitRepay('')">扫码支付还款（本息一并支付）</el-button>
                         <el-button type="success" :loading="repaySubmitting"
                           :disabled="!repayGuard || Number(repayGuard.balance) <= 0" @click="submitRepay('REPAY_GUARD')">
@@ -632,16 +629,28 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Money, Refresh } from '@element-plus/icons-vue'
+import { Refresh } from '@element-plus/icons-vue'
 import { getProductRules, preCheck, getCreditLimit, entrustPayment, getMerchants, applyMerchant, getMyMerchants,
   getEntrustRecords, getLoanApplications,
   withdrawCredit, repayCredit, getCreditTxns, getRepayPreview, entrustRepay, createRepayOrder,
   getObservationProgress, applyPromotion, getRepayGuard } from '@/api/loan'
 import PayCashier from '@/components/PayCashier.vue'
+import ModuleHeader from '@/components/ModuleHeader.vue'
 
 const activeTab = ref('tabA')
+
+// ---- 还款表格自适应高度：表格变短，使右列按钮底部与左列最后一行字对齐 ----
+const repayTableHeight = ref(160)
+async function fitRepayTable() {
+  await nextTick()
+  const left = document.querySelector('.repay-left')
+  const ops = document.querySelector('.repay-ops')
+  if (!left || !ops) return
+  const h = left.offsetHeight - ops.offsetHeight - 36
+  repayTableHeight.value = Math.max(48, Math.round(h))
+}
 
 // A/B 分区内各自的流程进度（步骤条高亮）
 const aCredit = computed(() => creditList.value.find(x => x.creditType === 'A_TYPE') || null)
@@ -661,7 +670,13 @@ const bStep = computed(() => {
 watch(activeTab, (v) => {
   if (v === 'tabA') switchRepay('A_TYPE')
   else switchRepay('B_TYPE')
+  setTimeout(fitRepayTable, 120)
 })
+
+// 窗口尺寸变化时重新适配还款表格高度
+if (typeof window !== 'undefined') {
+  window.addEventListener('resize', () => setTimeout(fitRepayTable, 80))
+}
 
 // 商户类型映射（merchant_type → 中文）
 const merchantTypeName = (t) => ({ MATERIAL: '物料采购', STALL: '摊位租赁', PROMOTION: '推广服务', OTHER: '综合服务' }[t] || t || '-')
@@ -1021,7 +1036,7 @@ const submitEntrust = async () => {
   } finally { paying.value = false }
 }
 
-onMounted(() => { loadRules(); loadCredit(); loadMerchants(); loadApplications(); loadMyMerchants(); loadEntrustRecords(); loadObsProgress(); loadRepayGuard() })
+onMounted(() => { loadRules(); loadCredit(); loadMerchants(); loadApplications(); loadMyMerchants(); loadEntrustRecords(); loadObsProgress(); loadRepayGuard(); setTimeout(fitRepayTable, 300) })
 </script>
 
 <style scoped>
@@ -1063,13 +1078,7 @@ onMounted(() => { loadRules(); loadCredit(); loadMerchants(); loadApplications()
 .credit-card { border: 1px solid #ebeef5; border-radius: 8px; padding: 18px 20px; box-shadow: 0 2px 8px rgba(0,0,0,.04); }
 .card-a { border-top: 3px solid #409eff; }
 .card-b { border-top: 3px solid #e6a23c; }
-.module-header :deep(.el-card__body) { padding: 0; }
-.header-content { display: flex; align-items: center; gap: 20px; padding: 24px; position: relative; }
-.module-icon { width: 72px; height: 72px; border-radius: 16px; display: flex; align-items: center; justify-content: center; }
-.module-info h2 { font-size: 22px; margin: 0 0 6px; color: #303133; }
-.module-info p { font-size: 14px; color: #909399; margin: 0 0 8px; }
-.risk-btn { margin-left: auto; }
-.flow-card { margin-top: 16px; }
+.flow-card { margin-top: 20px; }
 .flow-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
 .flow-title { font-size: 15px; font-weight: 600; color: #303133; }
 .flow-hint { font-size: 13px; color: #909399; }
@@ -1085,19 +1094,22 @@ onMounted(() => { loadRules(); loadCredit(); loadMerchants(); loadApplications()
 .quick-repay { display: flex; align-items: center; }
 .repay-panel { border-top: 3px solid #409eff; }
 .app-card-head { display: flex; justify-content: space-between; align-items: center; }
-.repay-fee-tip { margin-top: 8px; font-size: 13px; color: #606266; background: #fef0f0; border-radius: 6px; padding: 6px 10px; }
-.repay-fee-sub { font-size: 12px; color: #909399; }
+.repay-fee-tip { margin: 0; font-size: 13px; color: #606266; background: #fef0f0; border-radius: 6px; padding: 8px 10px; line-height: 1.6; }
+.repay-fee-sub { display: block; font-size: 12px; color: #909399; margin-top: 2px; }
 .repay-head { font-weight: 600; color: #303133; }
 .repay-types { margin-bottom: 12px; width: 100%; }
 .bank-total-split { font-size: 12px; color: #909399; margin-top: 4px; }
 .loan-table-title { font-size: 13px; font-weight: 600; color: #606266; margin: 4px 0 8px; }
 .repay-types :deep(.el-radio-button) { width: 50%; }
 .repay-types :deep(.el-radio-button__inner) { width: 100%; }
-.repay-form { margin-top: 4px; }
-.repay-form-label { font-size: 13px; color: #909399; margin-bottom: 6px; }
-.repay-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-.repay-btns .el-button { flex: 0 0 auto; min-width: 0; margin: 0; white-space: normal; }
-.repay-right { display: flex; flex-direction: column; min-width: 0; }
+.repay-form { margin-top: 4px; display: flex; flex-direction: column; gap: 10px; }
+.repay-form-label { font-size: 13px; color: #909399; margin: 0; }
+.repay-btns { display: flex; flex-direction: column; gap: 10px; margin-top: auto; padding-top: 14px; align-items: stretch; }
+.repay-btns .el-button { width: 100%; min-width: 0; margin: 0; white-space: normal; height: 44px; font-size: 14px; font-weight: 600; padding: 0 16px; border-radius: 10px; }
+.repay-btns .el-button + .el-button { margin-left: 0; margin-top: 0; }
+.repay-right { display: flex; flex-direction: column; min-width: 0; height: 100%; }
+.repay-left { display: flex; flex-direction: column; min-width: 0; }
+.repay-left .repay-remark { margin-top: 12px; }
 .repay-ops { margin-top: auto; padding-top: 4px; }
 .repay-right :deep(.el-table__body-wrapper) { overflow-y: auto; }
 .obs-banner { margin-bottom: 16px; border-top: 3px solid #67c23a; }
@@ -1148,4 +1160,19 @@ onMounted(() => { loadRules(); loadCredit(); loadMerchants(); loadApplications()
 .risk-panel { margin-bottom: 18px; }
 .risk-panel-title { font-size: 15px; font-weight: 600; color: #f56c6c; margin-bottom: 8px; }
 .risk-list { margin: 0; padding-left: 18px; font-size: 13px; color: #606266; line-height: 1.9; }
+
+/* 添加自定义商户按钮：蓝绿渐变 + 固定白字 */
+.merchant-add-btn {
+  background: linear-gradient(135deg, #0ea5e9, #10b981) !important;
+  border: none !important;
+  color: #fff !important;
+  font-weight: 600;
+  border-radius: 8px;
+}
+.merchant-add-btn:hover,
+.merchant-add-btn:focus {
+  background: linear-gradient(135deg, #0ea5e9, #10b981) !important;
+  border: none !important;
+  color: #fff !important;
+}
 </style>

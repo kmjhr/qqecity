@@ -1,17 +1,13 @@
 <template>
   <div class="budget-page">
-    <el-card shadow="never" class="module-header">
-      <div class="header-content">
-        <div class="module-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)">
-          <el-icon :size="32" color="#fff"><PieChart /></el-icon>
-        </div>
-        <div class="module-info">
-          <h2>碎片消费治理</h2>
-          <p>分类预算 · 交易归类 · 分级提醒 · 结余转储蓄</p>
-          <el-tag type="warning" size="small">演示系统 · 模拟数据</el-tag>
-        </div>
-      </div>
-    </el-card>
+    <ModuleHeader
+      title="碎片消费治理"
+      desc="分类预算 · 交易归类 · 分级提醒 · 结余转储蓄"
+      icon="budget"
+      color="#00c6fb"
+      tag="演示系统 · 模拟数据"
+      tag-type="warning"
+    />
 
     <!-- 预算概览 -->
     <el-row :gutter="16" class="overview-row" v-if="overview">
@@ -195,8 +191,9 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { PieChart, Plus, Coin } from '@element-plus/icons-vue'
+import { Plus, Coin } from '@element-plus/icons-vue'
 import { getCategories, saveBudgetSetting, getBudgetList, addTransaction, transferToSaving, getSavings, getBudgetOverview, getRepayGuard, transferRepayGuard } from '@/api/budget'
+import ModuleHeader from '@/components/ModuleHeader.vue'
 
 const activeTab = ref('list')
 const loading = ref(false)
@@ -312,12 +309,7 @@ onMounted(() => { loadAll(); loadRepayGuard() })
 </script>
 
 <style scoped>
-.module-header :deep(.el-card__body) { padding: 0; }
-.header-content { display: flex; align-items: center; gap: 20px; padding: 24px; }
-.module-icon { width: 72px; height: 72px; border-radius: 16px; display: flex; align-items: center; justify-content: center; }
-.module-info h2 { font-size: 22px; margin: 0 0 6px; color: #303133; }
-.module-info p { font-size: 14px; color: #909399; margin: 0 0 8px; }
-.overview-row { margin-top: 16px; }
+.overview-row { margin-top: 20px; }
 .ov-card { text-align: center; }
 .ov-label { font-size: 13px; color: #909399; margin-bottom: 6px; }
 .ov-value { font-size: 22px; font-weight: 600; color: #303133; }

@@ -7,7 +7,7 @@
           <template #header>
             <div class="list-header">
               <span>反诈情景模拟</span>
-              <el-button size="small" text type="primary" @click="openHistory">演练记录</el-button>
+              <el-button class="history-btn" @click="openHistory">演练记录</el-button>
             </div>
           </template>
           <div v-loading="listLoading">
@@ -838,5 +838,21 @@ loadList()
   font-size: 12px;
   color: #f56c6c;
   margin-top: 4px;
+}
+
+/* 演练记录按钮：蓝绿渐变 + 固定白字 */
+.history-btn {
+  background: linear-gradient(135deg, #0ea5e9, #10b981) !important;
+  border: none !important;
+  color: #fff !important;
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 8px 16px;
+}
+.history-btn:hover,
+.history-btn:focus {
+  background: linear-gradient(135deg, #0ea5e9, #10b981) !important;
+  border: none !important;
+  color: #fff !important;
 }
 </style>
