@@ -99,29 +99,37 @@
               <el-icon :size="18"><Bell /></el-icon>
             </el-button>
           </el-badge>
-          <!-- 用户区 -->
-          <el-dropdown @command="handleCommand">
-            <span class="user-name">
-              <el-avatar :size="28" :src="userStore.userInfo?.avatar">
-                {{ userStore.username?.charAt(0) || 'U' }}
-              </el-avatar>
-              <span class="name-text">{{ userStore.username || '用户' }}</span>
-              <el-icon><ArrowDown /></el-icon>
-            </span>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item command="message">
-                  <el-icon><Bell /></el-icon>消息中心
-                </el-dropdown-item>
-                <el-dropdown-item command="profile">
-                  <el-icon><User /></el-icon>个人中心
-                </el-dropdown-item>
-                <el-dropdown-item command="logout" divided>
-                  <el-icon><SwitchButton /></el-icon>退出登录
-                </el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
+          <!-- 用户区：未登录仅浏览，显示登录/注册入口 -->
+          <template v-if="userStore.token">
+            <el-dropdown @command="handleCommand">
+              <span class="user-name">
+                <el-avatar :size="28" :src="userStore.userInfo?.avatar">
+                  {{ userStore.username?.charAt(0) || 'U' }}
+                </el-avatar>
+                <span class="name-text">{{ userStore.username || '用户' }}</span>
+                <el-icon><ArrowDown /></el-icon>
+              </span>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="message">
+                    <el-icon><Bell /></el-icon>消息中心
+                  </el-dropdown-item>
+                  <el-dropdown-item command="profile">
+                    <el-icon><User /></el-icon>个人中心
+                  </el-dropdown-item>
+                  <el-dropdown-item command="logout" divided>
+                    <el-icon><SwitchButton /></el-icon>退出登录
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </template>
+          <template v-else>
+            <div class="guest-area">
+              <router-link to="/login" class="guest-login">登录</router-link>
+              <router-link to="/register" class="guest-register">注册</router-link>
+            </div>
+          </template>
         </div>
       </el-header>
 
@@ -432,6 +440,29 @@ function handleCommand(command) {
 
 .name-text {
   font-size: 14px;
+}
+
+.guest-area {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.guest-login {
+  color: #409eff;
+  font-size: 14px;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.guest-register {
+  color: #606266;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.guest-register:hover {
+  color: #409eff;
 }
 
 .app-main {

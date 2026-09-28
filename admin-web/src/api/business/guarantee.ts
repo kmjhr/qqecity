@@ -24,3 +24,24 @@ export function manualReviewGuarantee(id: number, data: {
     params: data
   })
 }
+
+// ============================================================
+// 管理端 - 保函管理（全量申请 + 代房东确认）
+// 接口前缀：/api/v1/admin/guarantee
+// ============================================================
+
+/** 保函申请全量分页（status 为空查全部，SUBMITTED=待房东确认） */
+export function getGuaranteeApplications(params: {
+  pageNum?: number
+  pageSize?: number
+  status?: string
+}): Promise<PageResult<any>> {
+  return request.get('/v1/admin/guarantee/applications', { params })
+}
+
+/** 代房东确认（银行/运营代操作，触发 AI 复审） */
+export function adminLandlordConfirm(id: number, signContent?: string): Promise<any> {
+  return request.put(`/v1/admin/guarantee/${id}/landlord-confirm`, null, {
+    params: signContent ? { signContent } : {}
+  })
+}

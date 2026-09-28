@@ -27,7 +27,7 @@ import java.util.List;
  * - POST /register/ai-review   注册 AI 预审（不落库、不建号）
  * - POST /register             正式注册（先过 AI 审核，通过才落库 + 审核留痕 + 欢迎站内信）
  * - GET  /schools              高校库列表（注册页学校下拉）
- * - POST /student-card/ocr     学生证照片 AI 识别（模拟）
+ * - POST /student-card/ocr     学生证/毕业证照片 AI 识别（模拟，按核验方式通用）
  */
 @Tag(name = "认证接口")
 @RestController
@@ -67,7 +67,7 @@ public class AuthController {
         return Result.success(reviewService.listSchools());
     }
 
-    @Operation(summary = "学生证照片 AI 识别（模拟）")
+    @Operation(summary = "学生证/毕业证照片 AI 识别（模拟）")
     @PostMapping("/student-card/ocr")
     public Result<StudentCardOcrVO> studentCardOcr(@RequestBody(required = false) StudentCardOcrDTO dto) {
         return Result.success(reviewService.mockOcr(dto != null ? dto : new StudentCardOcrDTO()));

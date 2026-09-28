@@ -1,7 +1,7 @@
 # 青启e城 · 数据库 ER 关系说明
 
-> 共 32 张表，分 7 大模块 + 7 张补充计划新增表。本文档用文字描述各表之间的实体关系与核心外键关联。
-> 表命名：`sys_*` 系统公共表，`biz_*` 业务模块表。
+> 共 41 张表（系统公共 5 + 业务模块 32 + 模拟支付中台 4），分 7 大模块 + 补充计划新增表 + 官方政策入口 + 支付中台。本文档用文字描述各表之间的实体关系与核心外键关联。
+> 表命名：`sys_*` 系统公共表，`biz_*` 业务模块表，`pay_*` 模拟支付中台表。
 >
 > **初始化方式**：执行 `backend/sql/init-database.sql`（内部按序 SOURCE schema.sql + data.sql）
 > 或分步执行：`mysql -u root -p < schema.sql && mysql -u root -p < data.sql`
@@ -15,11 +15,15 @@
 | 用户与权限 | 6 | sys_user, sys_role, sys_user_role, sys_login_log, biz_school, biz_registration_review |
 | 消息中心 | 1 | sys_message |
 | 安居金融风控 | 6 | biz_landlord, biz_house, biz_rental_contract, biz_guarantee_application, biz_guarantee, biz_guarantee_claim |
-| 青创e贷 | 4 | biz_merchant, biz_loan_application, biz_credit_limit, biz_entrust_payment |
+| 青创e贷 | 5 | biz_merchant, biz_loan_application, biz_credit_limit, biz_entrust_payment, biz_entrust_review |
 | 经营赋能 | 2 | biz_bookkeeping_record, biz_cashflow_report |
 | 预算消费 | 4 | biz_budget_category, biz_budget_setting, biz_transaction, biz_saving_goal |
-| 金融安全 | 4 | biz_anti_fraud_content, biz_fraud_detection_log, biz_credit_report, biz_risk_warning |
+| 金融安全 | 5 | biz_anti_fraud_content, biz_fraud_detection_log, biz_credit_report, biz_risk_warning, biz_anti_fraud_alert |
+| 官方政策入口导航 | 1 | biz_policy_portal |
 | 补充计划新增表 | 7 | biz_policy, biz_credit_txn, biz_insurance_product, biz_finance_product, biz_risk_assessment, biz_scenario_practice, biz_scenario_round |
+| 模拟支付中台 | 4 | pay_wallet, pay_merchant_account, pay_order, pay_transaction |
+
+> 合计 41 张表（6+1+6+5+2+4+5+1+7+4），与 `backend/sql/schema.sql` 中 41 个 CREATE TABLE 一一对应。
 
 ---
 
@@ -92,12 +96,49 @@
 ### biz_registration_review 注册AI审核记录表（模拟）
 
 - **用途**：记录每次注册申请的 AI 审核明细（白名单人群 / 同一材料同一人 / 重复注册），审核留痕可追溯
-- **核心字段**：`review_no`（唯一）、`id_card`（SHA-256 哈希，不存明文）、`user_type`、`school`、`education_level`、`graduation_date`、`verify_type`（XUE_XIN_WANG/STUDENT_CARD）、`whitelist_pass`+`whitelist_detail`（白名单审核）、`material_pass`+`material_detail`（同一材料/同一人审核）、`result`（APPROVED/REJECTED）、`reject_reason`、`user_id`（注册成功后的用户ID）
+- **核心字段**：`review_no`（唯一）、`id_card`（SHA-256 哈希，不存明文）、`user_type`、`school`、`education_level`、`graduation_date`、`verify_type`（XUE_XIN_WANG学信网 / STUDENT_CARD学生证·仅在校生 / GRAD_CERT毕业证·仅毕业2年内）、`whitelist_pass`+`whitelist_detail`（白名单审核）、`material_pass`+`material_detail`（同一材料/同一人审核）、`result`（APPROVED/REJECTED）、`reject_reason`、`user_id`（注册成功后的用户ID）
 - **审核规则（模拟 AI）**：
-  - 白名单人群：人群类型 ∈ {STUDENT/GRADUATE/ENTREPRENEUR}；STUDENT/GRADUATE 需学历核验（学校∈biz_school启用 + 学历层次合法 + GRADUATE 毕业2年内 + 核验方式有效）
+  - 白名单人群：人群类型 ∈ {STUDENT/GRADUATE/ENTREPRENEUR}；STUDENT/GRADUATE 需学历核验（学校∈biz_school启用 + 学历层次合法 + GRADUATE 毕业2年内 + 核验方式有效）；核验方式按人群限定：**在校生可选学信网或学生证照片识别（STUDENT_CARD）**，**毕业2年内可选学信网或毕业证照片识别（GRAD_CERT）**，学生证用于毕业人群、毕业证用于在校生均视为违规拒绝
   - 同一材料/同一人：身份证号已注册 → 同一人；手机号已注册 → 同一材料
   - 重复注册：用户名 / 证件号 / 手机号三重查重
 - **关联接口**：`POST /api/v1/auth/register/ai-review`（AI 预审，不落库）、`POST /api/v1/auth/register`（正式注册，落库写记录）
+
+### biz_anti_fraud_alert 实时反诈预警（模块5·安全教育平台）
+
+- **用途**：安全教育平台「实时预警」横幅数据（人工维护、模拟实时发布），按平台场景维度展示给用户
+- **核心字段**：`alert_level`（DANGER/WARNING/INFO）、`source`（来源，模拟）、`region`（涉及地区）、`summary`（预警内容）、`link_url`（官方链接：举报/提示入口）、`relate_scene`（GUARANTEE保函/LOAN创业贷/CREDIT征信/WEALTH理财/PLATFORM客服/OTHER）、`publish_time`（发布时间，模拟实时）
+- **演示数据**：10 条（含"免押金保函代办""征信洗白""低息创业贷先交解冻费""高收益理财""AI 换脸冒充熟人"等典型骗局预警）
+- **关联接口**：安全教育平台预警列表
+
+### biz_policy_portal 官方政策入口导航（政策模块·独立专区）
+
+- **用途**：政策专区「官方入口导航」——收录国家/省/市的人社、住建、政务、税务、教育等官方政策查询入口，跳转真实政府官网
+- **核心字段**：`portal_name`（官网名称）、`portal_type`（GOV_HR人社/GOV_HOUSING住建房管/GOV_AFFAIR政务服务/GOV_TAX税务/GOV_EDU教育高校/GOV_OTHER其他）、`region`（全国/省/直辖市）、`url`（官网链接）、`description`（入口说明）、`sort_order`（排序）
+- **演示数据**：29 条（覆盖全国 + 浙江/广东/江苏/上海/北京/四川/湖北/福建/山东/湖南/河南/安徽/重庆/广西/陕西等）
+- **关联接口**：`GET /api/v1/policy/portal`（政策专区官方入口导航）
+
+### pay_wallet 用户钱包表（模拟支付中台）
+
+- **用途**：模拟支付中台的用户钱包账户，演示充值/支付/退款余额流转
+- **核心字段**：`user_id`（唯一）、`balance`（可用余额，模拟）、`frozen`（冻结金额，支付中）、`pay_password`（支付密码，模拟默认123456）、`status`（ACTIVE/FROZEN/CLOSED）
+- **关联**：`pay_wallet.user_id` → `sys_user.id`（一对一）
+
+### pay_merchant_account 商户收款账户表（模拟支付中台）
+
+- **用途**：商户（biz_merchant）在支付中台的收款账户，记录受托支付/消费收款入账
+- **核心字段**：`merchant_id`（唯一，→ biz_merchant.id）、`balance`（收款余额）、`total_income`（累计收款）、`status`（ACTIVE/FROZEN）
+
+### pay_order 支付订单表（模拟支付中台）
+
+- **用途**：模拟支付订单（待支付→已支付/已关闭/已退款），统一承载保函费、贷款还款、受托支付、模拟消费、充值、退款等支付场景
+- **核心字段**：`order_no`（唯一）、`user_id`、`biz_type`（GUARANTEE_FEE保函费/LOAN_REPAY还款/ENTRUST_PAY受托支付/MERCHANT_CONSUME模拟消费/RECHARGE充值/REFUND退款）、`biz_id`（关联业务ID：保函ID/还款流水ID/受托支付ID等）、`merchant_id`（收款商户）、`subject`、`amount`、`pay_method`（WALLET/CARD/SIM_BANK）、`status`（PENDING_PAY/PAID/CLOSED/REFUNDED）、`pay_time`、`close_time`、`expire_time`（默认15分钟）
+
+### pay_transaction 支付流水表（模拟支付中台）
+
+- **用途**：每一笔支付/退款的资金流水明细（IN收入/OUT支出），记录交易后余额用于对账展示
+- **核心字段**：`txn_no`（唯一）、`order_id`+`order_no`（→ pay_order）、`user_id`、`merchant_id`、`direction`（IN/OUT）、`amount`、`balance_after`（交易后余额）、`pay_method`、`status`（SUCCESS/FAILED）、`biz_type`、`related_no`（关联业务单号：保函编号/还款流水号/受托支付号）
+- **关联**：`pay_transaction.order_id` → `pay_order.id`（一对多，一单可多笔流水，如退款）
+
 ---
 
 ## 二、核心 ER 关系详述
@@ -210,6 +251,10 @@ sys_user  ───1:N───  biz_loan_application  ───1:1───  bi
 4. **biz_merchant（商户表）**：
    - 受托支付的收款方，系统预置商户列表
    - 商户类型：MATERIAL（物料）、STALL（摊位）、PROMOTION（推广）、OTHER
+
+5. **biz_entrust_review（受托支付复核单）**：
+   - 用户自定义商户（USER_CUSTOM）每次受托支付前须银行复核，复核通过才执行放款（扣额度 + EP 流水 + 商户收款入账）；平台通用商户直接放款、不建复核单
+   - 字段与状态流转详见文末「14.1 受托支付复核单」章节
 
 ### 2.5 经营赋能模块
 
@@ -324,6 +369,11 @@ biz_anti_fraud_content（内容表，无用户关联）
    - 预警类型：OVERDUE_RISK / HIGH_FREQ_BORROW / CREDIT_ABNORMAL / BUDGET_OVER / CASHFLOW_WARNING
    - 预警等级：LOW / MEDIUM / HIGH / CRITICAL
    - 可关联具体业务模块和业务ID：`related_module` + `related_id`
+
+5. **biz_anti_fraud_alert（实时反诈预警）**：
+   - 系统内容表（人工维护、模拟实时发布），所有用户共享，无用户关联
+   - 级别：DANGER / WARNING / INFO；按平台场景 `relate_scene`（GUARANTEE/LOAN/CREDIT/WEALTH/PLATFORM/OTHER）维度展示
+   - 演示数据 10 条，详情见「补充计划新增表说明」
 
 ### 2.8 消费治理模块（补充计划步骤5）
 

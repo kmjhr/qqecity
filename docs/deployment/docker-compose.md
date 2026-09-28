@@ -21,8 +21,21 @@
 
 ## 快速启动
 
+> ⚠️ **第 1 步必须先准备 `.env` 文件**（重要）：
+> `.env` 已被 `.gitignore` 忽略、**不在代码库中**，而 `docker-compose.yml` 强制要求 `JWT_SECRET` 变量（缺失会直接报错退出）。项目已提供模板 `.env.example`，复制一份即可：
+
 ```bash
-# 在项目根目录执行
+# Windows
+copy .env.example .env
+
+# Linux / macOS
+cp .env.example .env
+```
+
+`.env.example` 自带演示用 `JWT_SECRET`，直接复制即可启动；正式使用请改成自己的随机密钥（可用 `openssl rand -base64 32` 生成）。**关于 AI/LLM（可选）**：`.env` 中 `CHAT_ENGINE`、`CHAT_LLM_API_KEY`、`CHAT_LLM_ENDPOINT`、`CHAT_LLM_MODEL` 四项控制 AI 增强。全部留空则后端使用本地规则模式（离线稳定、AI 不生效）；如需启用 AI（智能客服 agent 模式 + 反诈情景演练），请按 [06-ai-llm.md](./06-ai-llm.md) 配置本机 Ollama 或云端 API，并确认 LLM 服务已启动——**LLM 服务未启动时 AI 会静默降级本地，聊天消息标注"AI 降级本地"**。
+
+```bash
+# 第 2 步：在项目根目录执行
 docker compose up -d --build
 ```
 
@@ -74,6 +87,13 @@ docker compose restart backend
 - Redis 数据通过命名卷 `redis-data` 持久化，开启 AOF
 - 如需重置数据库，执行 `docker compose down -v` 后重新启动
 
+> ⚠️ **改过 SQL 后必须重建卷**：MySQL 初始化脚本（`backend/sql/*.sql`）**只在数据卷首次创建时执行一次**。如果之前已经启动过系统（已存在 `mysql-data` 卷），再更新 `schema.sql` / `data.sql` 后直接 `docker compose up` 不会生效，数据库仍是旧结构（表现为缺新表、缺演示数据）。
+> 更新 SQL 后需要：
+> ```bash
+> docker compose down -v      # 删除容器 + 数据卷（会清空现有数据，注意备份）
+> docker compose up -d --build
+> ```
+
 ## 环境变量说明
 
 | 变量 | 所在服务 | 默认值 | 说明 |
@@ -90,7 +110,7 @@ docker compose restart backend
 
 MySQL 首次启动时会自动执行 `backend/sql/` 目录下的 SQL：
 
-1. `schema.sql` — 建表（25 张表）
+1. `schema.sql` — 建表（41 张表）
 2. `data.sql` — 演示数据（含演示账号）
 
 演示账号（用户名登录，统一密码 `123456`）：`admin`、`testuser`、`entrepreneur`、`landlord01`、`banker01`

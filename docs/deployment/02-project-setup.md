@@ -131,7 +131,7 @@ CREATE DATABASE IF NOT EXISTS qingqi
 
 ### 3.3 导入表结构和数据
 
-SQL 文件位置：`backend/src/main/resources/db/` 或 `backend/sql/`
+SQL 文件位置：`backend/sql/`
 
 ```cmd
 # 进入 SQL 目录
@@ -149,7 +149,7 @@ mysql -u root -p123456 qingqi < data.sql
 ```sql
 USE qingqi;
 
--- 查看表数量（应返回 25）
+-- 查看表数量（应返回 41）
 SELECT COUNT(*) AS table_count FROM information_schema.tables WHERE table_schema = 'qingqi';
 
 -- 查看演示用户（应返回 5 条）
@@ -204,14 +204,17 @@ mvn clean compile
 mvn spring-boot:run
 ```
 
-### 5.2 方式二：使用 IDE 或系统 Maven 启动
+### 5.2 方式二：使用项目内置 Maven Wrapper 启动（无需安装 Maven）
 
 ```cmd
-# Windows
-> 项目已内置 Maven Wrapper（`backend/mvnw`），Windows 用 `mvnw.cmd`、Linux/macOS 用 `./mvnw` 启动；也可用系统 Maven 或 IDE 启动。
+# Windows：在 backend/ 目录下执行
+mvnw.cmd spring-boot:run
 
-# Linux / Mac
+# Linux / macOS：在 backend/ 目录下执行
+./mvnw spring-boot:run
 ```
+
+> 也可使用自己安装的系统 Maven 或 IDE 启动，三选一即可。
 
 ### 5.3 方式三：IDEA 启动（推荐开发时使用）
 

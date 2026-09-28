@@ -36,8 +36,8 @@ if command -v mvn &> /dev/null; then
     MAVEN_VER=$(mvn -version 2>&1 | head -1 | awk '{print $3}')
     echo "    ✅ Maven 已安装：$MAVEN_VER"
     PASS=$((PASS + 1))
-elif [ -f "$BACKEND_DIR/mvnw" ]; then
-    echo "    ✅ Maven Wrapper 已就绪（项目内置，首次运行自动下载 Maven）"
+elif [ -f "$SCRIPT_DIR/../../backend/mvnw" ]; then
+    echo "    ✅ Maven Wrapper 已就绪（项目内置 backend/mvnw，首次运行自动下载 Maven）"
     PASS=$((PASS + 1))
 else
     echo "    ❌ 未检测到 Maven，且项目未包含 Maven Wrapper"
@@ -71,6 +71,7 @@ if command -v mysql &> /dev/null; then
     echo "    ✅ MySQL 命令行工具已找到"
     if mysql -h"$MYSQL_HOST" -P"$MYSQL_PORT" -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" -e "SELECT 1;" &> /dev/null; then
         echo "    ✅ MySQL 连接成功（${MYSQL_HOST}:${MYSQL_PORT}）"
+        PASS=$((PASS + 1))
         if mysql -h"$MYSQL_HOST" -P"$MYSQL_PORT" -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" -e "USE $DB_NAME;" &> /dev/null; then
             echo "    ✅ 数据库 $DB_NAME 已存在"
         else
@@ -78,8 +79,8 @@ if command -v mysql &> /dev/null; then
         fi
     else
         echo "    ❌ MySQL 连接失败，请检查服务是否启动及配置是否正确"
+        FAIL=$((FAIL + 1))
     fi
-    PASS=$((PASS + 1))
 else
     echo "    ⚠️  未找到 mysql 命令（如未加入 PATH 可忽略）"
     echo "       请确保 MySQL 服务已启动"
@@ -111,11 +112,11 @@ fi
 
 if [ $REDIS_OK -eq 1 ]; then
     echo "    ✅ Redis 连接成功（${REDIS_HOST}:${REDIS_PORT}）"
+    PASS=$((PASS + 1))
 else
     echo "    ⚠️  Redis 连接失败或未安装（推荐安装：JWT 黑名单依赖；未安装时后端自动降级）"
     echo "       参考文档：docs/deployment/mysql-deployment.md + docs/deployment/redis-deployment.md"
 fi
-PASS=$((PASS + 1))
 echo ""
 
 # ---------- 6. Git ----------

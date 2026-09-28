@@ -60,7 +60,7 @@
 | [mysql-deployment.md](deployment/mysql-deployment.md) | 🗄️ MySQL 部署（Windows / Linux 双平台 + 远程访问） |
 | [redis-deployment.md](deployment/redis-deployment.md) | 💾 Redis 部署（Windows / Linux 双平台 + 安全加固） |
 | [docker-compose.md](deployment/docker-compose.md) | 🐳 Docker Compose 一键部署 |
-| [database-design.md](deployment/database-design.md) | 📐 数据库设计与 ER 关系图（25 张表） |
+| [database-design.md](deployment/database-design.md) | 📐 数据库设计与 ER 关系图（41 张表） |
 
 ### 适配报告
 
@@ -68,6 +68,7 @@
 | --- | --- |
 | [适配报告.md](./适配报告.md) | 第一期：代码骨架 ↔ 原始需求文档适配报告 |
 | [适配报告-第二期.md](./适配报告-第二期.md) | 第二期：数据库 + 原型 + 脚本 + 文档体系适配报告 |
+| [适配报告-第三期.md](./适配报告-第三期.md) | 第三期（新版）：业务规则落地 + 部署文档审计修复 + 部署验证 |
 
 ---
 

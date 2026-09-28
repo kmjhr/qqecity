@@ -151,33 +151,35 @@ public class ChatService {
 
     /**
      * ③ 意图识别 → 功能跳转动作（关键词规则，返回可点跳转的功能页）
+     * <p>注意：URL 必须与 user-web/src/router/index.js 的真实路由一致（均为顶层路径，无 /pages 前缀），
+     * 否则前端 router.push 命中兜底路由会重定向回首页。
      */
     private ChatMessageVO.ChatActionVO detectAction(String msg) {
         if (msg == null || msg.isBlank()) return null;
         String m = msg.toLowerCase();
         if (m.contains("保函") || m.contains("押金") || m.contains("租房") || m.contains("租金")) {
-            return action("去申请保函", "/pages/guarantee/apply");
+            return action("去申请保函", "/guarantee");
         }
         if (m.contains("贷款") || m.contains("青创") || m.contains("创业贷") || m.contains("额度")) {
-            return action("去申请青创e贷", "/pages/loan/apply");
+            return action("去申请青创e贷", "/loan");
         }
         if (m.contains("预算") || m.contains("记账") || m.contains("账单")) {
-            return action("去记账", "/pages/budget");
+            return action("去记账", "/budget");
         }
         if (m.contains("诈骗") || m.contains("反诈") || m.contains("刷单") || m.contains("骗")) {
-            return action("去反诈专区", "/pages/safety");
+            return action("去反诈专区", "/safety");
         }
         if (m.contains("政策") || m.contains("补贴") || m.contains("贴息") || m.contains("安居")) {
-            return action("去政策匹配", "/pages/policy/match");
+            return action("去政策匹配", "/policy");
         }
         if (m.contains("征信") || m.contains("信用")) {
-            return action("查看信用健康", "/pages/credit");
+            return action("查看信用健康", "/credit-profile");
         }
         if (m.contains("理财") || m.contains("基金")) {
-            return action("去低风险理财", "/pages/wealth");
+            return action("去预算消费（资金规划）", "/budget");
         }
         if (m.contains("保险")) {
-            return action("去看保险", "/pages/insurance");
+            return action("去金融安全专区", "/safety");
         }
         return null;
     }

@@ -6,6 +6,8 @@ import com.icbc.qingqi.module.admin.dto.LoanReviewDTO;
 import com.icbc.qingqi.module.admin.dto.WarningHandleDTO;
 import com.icbc.qingqi.module.admin.service.AdminService;
 import com.icbc.qingqi.module.guarantee.entity.BizGuaranteeApplication;
+import com.icbc.qingqi.module.guarantee.service.GuaranteeService;
+import com.icbc.qingqi.module.guarantee.dto.GuaranteeApplicationVO;
 import com.icbc.qingqi.module.loan.entity.BizCreditTxn;
 import com.icbc.qingqi.module.loan.entity.BizEntrustPayment;
 import com.icbc.qingqi.module.loan.entity.BizEntrustReview;
@@ -21,6 +23,7 @@ import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 管理端业务审核台（步骤 8·缺口 #22）
@@ -44,10 +47,12 @@ public class AdminController {
 
     private final AdminService adminService;
     private final LoanService loanService;
+    private final GuaranteeService guaranteeService;
 
-    public AdminController(AdminService adminService, LoanService loanService) {
+    public AdminController(AdminService adminService, LoanService loanService, GuaranteeService guaranteeService) {
         this.adminService = adminService;
         this.loanService = loanService;
+        this.guaranteeService = guaranteeService;
     }
 
     // ============================================================
@@ -181,6 +186,59 @@ public class AdminController {
             @PathVariable Long id,
             @Valid @RequestBody WarningHandleDTO dto) {
         return Result.success(adminService.handleRiskWarning(id, dto));
+    }
+
+    // ============================================================
+    //  ⑥ 保函管理（全量申请 + 代房东确认）
+    // ============================================================
+
+    @Operation(summary = "⑥ 保函申请全量分页（含待房东确认 SUBMITTED）",
+            description = "全量分页查询保函申请，按状态筛选（默认全部）：SUBMITTED待房东确认/LANDLORD_CONFIRM待缴费前/PENDING_PAY/AI_REVIEW/MANUAL_REVIEW/ISSUED/EXPIRED 等。")
+    @GetMapping("/guarantee/applications")
+    public Result<Page<BizGuaranteeApplication>> guaranteeApplications(
+            @RequestParam(defaultValue = "1") int pageNum,
+            @RequestParam(defaultValue = "10") int pageSize,
+            @Parameter(description = "申请状态（为空查全部）")
+            @RequestParam(required = false) String status) {
+        return Result.success(adminService.pageGuaranteeApplications(pageNum, pageSize, status));
+    }
+
+    @Operation(summary = "⑥-2 代房东确认（银行/运营代操作）",
+            description = "对 SUBMITTED（待确认）状态的保函申请代房东确认并电子签署（记录 ADMIN_AGENT_CONFIRM），随后自动触发 AI 合同复审（G-3）。")
+    @PutMapping("/guarantee/{id}/landlord-confirm")
+    public Result<GuaranteeApplicationVO> adminLandlordConfirm(
+            @PathVariable Long id,
+            @Parameter(description = "代签内容（可选，默认 ADMIN_AGENT_CONFIRM）")
+            @RequestParam(required = false) String signContent) {
+        return Result.success(guaranteeService.adminLandlordConfirm(UserContext.getUserId(), id, signContent));
+    }
+
+    // ============================================================
+    //  ⑦ 注册审核记录（白名单 AI 审核留痕）
+    // ============================================================
+
+    @Operation(summary = "⑦ 注册审核记录分页（白名单 AI 审核留痕）",
+            description = "全量分页查询 biz_registration_review；支持关键词（用户名/姓名/手机号/审核编号）与结论（APPROVED/REJECTED）筛选。")
+    @GetMapping("/registration-reviews")
+    public Result<Page<com.icbc.qingqi.module.user.entity.BizRegistrationReview>> registrationReviews(
+            @RequestParam(defaultValue = "1") int pageNum,
+            @RequestParam(defaultValue = "10") int pageSize,
+            @Parameter(description = "关键词：用户名/姓名/手机号/审核编号")
+            @RequestParam(required = false) String keyword,
+            @Parameter(description = "审核结论：APPROVED/REJECTED")
+            @RequestParam(required = false) String result) {
+        return Result.success(adminService.pageRegistrationReviews(pageNum, pageSize, keyword, result));
+    }
+
+    // ============================================================
+    //  ⑧ 仪表盘统计（管理端数据看板）
+    // ============================================================
+
+    @Operation(summary = "⑧ 仪表盘统计",
+            description = "返回管理端数据看板核心指标：用户总数/今日新增、保函申请总数/待房东确认/人工复审待办、贷款待审批、预警未处理、注册审核记录数。")
+    @GetMapping("/dashboard/stats")
+    public Result<Map<String, Object>> dashboardStats() {
+        return Result.success(adminService.dashboardStats());
     }
 
     // ============================================================

@@ -84,7 +84,7 @@ scripts\windows\01-init-db.bat
 scripts/linux/01-init-db.sh
 ```
 
-完成后会显示 25 张表和 5 个演示账号。
+完成后会显示 41 张表和 5 个演示账号。
 
 ### 第 5 步：初始化项目（编译+安装依赖）
 

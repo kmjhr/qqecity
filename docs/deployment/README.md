@@ -15,6 +15,7 @@
 | [03-backend-config.md](./03-backend-config.md) | 后端配置：application.yml 完整配置说明 | 后端配置阶段 |
 | [04-frontend-config.md](./04-frontend-config.md) | 前端配置：Vite 代理、双前端项目配置说明 | 前端配置阶段 |
 | [05-troubleshooting.md](./05-troubleshooting.md) | 问题排查：环境 / 数据库 / Redis / 前后端 / 功能类 | 问题排查阶段 |
+| [06-ai-llm.md](./06-ai-llm.md) | AI/LLM 配置：Ollama / 云端 API / "AI 降级本地"排障 | AI 功能配置与排障 |
 
 ### 专项部署文档
 
@@ -23,7 +24,7 @@
 | [mysql-deployment.md](./mysql-deployment.md) | MySQL 8.0 部署（Windows / Linux 双平台 + 远程访问 + 数据导入） |
 | [redis-deployment.md](./redis-deployment.md) | Redis 7.x 部署（Windows / Linux 双平台 + 远程访问 + 安全加固） |
 | [docker-compose.md](./docker-compose.md) | Docker Compose 一键部署（MySQL + Redis + 后端 + 双前端） |
-| [database-design.md](./database-design.md) | 数据库设计与 ER 图（25 张表结构说明） |
+| [database-design.md](./database-design.md) | 数据库设计与 ER 图（41 张表结构说明） |
 
 ---
 
@@ -149,7 +150,7 @@ scripts/linux/99-start-all.sh
 - [ ] JDK 17+ 已安装，`java -version` 正常
 - [ ] Node.js 18+ 已安装，`node -v` 正常
 - [ ] MySQL 8.0 已启动，数据库 `qingqi` 已创建
-- [ ] schema.sql 已导入，表数量 = 25
+- [ ] schema.sql 已导入，表数量 = 41
 - [ ] data.sql 已导入，5 个演示账号可登录
 - [ ] Redis 已启动（推荐安装；未安装时后端自动降级，仅黑名单功能失效）
 - [ ] 后端 application.yml 数据库 / Redis 配置正确

@@ -22,7 +22,7 @@
     <!-- 状态流转说明 -->
     <el-card shadow="never" class="flow-card" v-if="statusFlow.length">
       <div class="flow-title">保函状态流转</div>
-      <el-steps :active="activeStep" finish-status="success" align-center>
+      <el-steps :active="activeStep" finish-status="finish" align-center>
         <el-step v-for="(s, i) in statusFlow" :key="s.status" :title="s.name" :description="s.desc" />
       </el-steps>
     </el-card>
@@ -42,7 +42,7 @@
         </div>
       </template>
 
-      <el-table v-loading="loading" :data="list" empty-text="暂无保函申请，点击上方「申请保函」开始" stripe>
+      <el-table v-loading="loading" :data="list" empty-text="暂无保函申请，点击上方「申请保函」开始" stripe @row-click="onRowClick">
         <el-table-column prop="applyNo" label="申请编号" width="160" />
         <el-table-column prop="houseTitle" label="房屋" min-width="140" />
         <el-table-column prop="landlordName" label="房东" width="90" />
@@ -194,7 +194,23 @@ const loadFlow = async () => {
   try {
     const data = await getStatusFlow()
     statusFlow.value = data.flow || []
+    // 状态流加载完成后重新对齐进度条（避免与列表并发时的竞态导致高亮错位）
+    updateActiveStep()
   } catch (e) {}
+}
+
+const updateActiveStep = (status) => {
+  if (!statusFlow.value.length) return
+  // 传入 status 时按该保函状态对齐（点击行/详情时）；缺省跟随列表第一条（最新一条）
+  const target = status || list.value[0]?.applyStatus
+  if (!target) return
+  const idx = statusFlow.value.findIndex(s => s.status === target)
+  activeStep.value = idx >= 0 ? idx : 0
+}
+
+// 点击列表行：进度条高亮跟随该行状态（修复“高亮与点击状态不匹配”）
+const onRowClick = (row) => {
+  updateActiveStep(row?.applyStatus)
 }
 
 const loadList = async () => {
@@ -203,10 +219,7 @@ const loadList = async () => {
     const data = await getGuaranteePage({ pageNum: pageNum.value, pageSize, status: filterStatus.value })
     list.value = data.records || []
     total.value = data.total || 0
-    if (list.value.length) {
-      const idx = statusFlow.value.findIndex(s => s.status === list.value[0].applyStatus)
-      activeStep.value = idx >= 0 ? idx : 0
-    }
+    updateActiveStep()
   } catch (e) {} finally {
     loading.value = false
   }
@@ -228,6 +241,8 @@ const submitApply = async () => {
 }
 
 const showDetail = async (row) => {
+  // 点击详情：进度条高亮跟随该行状态
+  updateActiveStep(row?.applyStatus)
   detailVisible.value = true
   currentDetail.value = null
   try {
@@ -265,8 +280,36 @@ onMounted(() => { loadFlow(); loadList() })
 .header-actions { margin-left: auto; }
 .flow-card { margin-top: 16px; }
 .flow-title { font-weight: 600; margin-bottom: 12px; color: #303133; }
+/* 状态流转：完全静态展示，无任何交互指示——所有节点/连接线/文字统一灰色系
+   （不区分完成/进行中/未完成；状态类在 .el-step__head 上，全状态覆盖）
+   Element Plus 线填充色由 line-inner 的 border-top-color 控制（默认主题蓝），
+   需同时覆盖 background 与 border-top-color，加 !important 压过组件默认 */
+.flow-card :deep(.el-step__head .el-step__line-inner) {
+  display: none; /* 去掉进度填充线：连接线无已完成段/未完成段之分，全段同一种颜色 */
+}
+/* 连接线容器本身统一灰色（EP 默认已完成段为主题蓝边框，必须一并覆盖） */
+.flow-card :deep(.el-step__head .el-step__line) {
+  border-color: #909399 !important;
+}
+.flow-card :deep(.el-step__head .el-step__icon) {
+  background: #fff;
+  border-color: #909399 !important;
+}
+.flow-card :deep(.el-step__head .el-step__icon-inner) {
+  color: #303133 !important;
+}
+.flow-card :deep(.el-step__title) { color: #303133 !important; }
+.flow-card :deep(.el-step__description) { color: #909399; }
 .list-card { margin-top: 16px; }
 .card-header { display: flex; align-items: center; gap: 12px; }
+/* 状态筛选 radio 按钮选中态改灰色（交互指示不要蓝色） */
+.card-header :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
+  background-color: #909399;
+  border-color: #909399;
+  box-shadow: -1px 0 0 0 #909399;
+  color: #fff;
+}
+.card-header :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner:hover) { color: #fff; }
 .card-header > span:first-child { font-weight: 600; }
 .card-header .el-radio-group { margin-left: auto; }
 .pagination { margin-top: 16px; display: flex; justify-content: flex-end; }

@@ -2,10 +2,14 @@ package com.icbc.qingqi.common;
 
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.stream.Collectors;
 
@@ -37,6 +41,44 @@ public class GlobalExceptionHandler {
                 .collect(Collectors.joining("; "));
         log.warn("参数校验失败：{}", msg);
         return Result.fail(ErrorCode.PARAM_ERROR, msg);
+    }
+
+    /**
+     * 缺少必填请求参数（@RequestParam 未传）
+     */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public Result<Void> handleMissingParam(MissingServletRequestParameterException e) {
+        String msg = "缺少必填参数：" + e.getParameterName();
+        log.warn("缺少必填参数：{}", e.getParameterName());
+        return Result.fail(ErrorCode.PARAM_ERROR, msg);
+    }
+
+    /**
+     * 路径/查询参数类型转换失败（如 Long 收到非数字）
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public Result<Void> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
+        String msg = "参数类型错误：" + e.getName() + " 应为 " + (e.getRequiredType() != null ? e.getRequiredType().getSimpleName() : "合法值");
+        log.warn("参数类型转换失败：{}", e.getMessage());
+        return Result.fail(ErrorCode.PARAM_ERROR, msg);
+    }
+
+    /**
+     * 请求体 JSON 解析失败
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public Result<Void> handleNotReadable(HttpMessageNotReadableException e) {
+        log.warn("请求体解析失败：{}", e.getMessage());
+        return Result.fail(ErrorCode.PARAM_ERROR, "请求体格式错误（JSON 解析失败）");
+    }
+
+    /**
+     * 接口路径不存在
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public Result<Void> handleNoResource(NoResourceFoundException e) {
+        log.warn("接口路径不存在：{}", e.getResourcePath());
+        return Result.fail(ErrorCode.PARAM_ERROR, "接口路径不存在：" + e.getResourcePath());
     }
 
     /**

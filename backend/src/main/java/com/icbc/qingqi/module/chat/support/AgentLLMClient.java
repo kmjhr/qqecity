@@ -37,7 +37,7 @@ public class AgentLLMClient {
     @Value("${chat.llm.timeout-seconds:15}")
     private int timeoutSeconds;
 
-    @Value("${chat.llm.max-tokens:1024}")
+    @Value("${chat.llm.max-tokens:256}")
     private int maxTokens;
 
     @Value("${chat.llm.api-key:}")
@@ -80,15 +80,19 @@ public class AgentLLMClient {
             sysMsg.put("role", "system");
             sysMsg.put("content", systemOverride + "\n\n【知识库上下文】\n" + context);
 
-            // 历史对话
-            for (int i = 0; i < historyMessages.size(); i += 2) {
+            // 历史对话（只取最近 3 轮共 6 条，避免长历史拖慢本地 LLM 输入处理）
+            List<String> recentHistory = historyMessages;
+            if (recentHistory.size() > 6) {
+                recentHistory = new java.util.ArrayList<>(recentHistory.subList(recentHistory.size() - 6, recentHistory.size()));
+            }
+            for (int i = 0; i < recentHistory.size(); i += 2) {
                 ObjectNode user = messages.addObject();
                 user.put("role", "user");
-                user.put("content", historyMessages.get(i));
-                if (i + 1 < historyMessages.size()) {
+                user.put("content", recentHistory.get(i));
+                if (i + 1 < recentHistory.size()) {
                     ObjectNode asst = messages.addObject();
                     asst.put("role", "assistant");
-                    asst.put("content", historyMessages.get(i + 1));
+                    asst.put("content", recentHistory.get(i + 1));
                 }
             }
             // 当前问题

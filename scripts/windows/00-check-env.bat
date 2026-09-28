@@ -43,8 +43,8 @@ if %errorlevel%==0 (
     )
     echo     ✅ Maven 已安装：!MAVEN_VER!
     set /a PASS+=1
-) else if exist "%BACKEND_DIR%\mvnw.cmd" (
-    echo     ✅ Maven Wrapper 已就绪（项目内置，首次运行自动下载 Maven）
+) else if exist "%~dp0..\..\backend\mvnw.cmd" (
+    echo     ✅ Maven Wrapper 已就绪（项目内置 backend\mvnw.cmd，首次运行自动下载 Maven）
     set /a PASS+=1
 ) else (
     echo     ❌ 未检测到 Maven，且项目未包含 Maven Wrapper
@@ -81,6 +81,7 @@ if %errorlevel%==0 (
     mysql -h%MYSQL_HOST% -P%MYSQL_PORT% -u%MYSQL_USER% -p%MYSQL_PASSWORD% -e "SELECT 1;" >nul 2>nul
     if !errorlevel!==0 (
         echo     ✅ MySQL 连接成功（%MYSQL_HOST%:%MYSQL_PORT%）
+        set /a PASS+=1
         REM 检查数据库是否存在
         mysql -h%MYSQL_HOST% -P%MYSQL_PORT% -u%MYSQL_USER% -p%MYSQL_PASSWORD% -e "USE %DB_NAME%;" >nul 2>nul
         if !errorlevel!==0 (
@@ -90,8 +91,8 @@ if %errorlevel%==0 (
         )
     ) else (
         echo     ❌ MySQL 连接失败，请检查服务是否启动及配置是否正确
+        set /a FAIL+=1
     )
-    set /a PASS+=1
 ) else (
     echo     ⚠️  未找到 mysql 命令（如未加入 PATH 可忽略）
     echo        请确保 MySQL 服务已启动
@@ -120,11 +121,11 @@ if "%REDIS_PASSWORD%"=="" (
 
 if %REDIS_OK%==1 (
     echo     ✅ Redis 连接成功（%REDIS_HOST%:%REDIS_PORT%）
+    set /a PASS+=1
 ) else (
     echo     ⚠️  Redis 连接失败或未安装（推荐安装：JWT 黑名单依赖；未安装时后端自动降级）
     echo        参考文档：docs\deployment\mysql-deployment.md + docs\deployment\redis-deployment.md
 )
-set /a PASS+=1
 echo.
 
 REM ---------- 6. Git ----------

@@ -109,14 +109,14 @@ EXIT;
 # 1. 创建数据库
 mysql -u root -p123456 -e "CREATE DATABASE IF NOT EXISTS qingqi DEFAULT CHARSET utf8mb4 DEFAULT COLLATE utf8mb4_general_ci;"
 
-# 2. 导入表结构（25 张表）
+# 2. 导入表结构（41 张表）
 mysql -u root -p123456 qingqi < backend/sql/schema.sql
 
 # 3. 导入演示数据
 mysql -u root -p123456 qingqi < backend/sql/data.sql
 ```
 
-> SQL 文件位置：`backend/sql/`（另有 `backend/src/main/resources/db/` 副本，内容一致）。
+> SQL 文件位置：`backend/sql/`（唯一权威版本）。
 > data.sql 内置 5 个演示账号（admin / testuser / entrepreneur / landlord01 / banker01），统一密码 `123456`。
 
 ### 脚本一键导入（推荐）
@@ -141,7 +141,7 @@ chmod +x *.sh
 ```sql
 USE qingqi;
 SELECT COUNT(*) AS table_count FROM information_schema.tables WHERE table_schema='qingqi';
--- 应为 25
+-- 应为 41
 
 SELECT username, role FROM sys_user;
 -- 应返回 5 条演示账号
@@ -226,7 +226,7 @@ spring:
 docker compose up -d mysql
 ```
 
-- 端口：`3306`（映射到宿主机）
+- 端口：`3307`（映射到宿主机；容器内为 3306，注意与 docker-compose.md 保持一致）
 - root 密码：`123456`
 - 数据库：`qingqi`（自动创建，自动导入 schema.sql + data.sql）
 

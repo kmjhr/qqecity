@@ -77,10 +77,49 @@ const routes: RouteRecordRaw[] = [
             meta: { title: '受托支付复核', icon: 'Money', requiresAuth: true }
           },
           {
+            path: 'guarantee-manage',
+            name: 'GuaranteeManage',
+            component: () => import('@/views/business/guarantee-manage/index.vue'),
+            meta: { title: '保函管理', icon: 'Document', requiresAuth: true }
+          },
+          {
+            path: 'registration-review',
+            name: 'RegistrationReview',
+            component: () => import('@/views/business/registration-review/index.vue'),
+            meta: { title: '注册审核', icon: 'UserFilled', requiresAuth: true }
+          },
+          {
             path: 'risk-overview',
             name: 'RiskOverview',
             component: () => import('@/views/business/risk-overview/index.vue'),
             meta: { title: '风险预警总览', icon: 'Warning', requiresAuth: true }
+          }
+        ]
+      },
+      // 内容管理（安全教育平台 + 政策专区）
+      {
+        path: 'content',
+        name: 'Content',
+        redirect: '/content/alert-manage',
+        meta: { title: '内容管理', icon: 'Notebook' },
+        children: [
+          {
+            path: 'alert-manage',
+            name: 'AlertManage',
+            component: () => import('@/views/content/alert-manage/index.vue'),
+            meta: { title: '实时预警管理', icon: 'Bell', requiresAuth: true }
+          },
+          {
+            path: 'anti-fraud-manage',
+            name: 'AntiFraudManage',
+            component: () => import('@/views/content/anti-fraud-manage/index.vue'),
+            meta: { title: '反诈教学内容', icon: 'Reading', requiresAuth: true }
+          },
+          {
+            path: 'portal-manage',
+            name: 'PortalManage',
+            component: () => import('@/views/content/portal-manage/index.vue'),
+            meta: { title: '政策门户管理', icon: 'Link', requiresAuth: true }
           }
         ]
       }

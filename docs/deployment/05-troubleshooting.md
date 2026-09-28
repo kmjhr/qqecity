@@ -60,8 +60,8 @@
 - 关键信息：启动时的 `Started QingqiApplication`、异常堆栈（Exception stack trace）
 
 **生产环境（JAR 包部署）：**
-- 日志文件路径由 `logging.file.name` 配置决定
-- 默认在 `logs/qingqi.log`
+- 项目默认**不写日志文件**，日志直接输出到控制台（application.yml 未配置 `logging.file.name`）
+- 如需文件日志，在 `application.yml` 中添加 `logging.file.name: logs/qingqi.log`，重启后生效
 - 实时查看：`tail -f logs/qingqi.log`（Linux）或 `Get-Content logs/qingqi.log -Wait`（Windows）
 
 ### 前端日志
@@ -269,7 +269,7 @@ SELECT DATABASE();
 USE qingqi;
 SHOW TABLES;
 
--- 3. 检查表数量（应为 25 张）
+-- 3. 检查表数量（应为 41 张）
 SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'qingqi';
 ```
 
@@ -785,6 +785,29 @@ server: {
 3. **文件类型不允许**
    - 检查后端是否有文件类型校验
    - 确认上传的文件类型在白名单内
+
+### 6.6 AI / LLM 调用失败（消息标注"AI 降级本地"）
+
+**现象：** 智能客服或反诈情景演练的消息标注"AI 降级本地"；或后端日志出现 `[AgentLLM] 调用失败`。
+
+**原因与排查（按顺序）：**
+
+1. **LLM 服务未启动（最常见）**
+   - 方案 A（本机 Ollama）：`curl http://localhost:11434/` 应返回 `HTTP 200`；无响应则 `ollama serve` 启动，并配置开机自启
+   - 方案 B（云端 API）：检查 `.env` 中 `CHAT_LLM_API_KEY` 是否有效、是否欠费
+
+2. **模型未拉取 / 模型名不匹配**
+   - `ollama list` 确认模型存在，`.env` 中 `CHAT_LLM_MODEL` 与模型名完全一致（如 `qwen2.5:3b-instruct`）
+
+3. **请求超时（慢）**
+   - 模型冷加载：设置 `OLLAMA_KEEP_ALIVE=-1` 常驻内存
+   - 输出过长 / 历史过长：确认后端 `chat.llm.max-tokens=256`、历史自动截断最近 3 轮（新版已默认）
+
+4. **配置未生效**
+   - 修改 `.env` 后需重建后端：`docker compose up -d --build backend`
+   - 确认引擎状态：登录后访问 `/api/v1/chat/engine-status`，期望 `activeEngine=agent`、`agentAvailable=true`
+
+> 完整配置与验证见 [06-ai-llm.md](./06-ai-llm.md)。
 
 ---
 

@@ -60,7 +60,7 @@ public class RegisterDTO {
     /** 毕业日期（GRADUATE 需毕业2年内，STUDENT 需在校） */
     private LocalDate graduationDate;
 
-    /** 核验方式：XUE_XIN_WANG-学信网在线核验（模拟）/ STUDENT_CARD-学生证照片识别（模拟） */
+    /** 核验方式：XUE_XIN_WANG-学信网在线核验（模拟）/ STUDENT_CARD-学生证照片识别·仅在校生（模拟）/ GRAD_CERT-毕业证照片识别·仅毕业2年内（模拟） */
     private String verifyType;
 
     /** 学信档案验证码/学号（模拟） */

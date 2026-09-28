@@ -311,6 +311,42 @@ public class GuaranteeService {
     }
 
     /**
+     * 管理端代房东确认（银行/运营代操作，演示降低门槛）
+     * <p>
+     * 与 landlordConfirm 的区别：不校验"当前用户为该申请房东"，
+     * 由 ADMIN/BANK_OPERATOR 角色（JwtAuthFilter 已校验）代房东确认并电子签署，
+     * 签名方式记录为 ADMIN_AGENT_CONFIRM，随后同样自动触发 AI 合同复审（G-3）。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public GuaranteeApplicationVO adminLandlordConfirm(Long operatorId, Long applicationId, String signContent) {
+        BizGuaranteeApplication app = getApplication(applicationId);
+
+        // 状态校验
+        if (!STATUS_SUBMITTED.equals(app.getApplyStatus())) {
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET,
+                    "当前申请状态为" + statusName(app.getApplyStatus()) + "，仅待确认状态可操作");
+        }
+
+        // 代房东确认 + 电子签署（管理端代签标识）
+        app.setApplyStatus(STATUS_LANDLORD_CONFIRM);
+        app.setLandlordConfirmTime(LocalDateTime.now());
+        app.setSignContent(signContent != null && !signContent.isBlank() ? signContent : "ADMIN_AGENT_CONFIRM");
+        app.setSignTime(LocalDateTime.now());
+        applicationMapper.updateById(app);
+
+        log.info("[保函-管理端代房东确认] 申请编号={}, 操作人={}, 签名方式=ADMIN_AGENT（模拟）",
+                app.getApplyNo(), operatorId);
+
+        // 站内信：房东已确认（管理端代操作）
+        sendInternalMessage(app.getTenantId(), "房东已确认保函申请（管理端代操作）",
+                "房东已确认并电子签署保函申请（编号" + app.getApplyNo() + "），系统正在进行AI复审。【模拟】",
+                "GUARANTEE", app.getId());
+
+        // G-3 自动触发 AI 合同复审
+        return aiReview(app);
+    }
+
+    /**
      * G-3 AI 合同复审（规则引擎 + 置信度阈值）
      * <p>
      * 风险判定规则：

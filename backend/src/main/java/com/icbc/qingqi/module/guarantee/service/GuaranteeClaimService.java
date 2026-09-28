@@ -12,6 +12,7 @@ import com.icbc.qingqi.module.message.entity.SysMessage;
 import com.icbc.qingqi.module.message.mapper.SysMessageMapper;
 import com.icbc.qingqi.module.user.entity.SysUser;
 import com.icbc.qingqi.module.user.mapper.SysUserMapper;
+import com.icbc.qingqi.security.UserContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -304,6 +305,8 @@ public class GuaranteeClaimService {
      */
     @Transactional(rollbackFor = Exception.class)
     public ClaimVO manualReview(Long currentUserId, Long claimId, ClaimReviewDTO dto) {
+        // 角色校验：仅 ADMIN / BANK_OPERATOR 可人工复核（修复普通用户越权漏洞）
+        checkBackOffice();
         BizGuaranteeClaim claim = getClaim(claimId);
 
         // 状态校验
@@ -408,6 +411,8 @@ public class GuaranteeClaimService {
      * 查询人工复核队列（banker 专用）
      */
     public Page<ClaimVO> pageManualReviewQueue(int pageNum, int pageSize) {
+        // 角色校验：仅 ADMIN / BANK_OPERATOR 可查（修复普通用户越权漏洞）
+        checkBackOffice();
         Page<BizGuaranteeClaim> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<BizGuaranteeClaim> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(BizGuaranteeClaim::getClaimStatus, CLAIM_MANUAL_REVIEW);
@@ -447,6 +452,16 @@ public class GuaranteeClaimService {
             throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "索赔不存在");
         }
         return claim;
+    }
+
+    /**
+     * 后台角色校验：仅 ADMIN 系统管理员 / BANK_OPERATOR 银行运营岗可操作
+     */
+    private void checkBackOffice() {
+        String role = UserContext.getRole();
+        if (!"ADMIN".equals(role) && !"BANK_OPERATOR".equals(role)) {
+            throw new BizException(ErrorCode.FORBIDDEN, "仅银行运营人员可操作");
+        }
     }
 
     private void updateGuaranteeClaimed(BizGuarantee guarantee) {

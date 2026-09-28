@@ -64,8 +64,8 @@
             <el-radio-button value="STUDENT">在校大学生</el-radio-button>
             <el-radio-button value="GRADUATE">毕业2年内</el-radio-button>
             <el-radio-button value="ENTREPRENEUR">青年创业者</el-radio-button>
-            <el-radio-button value="OTHER">其他（非白名单）</el-radio-button>
           </el-radio-group>
+          <div class="whitelist-tip">仅白名单人群可注册（在校大学生 / 毕业2年内 / 青年创业者），非白名单不可注册</div>
         </el-form-item>
 
         <template v-if="needEducation">
@@ -108,22 +108,24 @@
             <template #label>核验方式<span class="req">*</span>（模拟）</template>
             <el-radio-group v-model="registerForm.verifyType">
               <el-radio-button value="XUE_XIN_WANG">方式A · 学信网在线核验（模拟）</el-radio-button>
-              <el-radio-button value="STUDENT_CARD">方式B · 学生证照片识别（模拟）</el-radio-button>
+              <el-radio-button v-if="registerForm.userType === 'GRADUATE'" value="GRAD_CERT">方式B · 毕业证照片识别（模拟）</el-radio-button>
+              <el-radio-button v-else value="STUDENT_CARD">方式B · 学生证照片识别（模拟）</el-radio-button>
             </el-radio-group>
           </el-form-item>
 
           <el-form-item prop="studentNo">
             <template #label>
               <span v-if="registerForm.verifyType === 'XUE_XIN_WANG'">学信档案验证码<span class="req">*</span>（模拟）</span>
+              <span v-else-if="registerForm.verifyType === 'GRAD_CERT'">毕业证编号<span class="req">*</span>（模拟识别回填）</span>
               <span v-else>学号<span class="req">*</span>（模拟识别回填）</span>
             </template>
             <div class="student-no-row">
               <el-input
                 v-model="registerForm.studentNo"
-                :placeholder="registerForm.verifyType === 'XUE_XIN_WANG' ? '请输入学信档案在线验证码' : '请输入学号'"
+                :placeholder="registerForm.verifyType === 'XUE_XIN_WANG' ? '请输入学信档案在线验证码' : (registerForm.verifyType === 'GRAD_CERT' ? '请输入毕业证编号' : '请输入学号')"
               />
-              <el-button v-if="registerForm.verifyType === 'STUDENT_CARD'" :loading="ocrLoading" @click="handleMockOcr">
-                模拟上传学生证识别
+              <el-button v-if="registerForm.verifyType === 'STUDENT_CARD' || registerForm.verifyType === 'GRAD_CERT'" :loading="ocrLoading" @click="handleMockOcr">
+                {{ registerForm.verifyType === 'GRAD_CERT' ? '模拟上传毕业证识别' : '模拟上传学生证识别' }}
               </el-button>
             </div>
           </el-form-item>
@@ -184,7 +186,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
@@ -226,6 +228,13 @@ const registerForm = reactive({
 /** STUDENT / GRADUATE 需要学历核验 */
 const needEducation = computed(() =>
   registerForm.userType === 'STUDENT' || registerForm.userType === 'GRADUATE')
+
+/** 切换人群类型时重置核验方式（学生证仅在校生 / 毕业证仅毕业2年内，避免残留无效值） */
+watch(() => registerForm.userType, () => {
+  registerForm.verifyType = ''
+  registerForm.studentNo = ''
+  ocrMessage.value = ''
+})
 
 /** AI 审核是否通过（通过后才允许注册） */
 const reviewPassed = computed(() => !!reviewResult.value?.passed)
@@ -269,7 +278,7 @@ const registerRules = {
   educationLevel: [{ required: true, message: '请选择学历层次', trigger: 'change' }],
   graduationDate: [{ required: true, message: '请选择毕业日期', trigger: 'change' }],
   verifyType: [{ required: true, message: '请选择核验方式', trigger: 'change' }],
-  studentNo: [{ required: true, message: '请输入学信档案验证码/学号', trigger: 'blur' }]
+  studentNo: [{ required: true, message: '请输入学信档案验证码/学号/毕业证编号', trigger: 'blur' }]
 }
 
 /** 组装提交/预审数据 */
@@ -312,17 +321,18 @@ async function handleAiReview() {
   })
 }
 
-/** 学生证照片 AI 识别（模拟） */
+/** 学生证/毕业证照片 AI 识别（模拟） */
 async function handleMockOcr() {
   ocrLoading.value = true
+  const isGradCert = registerForm.verifyType === 'GRAD_CERT'
   try {
     const data = await studentCardOcr({
       demoSchool: registerForm.school || '中山大学'
     })
     registerForm.school = data.school
     registerForm.studentNo = data.studentNo
-    ocrMessage.value = `已模拟识别：${data.school} · 学号 ${data.studentNo}（置信度 ${data.confidence}%）`
-    ElMessage.success('学生证照片识别完成（模拟）')
+    ocrMessage.value = `已模拟识别：${data.school} · ${isGradCert ? '毕业证编号' : '学号'} ${data.studentNo}（置信度 ${data.confidence}%）`
+    ElMessage.success(isGradCert ? '毕业证照片识别完成（模拟）' : '学生证照片识别完成（模拟）')
   } catch (e) {
     // 错误已在拦截器中提示
   } finally {
@@ -408,6 +418,13 @@ async function handleRegister() {
 
 .user-type-group {
   width: 100%;
+}
+
+.whitelist-tip {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.5;
 }
 
 .user-type-group :deep(.el-radio-button) {

@@ -354,6 +354,8 @@ public class LoanService {
     /**
      * 确保 B 类授信额度存在（预审通过时调用）
      * B 类预审通过后进入 6 个月观察期（缺口 #11）
+     * 幂等：若已有 B 额度但观察期未启动（NONE/空），补启动观察期；
+     * 不覆盖已处于 OBSERVING/PROMOTED/EXITED 的状态（修复 B转A 闭环卡死问题）
      */
     private void ensureBCreditLimit(Long userId, BigDecimal total) {
         BizCreditLimit existing = creditLimitMapper.selectOne(
@@ -373,6 +375,18 @@ public class LoanService {
             sendInternalMessage(userId, "B类授信观察期已开始",
                     "您的B类预审已通过，进入6个月观察期。观察期内通过受托支付、记账等积累信用，达标可转A类循环贷并提额。【模拟】",
                     "LOAN", b.getId());
+        } else if (existing.getObservationStatus() == null
+                || "NONE".equals(existing.getObservationStatus())
+                || existing.getObservationStatus().isBlank()) {
+            // 已有额度但观察期未启动（如历史预置数据）：幂等补启动
+            existing.setObservationStatus("OBSERVING");
+            existing.setObservationStart(LocalDate.now());
+            existing.setObservationMonths(existing.getObservationMonths() == null ? 0 : existing.getObservationMonths());
+            existing.setObservationScore(existing.getObservationScore() == null ? 0 : existing.getObservationScore());
+            creditLimitMapper.updateById(existing);
+            sendInternalMessage(userId, "B类授信观察期已开始",
+                    "您的B类预审已通过，进入6个月观察期。观察期内通过受托支付、记账等积累信用，达标可转A类循环贷并提额。【模拟】",
+                    "LOAN", existing.getId());
         }
     }
 

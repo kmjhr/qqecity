@@ -18,12 +18,19 @@ import com.icbc.qingqi.module.message.entity.SysMessage;
 import com.icbc.qingqi.module.message.mapper.SysMessageMapper;
 import com.icbc.qingqi.module.risk.entity.BizRiskWarning;
 import com.icbc.qingqi.module.risk.mapper.BizRiskWarningMapper;
+import com.icbc.qingqi.module.user.entity.BizRegistrationReview;
+import com.icbc.qingqi.module.user.entity.SysUser;
+import com.icbc.qingqi.module.user.mapper.BizRegistrationReviewMapper;
+import com.icbc.qingqi.module.user.mapper.SysUserMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * 管理端业务审核台服务（步骤 8·缺口 #22）
@@ -48,6 +55,8 @@ public class AdminService {
     private final BizEntrustPaymentMapper entrustPaymentMapper;
     private final BizRiskWarningMapper riskWarningMapper;
     private final SysMessageMapper messageMapper;
+    private final SysUserMapper sysUserMapper;
+    private final BizRegistrationReviewMapper registrationReviewMapper;
 
     // 状态常量
     private static final String LOAN_PENDING_APPROVAL = "PENDING_APPROVAL";
@@ -64,13 +73,17 @@ public class AdminService {
                         BizCreditTxnMapper creditTxnMapper,
                         BizEntrustPaymentMapper entrustPaymentMapper,
                         BizRiskWarningMapper riskWarningMapper,
-                        SysMessageMapper messageMapper) {
+                        SysMessageMapper messageMapper,
+                        SysUserMapper sysUserMapper,
+                        BizRegistrationReviewMapper registrationReviewMapper) {
         this.guaranteeApplicationMapper = guaranteeApplicationMapper;
         this.loanApplicationMapper = loanApplicationMapper;
         this.creditTxnMapper = creditTxnMapper;
         this.entrustPaymentMapper = entrustPaymentMapper;
         this.riskWarningMapper = riskWarningMapper;
         this.messageMapper = messageMapper;
+        this.sysUserMapper = sysUserMapper;
+        this.registrationReviewMapper = registrationReviewMapper;
     }
 
     // ============================================================
@@ -243,5 +256,71 @@ public class AdminService {
         messageMapper.insert(msg);
 
         return warning;
+    }
+
+    // ============================================================
+    //  ⑥ 保函管理（全量申请列表，含待房东确认）
+    // ============================================================
+
+    public Page<BizGuaranteeApplication> pageGuaranteeApplications(int pageNum, int pageSize, String status) {
+        Page<BizGuaranteeApplication> page = new Page<>(pageNum, pageSize);
+        LambdaQueryWrapper<BizGuaranteeApplication> wrapper = new LambdaQueryWrapper<>();
+        if (status != null && !status.isBlank()) {
+            wrapper.eq(BizGuaranteeApplication::getApplyStatus, status);
+        }
+        wrapper.orderByDesc(BizGuaranteeApplication::getSubmitTime);
+        return guaranteeApplicationMapper.selectPage(page, wrapper);
+    }
+
+    // ============================================================
+    //  ⑦ 注册审核记录（白名单 AI 审核留痕）
+    // ============================================================
+
+    public Page<BizRegistrationReview> pageRegistrationReviews(int pageNum, int pageSize,
+                                                                String keyword, String result) {
+        Page<BizRegistrationReview> page = new Page<>(pageNum, pageSize);
+        LambdaQueryWrapper<BizRegistrationReview> wrapper = new LambdaQueryWrapper<>();
+        if (keyword != null && !keyword.isBlank()) {
+            wrapper.and(w -> w.like(BizRegistrationReview::getUsername, keyword)
+                    .or().like(BizRegistrationReview::getRealName, keyword)
+                    .or().like(BizRegistrationReview::getPhone, keyword)
+                    .or().like(BizRegistrationReview::getReviewNo, keyword));
+        }
+        if (result != null && !result.isBlank()) {
+            wrapper.eq(BizRegistrationReview::getResult, result);
+        }
+        wrapper.orderByDesc(BizRegistrationReview::getCreateTime);
+        return registrationReviewMapper.selectPage(page, wrapper);
+    }
+
+    // ============================================================
+    //  ⑧ 仪表盘统计（管理端数据看板）
+    // ============================================================
+
+    public Map<String, Object> dashboardStats() {
+        Map<String, Object> stats = new HashMap<>();
+        // 用户维度
+        stats.put("userCount", sysUserMapper.selectCount(null));
+        stats.put("userToday", sysUserMapper.selectCount(new LambdaQueryWrapper<SysUser>()
+                .ge(SysUser::getCreateTime, LocalDate.now().atStartOfDay())));
+        // 保函维度
+        stats.put("guaranteeTotal", guaranteeApplicationMapper.selectCount(null));
+        stats.put("guaranteePendingConfirm", guaranteeApplicationMapper.selectCount(
+                new LambdaQueryWrapper<BizGuaranteeApplication>()
+                        .eq(BizGuaranteeApplication::getApplyStatus, "SUBMITTED")));
+        stats.put("guaranteeManualReview", guaranteeApplicationMapper.selectCount(
+                new LambdaQueryWrapper<BizGuaranteeApplication>()
+                        .eq(BizGuaranteeApplication::getApplyStatus, "MANUAL_REVIEW")));
+        // 贷款维度
+        stats.put("loanPending", loanApplicationMapper.selectCount(
+                new LambdaQueryWrapper<BizLoanApplication>()
+                        .eq(BizLoanApplication::getApplyStatus, LOAN_PENDING_APPROVAL)));
+        // 风控维度
+        stats.put("riskUnhandled", riskWarningMapper.selectCount(
+                new LambdaQueryWrapper<BizRiskWarning>()
+                        .eq(BizRiskWarning::getIsHandled, 0)));
+        // 注册审核维度
+        stats.put("registrationReviews", registrationReviewMapper.selectCount(null));
+        return stats;
     }
 }

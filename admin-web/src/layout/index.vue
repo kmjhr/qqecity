@@ -121,12 +121,24 @@ const menuList = [
     title: '业务审核',
     icon: 'Checked',
     children: [
+      { path: '/business/guarantee-manage', title: '保函管理', icon: 'Document' },
+      { path: '/business/registration-review', title: '注册审核', icon: 'UserFilled' },
       { path: '/business/ai-review', title: 'AI 复审队列', icon: 'View' },
       { path: '/business/claim-review', title: '索赔复核队列', icon: 'Document' },
       { path: '/business/loan-review', title: '贷款审批', icon: 'Money' },
       { path: '/business/merchant-audit', title: '商户白名单', icon: 'Shop' },
       { path: '/business/entrust-review', title: '受托支付复核', icon: 'Money' },
       { path: '/business/risk-overview', title: '风险预警总览', icon: 'Warning' }
+    ]
+  },
+  {
+    path: '/content',
+    title: '内容管理',
+    icon: 'Notebook',
+    children: [
+      { path: '/content/alert-manage', title: '实时预警管理', icon: 'Bell' },
+      { path: '/content/anti-fraud-manage', title: '反诈教学内容', icon: 'Reading' },
+      { path: '/content/portal-manage', title: '政策门户管理', icon: 'Link' }
     ]
   },
   {

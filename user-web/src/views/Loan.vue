@@ -22,7 +22,7 @@
       <el-tab-pane label="A类 · 循环贷（随借随还）" name="tabA">
         <el-card shadow="never" class="zone-card">
           <div class="steps-wrap" @click="onStepsClick($event, 'tabA')">
-            <el-steps :active="aStep" finish-status="success" align-center class="zone-steps zone-steps-clickable">
+            <el-steps :active="aStep" finish-status="finish" align-center class="zone-steps zone-steps-clickable">
               <el-step title="① 提款" description="从循环额度分次提款（单笔≥¥1000）" />
               <el-step title="② 随借随还" description="按实际用款天数计息（3.85%÷365）" />
               <el-step title="③ 还款结清" description="可部分/按笔/全部结清，额度即时恢复" />
@@ -171,7 +171,7 @@
       <el-tab-pane label="B类 · 定向贷（受托支付）" name="tabB">
         <el-card shadow="never" class="zone-card">
           <div class="steps-wrap" @click="onStepsClick($event, 'tabB')">
-            <el-steps :active="bStep" finish-status="success" align-center class="zone-steps zone-steps-clickable">
+            <el-steps :active="bStep" finish-status="finish" align-center class="zone-steps zone-steps-clickable">
               <el-step title="① 预审+申请" description="免费预审（不查征信），获批才有钱可用" />
               <el-step title="② 获批额度" description="定向小额额度（¥5,000~¥20,000）" />
               <el-step title="③ 受托支付" description="银行直付商户账户，不经过个人账户" />
@@ -1033,7 +1033,13 @@ onMounted(() => { loadRules(); loadCredit(); loadMerchants(); loadApplications()
 .zone-steps-clickable :deep(.el-step__title) { color: #303133; font-weight: 600; }
 .zone-steps-clickable :deep(.el-step__description) { color: #909399; }
 .zone-steps-clickable :deep(.el-step__head.is-finish .el-step__icon), .zone-steps-clickable :deep(.el-step__head.is-process .el-step__icon) { border-color: #909399 !important; background: #fff; }
-.zone-steps-clickable :deep(.el-step__head.is-finish .el-step__line), .zone-steps-clickable :deep(.el-step__head.is-process .el-step__line) { border-color: #909399; }
+/* 连接线容器本身也统一灰色（EP 默认已完成段为主题蓝边框，全状态统一） */
+.zone-steps-clickable :deep(.el-step__head .el-step__line) { border-color: #909399 !important; }
+/* 连接线完全静态统一灰色（无任何交互指示；不区分完成/进行中/未完成）
+   Element Plus 线填充色由 line-inner 的 border-top-color 控制（默认主题蓝）；
+   去掉进度填充线，所有连接线只显示统一灰容器线 */
+.zone-steps-clickable :deep(.el-step__head .el-step__line-inner) { display: none; }
+.zone-steps-clickable :deep(.el-step__head .el-step__icon-inner) { color: #303133 !important; }
 .rule-collapse { border: 1px solid #ebeef5; border-radius: 8px; }
 .steps-wrap { cursor: pointer; }
 .zone-steps-clickable :deep(.el-step) { cursor: pointer; }
@@ -1123,6 +1129,10 @@ onMounted(() => { loadRules(); loadCredit(); loadMerchants(); loadApplications()
 .rule-list li::marker { color: #409eff; }
 .rule-block .el-button { margin-top: 10px; }
 .main-tabs { margin-top: 16px; }
+/* A/B 选项卡选中态改灰色（交互指示不要蓝色）：选中文字深灰、指示条灰、hover 灰 */
+.main-tabs :deep(.el-tabs__item.is-active) { color: #303133; }
+.main-tabs :deep(.el-tabs__active-bar) { background: #909399; }
+.main-tabs :deep(.el-tabs__item:hover) { color: #606266; }
 .amount-range { width: 100%; }
 .amount-item { display: flex; justify-content: space-between; padding: 8px 16px; background: #f5f7fa; border-radius: 6px; }
 .amount-item .label { color: #909399; }
