@@ -125,6 +125,7 @@ const menuList = [
       { path: '/business/claim-review', title: '索赔复核队列', icon: 'Document' },
       { path: '/business/loan-review', title: '贷款审批', icon: 'Money' },
       { path: '/business/merchant-audit', title: '商户白名单', icon: 'Shop' },
+      { path: '/business/entrust-review', title: '受托支付复核', icon: 'Money' },
       { path: '/business/risk-overview', title: '风险预警总览', icon: 'Warning' }
     ]
   },
