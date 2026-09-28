@@ -16,10 +16,15 @@ export const useUiStore = defineStore('ui', {
   }),
   actions: {
     togglePanel() {
+      // 打开消息侧栏时关闭对话侧栏（互斥，避免重叠遮挡）
+      if (this.chatOpen) {
+        this.chatOpen = false
+      }
       this.panelOpen = !this.panelOpen
     },
     openPanel(tab = 'msg') {
       this.panelTab = tab
+      this.chatOpen = false
       this.panelOpen = true
     },
     closePanel() {

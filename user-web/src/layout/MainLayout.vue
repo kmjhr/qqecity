@@ -13,7 +13,7 @@
         router
         class="aside-menu"
         background-color="transparent"
-        text-color="#c0c4cc"
+        text-color="#606266"
         active-text-color="#409EFF"
       >
         <el-menu-item index="/home">
@@ -234,15 +234,16 @@ function handleCommand(command) {
 
 /* ===== 左侧导航 ===== */
 .app-aside {
-  background: linear-gradient(180deg, #1f2d3d 0%, #24344a 100%);
+  background: #fff;
   display: flex;
   flex-direction: column;
-  color: #fff;
+  color: #303133;
   position: sticky;
   top: 0;
   height: 100vh;
   overflow-y: auto;
   flex-shrink: 0;
+  border-right: 1px solid #ebeef5;
 }
 
 .aside-logo {
@@ -269,7 +270,7 @@ function handleCommand(command) {
 .logo-text {
   font-size: 17px;
   font-weight: 600;
-  color: #fff;
+  color: #303133;
 }
 
 .demo-tag {
@@ -303,7 +304,7 @@ function handleCommand(command) {
 }
 
 .aside-menu :deep(.el-sub-menu .el-menu-item:hover) {
-  background: rgba(255, 255, 255, 0.06);
+  background: #f0f7ff;
 }
 
 .aside-menu :deep(.el-sub-menu .el-menu-item.is-active) {
@@ -312,7 +313,8 @@ function handleCommand(command) {
 
 .aside-menu :deep(.el-menu-item:hover),
 .aside-menu :deep(.el-sub-menu__title:hover) {
-  background: rgba(255, 255, 255, 0.06);
+  background: #f0f7ff;
+  color: #409eff;
 }
 
 .menu-group-label {
@@ -325,15 +327,15 @@ function handleCommand(command) {
 
 .intel-group {
   margin-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid #ebeef5;
   padding-top: 4px;
 }
 
 .aside-footer {
   padding: 14px 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid #ebeef5;
   font-size: 12px;
-  color: #7a8ba3;
+  color: #909399;
 }
 
 .aside-footer-item {
