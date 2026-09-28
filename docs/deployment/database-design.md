@@ -36,10 +36,10 @@
 ### biz_credit_txn 循环贷交易流水
 
 - **用途**：A 类 5 万循环贷的提款/还款流水记录
-- **核心字段**：`txn_type`（WITHDRAW/REPAY）、`principal_amount`、`interest_amount`、`borrow_days`、`balance_after`
+- **核心字段**：`txn_type`（WITHDRAW/REPAY）、`principal_amount`、`interest_amount`、`borrow_days`、`balance_after`、`target_loan_no`（仅"指定结清某笔"的 REPAY 流水记录目标借款编号；FIFO 普通还款为空）
 - **关联**：`credit_limit_id` → `biz_credit_limit.id`
-- **计息规则**：`interest = principal × 3.85% × days / 365`（模拟年化）
-- **关联接口**：`POST /api/v1/loan/withdraw`、`POST /api/v1/loan/repay`、`GET /api/v1/loan/credit-txns`
+- **计息规则**：按笔计息（利随本清）：每笔提款独立起息，`interest = 剩余本金 × 3.85% × days / 365`；还款按先进先出冲抵本金（指定结清的 REPAY 通过 `target_loan_no` 精确冲抵目标借款，不参与 FIFO、不漂移）
+- **关联接口**：`POST /api/v1/loan/withdraw`、`POST /api/v1/loan/repay-order`、`GET /api/v1/loan/repay-preview`、`GET /api/v1/loan/credit-txns`
 
 ### biz_insurance_product 保险代销产品表（模拟）
 

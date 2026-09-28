@@ -5,6 +5,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  * 还款试算预览（A/B 双轨通用）
@@ -42,4 +43,13 @@ public class RepayPreviewVO {
 
     @Schema(description = "计息规则说明")
     private String remark;
+
+    @Schema(description = "待还本金合计（=usedLimit）")
+    private BigDecimal principalTotal;
+
+    @Schema(description = "应还利息合计（按笔汇总）")
+    private BigDecimal interestTotal;
+
+    @Schema(description = "未结清借款明细（按笔计息）")
+    private List<LoanItemVO> loans;
 }

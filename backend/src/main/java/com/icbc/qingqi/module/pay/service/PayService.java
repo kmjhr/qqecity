@@ -322,7 +322,14 @@ public class PayService {
     /** 创建业务订单（保函缴费等），返回待支付订单 */
     public PayOrderVO createBizOrder(Long userId, String bizType, Long bizId, String subject,
                                      BigDecimal amount, Long merchantId) {
-        PayOrder order = buildOrder(userId, bizType, bizId, merchantId, subject, amount, null);
+        return createBizOrder(userId, bizType, bizId, subject, amount, merchantId, null);
+    }
+
+    /** 创建业务订单（可携带业务扩展标记，如还款指定借款编号 LOAN#<loanNo>） */
+    @Transactional(rollbackFor = Exception.class)
+    public PayOrderVO createBizOrder(Long userId, String bizType, Long bizId, String subject,
+                                     BigDecimal amount, Long merchantId, String remark) {
+        PayOrder order = buildOrder(userId, bizType, bizId, merchantId, subject, amount, remark);
         orderMapper.insert(order);
         return toOrderVO(order);
     }
@@ -453,7 +460,8 @@ public class PayService {
         }
         // 其他业务（GUARANTEE_FEE）通过事件回调
         eventPublisher.publishEvent(new PaySuccessEvent(order.getOrderNo(), order.getBizType(),
-                order.getBizId(), order.getUserId(), order.getAmount(), order.getPayMethod(), order.getMerchantId()));
+                order.getBizId(), order.getUserId(), order.getAmount(), order.getPayMethod(), order.getMerchantId(),
+                order.getRemark()));
     }
 
     /** 消费支付成功后同步写 biz_transaction（归类，供预算页展示） */

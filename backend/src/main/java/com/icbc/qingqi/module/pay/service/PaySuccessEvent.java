@@ -19,4 +19,5 @@ public class PaySuccessEvent {
     private BigDecimal amount;
     private String payMethod;
     private Long merchantId;
+    private String remark;
 }

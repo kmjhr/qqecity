@@ -560,13 +560,32 @@ public class LoanService {
         if (limit.getUsedLimit() == null || limit.getUsedLimit().compareTo(BigDecimal.ZERO) <= 0) {
             throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, aType ? "当前无待还本金" : "当前无 B类待还本金");
         }
-        if (dto.getAmount().compareTo(limit.getUsedLimit()) > 0) {
-            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET,
-                    "还款金额不能超过待还本金（待还：¥" + limit.getUsedLimit() + "）");
+        BigDecimal rate = aType ? A_TYPE_RATE : B_TYPE_RATE;
+        String remark = null;
+        String subject;
+        if (dto.getLoanNo() != null && !dto.getLoanNo().isBlank()) {
+            // 结清指定借款（按笔）：金额必须等于该笔剩余本金，利息在支付成功后按该笔天数自动结算
+            List<LoanItemVO> loans = buildLoanItems(userId, creditType, rate, limit);
+            LoanItemVO target = loans.stream()
+                    .filter(l -> dto.getLoanNo().equals(l.getLoanNo()))
+                    .findFirst()
+                    .orElseThrow(() -> new BizException(ErrorCode.BIZ_RULE_NOT_MET,
+                            "未找到该笔借款（可能已结清）"));
+            if (dto.getAmount().compareTo(target.getRemainingPrincipal()) != 0) {
+                throw new BizException(ErrorCode.BIZ_RULE_NOT_MET,
+                        "结清借款「" + target.getLoanNo() + "」需还款本金 ¥" + target.getRemainingPrincipal());
+            }
+            remark = "LOAN#" + target.getLoanNo();
+            subject = (aType ? "青创e贷A类还款" : "青创e贷B类还款") + "（结清借款" + target.getLoanNo() + "）";
+        } else {
+            if (dto.getAmount().compareTo(limit.getUsedLimit()) > 0) {
+                throw new BizException(ErrorCode.BIZ_RULE_NOT_MET,
+                        "还款金额不能超过待还本金（待还：¥" + limit.getUsedLimit() + "）");
+            }
+            subject = aType ? "青创e贷A类还款（扫码支付）" : "青创e贷B类还款（扫码支付）";
         }
-        String subject = aType ? "青创e贷A类还款（扫码支付）" : "青创e贷B类还款（扫码支付）";
-        log.info("[创建还款订单] 用户={}, 类型={}, 金额={}", userId, creditType, dto.getAmount());
-        return payService.createBizOrder(userId, "LOAN_REPAY", limit.getId(), subject, dto.getAmount(), null);
+        log.info("[创建还款订单] 用户={}, 类型={}, 金额={}, 借款={}", userId, creditType, dto.getAmount(), remark);
+        return payService.createBizOrder(userId, "LOAN_REPAY", limit.getId(), subject, dto.getAmount(), null, remark);
     }
 
     /**
@@ -583,35 +602,45 @@ public class LoanService {
         boolean aType = TYPE_A.equals(limit.getCreditType());
         BigDecimal rate = aType ? A_TYPE_RATE : B_TYPE_RATE;
 
-        // 计息天数：A 取最早提款日；B 取最早受托支付成功日
-        LocalDate earliest = null;
-        if (aType) {
-            BizCreditTxn w = creditTxnMapper.selectOne(
-                    new LambdaQueryWrapper<BizCreditTxn>()
-                            .eq(BizCreditTxn::getUserId, event.getUserId())
-                            .eq(BizCreditTxn::getTxnType, "WITHDRAW")
-                            .orderByAsc(BizCreditTxn::getTxnTime)
-                            .last("LIMIT 1"));
-            if (w != null && w.getTxnTime() != null) earliest = w.getTxnTime().toLocalDate();
+        // 按笔计息（利随本清）：指定借款结清 或 FIFO 先进先出冲抵，被冲抵本金按所在借款的天数结息
+        BigDecimal repayPrincipal = BigDecimal.ZERO;
+        BigDecimal interest = BigDecimal.ZERO;
+        int maxDays = 0;
+        String detail;
+        String remark = event.getRemark();
+        List<LoanItemVO> loans = buildLoanItems(event.getUserId(), limit.getCreditType(), rate, limit);
+
+        if (remark != null && remark.startsWith("LOAN#")) {
+            String loanNo = remark.substring("LOAN#".length());
+            LoanItemVO t = loans.stream().filter(l -> loanNo.equals(l.getLoanNo())).findFirst().orElse(null);
+            if (t == null) {
+                log.warn("[还款回调] 指定借款不存在或已结清 loanNo={}", loanNo);
+                return;
+            }
+            repayPrincipal = t.getRemainingPrincipal();
+            interest = t.getInterestPreview();
+            maxDays = t.getBorrowDays();
+            detail = "结清借款" + t.getLoanNo() + "：本金¥" + repayPrincipal + "，利息¥" + interest
+                    + "（" + t.getBorrowDays() + "天，年化" + (aType ? "3.85" : "4.35") + "%按笔模拟）";
         } else {
-            BizEntrustPayment pm = paymentMapper.selectOne(
-                    new LambdaQueryWrapper<BizEntrustPayment>()
-                            .eq(BizEntrustPayment::getUserId, event.getUserId())
-                            .eq(BizEntrustPayment::getPaymentStatus, PAY_SUCCESS)
-                            .orderByAsc(BizEntrustPayment::getPaymentTime)
-                            .last("LIMIT 1"));
-            if (pm != null && pm.getPaymentTime() != null) earliest = pm.getPaymentTime().toLocalDate();
-        }
-        int borrowDays = 1;
-        if (earliest != null) {
-            borrowDays = (int) ChronoUnit.DAYS.between(earliest, LocalDate.now());
-            if (borrowDays < 1) borrowDays = 1;
+            BigDecimal remain = event.getAmount();
+            List<String> parts = new ArrayList<>();
+            for (LoanItemVO l : loans) {
+                if (remain.compareTo(BigDecimal.ZERO) <= 0) break;
+                BigDecimal take = l.getRemainingPrincipal().min(remain);
+                if (take.compareTo(BigDecimal.ZERO) <= 0) continue;
+                BigDecimal loanInterest = take.multiply(rate).multiply(new BigDecimal(l.getBorrowDays()))
+                        .divide(new BigDecimal("365"), 2, RoundingMode.HALF_UP);
+                repayPrincipal = repayPrincipal.add(take);
+                interest = interest.add(loanInterest);
+                maxDays = Math.max(maxDays, l.getBorrowDays());
+                parts.add(l.getLoanNo() + "冲" + take.stripTrailingZeros().toPlainString()
+                        + "（息" + loanInterest.stripTrailingZeros().toPlainString() + "）");
+                remain = remain.subtract(take);
+            }
+            detail = "先进先出冲抵：" + String.join("；", parts) + "（按笔计息，模拟）";
         }
 
-        // 还本付息：本金 = 订单金额（≤ 待还本金），利息按日累计
-        BigDecimal repayPrincipal = event.getAmount().min(limit.getUsedLimit());
-        BigDecimal interest = repayPrincipal.multiply(rate).multiply(new BigDecimal(borrowDays))
-                .divide(new BigDecimal("365"), 2, RoundingMode.HALF_UP);
         limit.setUsedLimit(limit.getUsedLimit().subtract(repayPrincipal));
         limit.setAvailableLimit(limit.getAvailableLimit().add(repayPrincipal));
         creditLimitMapper.updateById(limit);
@@ -623,67 +652,134 @@ public class LoanService {
         txn.setTxnType("REPAY");
         txn.setPrincipalAmount(repayPrincipal);
         txn.setInterestAmount(interest);
-        txn.setBorrowDays(borrowDays);
+        txn.setBorrowDays(maxDays);
+        if (remark != null && remark.startsWith("LOAN#")) {
+            txn.setTargetLoanNo(remark.substring("LOAN#".length()));
+        }
         txn.setBalanceAfter(limit.getAvailableLimit());
-        txn.setRemark((aType ? "A类" : "B类") + "扫码还款（订单" + event.getOrderNo() + "），利息¥" + interest
-                + "（" + borrowDays + "天，年化" + (aType ? "3.85" : "4.35") + "%模拟）");
+        txn.setRemark((aType ? "A类" : "B类") + "扫码还款（订单" + event.getOrderNo() + "）：" + detail);
         txn.setTxnTime(LocalDateTime.now());
         creditTxnMapper.insert(txn);
 
-        log.info("[扫码还款成功] 订单={}, 用户={}, 类型={}, 本金={}, 利息={}, 天数={}",
-                event.getOrderNo(), event.getUserId(), limit.getCreditType(), repayPrincipal, interest, borrowDays);
+        log.info("[扫码还款成功] 订单={}, 用户={}, 类型={}, 本金={}, 利息={}",
+                event.getOrderNo(), event.getUserId(), limit.getCreditType(), repayPrincipal, interest);
     }
 
     /**
-     * 还款试算预览（A/B 双轨）：待还本金、计息天数、预估利息、应还合计
+     * 还款试算预览（A/B 双轨，按笔计息）：待还本金、利息、应还合计 + 每笔借款明细
      */
     public RepayPreviewVO repayPreview(Long userId, String creditType) {
         BigDecimal rate = TYPE_A.equals(creditType) ? A_TYPE_RATE : B_TYPE_RATE;
         BizCreditLimit limit = TYPE_A.equals(creditType) ? getActiveACreditLimit(userId) : getActiveBCreditLimit(userId);
-        LocalDate earliest = null;
-        if (TYPE_A.equals(creditType)) {
-            BizCreditTxn w = creditTxnMapper.selectOne(
-                    new LambdaQueryWrapper<BizCreditTxn>()
-                            .eq(BizCreditTxn::getUserId, userId)
-                            .eq(BizCreditTxn::getTxnType, "WITHDRAW")
-                            .orderByAsc(BizCreditTxn::getTxnTime)
-                            .last("LIMIT 1"));
-            if (w != null && w.getTxnTime() != null) {
-                earliest = w.getTxnTime().toLocalDate();
-            }
-        } else {
-            BizEntrustPayment p = paymentMapper.selectOne(
-                    new LambdaQueryWrapper<BizEntrustPayment>()
-                            .eq(BizEntrustPayment::getUserId, userId)
-                            .eq(BizEntrustPayment::getPaymentStatus, PAY_SUCCESS)
-                            .orderByAsc(BizEntrustPayment::getPaymentTime)
-                            .last("LIMIT 1"));
-            if (p != null && p.getPaymentTime() != null) {
-                earliest = p.getPaymentTime().toLocalDate();
-            }
-        }
-        int borrowDays = 1;
-        if (earliest != null) {
-            borrowDays = (int) ChronoUnit.DAYS.between(earliest, LocalDate.now());
-            if (borrowDays < 1) borrowDays = 1;
-        }
+        List<LoanItemVO> loans = buildLoanItems(userId, creditType, rate, limit);
         BigDecimal used = limit.getUsedLimit() == null ? BigDecimal.ZERO : limit.getUsedLimit();
-        BigDecimal interest = used.multiply(rate).multiply(new BigDecimal(borrowDays))
-                .divide(new BigDecimal("365"), 2, RoundingMode.HALF_UP);
+        BigDecimal interestTotal = loans.stream().map(LoanItemVO::getInterestPreview)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        int maxDays = loans.stream().mapToInt(LoanItemVO::getBorrowDays).max().orElse(0);
         RepayPreviewVO vo = new RepayPreviewVO();
         vo.setCreditType(creditType);
         vo.setCreditTypeName(TYPE_A.equals(creditType) ? "A类循环额度" : "B类定向额度");
         vo.setUsedLimit(used);
         vo.setRate(rate);
         vo.setRateText(rate.multiply(new BigDecimal("100")).setScale(2, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString() + "%");
-        vo.setEarliestDate(earliest);
-        vo.setBorrowDays(borrowDays);
-        vo.setInterestPreview(interest);
-        vo.setTotalDue(used.add(interest));
+        vo.setEarliestDate(loans.isEmpty() ? null : loans.get(0).getLoanDate());
+        vo.setBorrowDays(maxDays);
+        vo.setInterestPreview(interestTotal);
+        vo.setTotalDue(used.add(interestTotal));
+        vo.setPrincipalTotal(used);
+        vo.setInterestTotal(interestTotal);
+        vo.setLoans(loans);
         vo.setRemark(TYPE_A.equals(creditType)
-                ? "还款需还本付息：全额结清 = 本金 + 按日累计利息（本息合计）。利息 = 待还本金 × 3.85% ÷ 365 × 实际用款天数（随借随还、无违约金，模拟）"
-                : "还款需还本付息：全额结清 = 本金 + 按日累计利息（本息合计）。利息 = 待还本金 × 4.35% ÷ 365 × 自受托支付日起算天数（B类定向贷款，模拟）");
+                ? "按笔计息（随借随还）：每笔提款独立起息，利息 = 剩余本金 × 3.85% ÷ 365 × 借款天数；还款按先进先出冲抵本金，被冲抵本金对应利息随还款一并结清（利随本清，无违约金，模拟）"
+                : "按笔计息（定向贷）：每笔受托支付独立起息，利息 = 剩余本金 × 4.35% ÷ 365 × 自放款日起天数；还款按先进先出冲抵本金，被冲抵本金对应利息随还款一并结清（利随本清，无违约金，模拟）");
         return vo;
+    }
+
+    /**
+     * 构建未结清借款明细（按笔计息，FIFO 冲抵，实时重算）：
+     * A 类 = 每笔提款流水；B 类 = 每笔受托支付成功；还款流水按时间先进先出冲抵本金
+     */
+    private List<LoanItemVO> buildLoanItems(Long userId, String creditType, BigDecimal rate, BizCreditLimit limit) {
+        List<String> loanNos = new ArrayList<>();
+        List<LocalDate> loanDates = new ArrayList<>();
+        List<BigDecimal> principals = new ArrayList<>();
+        List<BigDecimal> remaining = new ArrayList<>();
+
+        if (TYPE_A.equals(creditType)) {
+            List<BizCreditTxn> ws = creditTxnMapper.selectList(new LambdaQueryWrapper<BizCreditTxn>()
+                    .eq(BizCreditTxn::getCreditLimitId, limit.getId())
+                    .eq(BizCreditTxn::getTxnType, "WITHDRAW")
+                    .orderByAsc(BizCreditTxn::getTxnTime)
+                    .orderByAsc(BizCreditTxn::getId));
+            for (BizCreditTxn w : ws) {
+                loanNos.add(w.getTxnNo());
+                loanDates.add(w.getTxnTime() == null ? LocalDate.now() : w.getTxnTime().toLocalDate());
+                principals.add(w.getPrincipalAmount());
+                remaining.add(w.getPrincipalAmount());
+            }
+        } else {
+            List<BizEntrustPayment> ps = paymentMapper.selectList(new LambdaQueryWrapper<BizEntrustPayment>()
+                    .eq(BizEntrustPayment::getUserId, userId)
+                    .eq(BizEntrustPayment::getPaymentStatus, PAY_SUCCESS)
+                    .orderByAsc(BizEntrustPayment::getPaymentTime)
+                    .orderByAsc(BizEntrustPayment::getId));
+            for (BizEntrustPayment p : ps) {
+                loanNos.add(p.getPaymentNo());
+                loanDates.add(p.getPaymentTime() == null ? LocalDate.now() : p.getPaymentTime().toLocalDate());
+                principals.add(p.getAmount());
+                remaining.add(p.getAmount());
+            }
+        }
+        // 还款冲抵：① 指定结清某笔（target_loan_no）→ 精确冲抵该笔借款（不参与 FIFO，不漂移）
+        List<BizCreditTxn> repays = creditTxnMapper.selectList(new LambdaQueryWrapper<BizCreditTxn>()
+                .eq(BizCreditTxn::getCreditLimitId, limit.getId())
+                .eq(BizCreditTxn::getTxnType, "REPAY")
+                .orderByAsc(BizCreditTxn::getTxnTime)
+                .orderByAsc(BizCreditTxn::getId));
+        for (BizCreditTxn r : repays) {
+            String target = r.getTargetLoanNo();
+            if (target == null || target.isBlank()) continue;
+            int idx = loanNos.indexOf(target);
+            if (idx >= 0) {
+                BigDecimal take = remaining.get(idx).min(r.getPrincipalAmount());
+                remaining.set(idx, remaining.get(idx).subtract(take));
+            }
+        }
+        // ② 剩余普通还款 FIFO 冲抵（每笔还款先冲最早的借款）
+        for (BizCreditTxn r : repays) {
+            if (r.getTargetLoanNo() != null && !r.getTargetLoanNo().isBlank()) continue;
+            BigDecimal remain = r.getPrincipalAmount();
+            for (int i = 0; i < remaining.size() && remain.compareTo(BigDecimal.ZERO) > 0; i++) {
+                BigDecimal take = remaining.get(i).min(remain);
+                remaining.set(i, remaining.get(i).subtract(take));
+                remain = remain.subtract(take);
+            }
+        }
+
+        List<LoanItemVO> loans = new ArrayList<>();
+        for (int i = 0; i < loanNos.size(); i++) {
+            if (remaining.get(i).compareTo(BigDecimal.ZERO) <= 0) continue;
+            int days = (int) ChronoUnit.DAYS.between(loanDates.get(i), LocalDate.now());
+            if (days < 1) days = 1;
+            BigDecimal rem = remaining.get(i);
+            BigDecimal interest = rem.multiply(rate).multiply(new BigDecimal(days))
+                    .divide(new BigDecimal("365"), 2, RoundingMode.HALF_UP);
+            BigDecimal dailyPct = rate.divide(new BigDecimal("365"), 8, RoundingMode.HALF_UP)
+                    .multiply(new BigDecimal("100")).setScale(4, RoundingMode.HALF_UP).stripTrailingZeros();
+            LoanItemVO vo = new LoanItemVO();
+            vo.setLoanNo(loanNos.get(i));
+            vo.setLoanDate(loanDates.get(i));
+            vo.setPrincipal(principals.get(i));
+            vo.setRepaidPrincipal(principals.get(i).subtract(rem));
+            vo.setRemainingPrincipal(rem);
+            vo.setBorrowDays(days);
+            vo.setRate(rate);
+            vo.setDailyRateText(dailyPct.toPlainString() + "%/日");
+            vo.setInterestPreview(interest);
+            vo.setTotalDue(rem.add(interest));
+            loans.add(vo);
+        }
+        return loans;
     }
 
     /**

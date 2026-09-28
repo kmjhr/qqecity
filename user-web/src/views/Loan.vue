@@ -164,48 +164,71 @@
           </el-col>
           <el-col :span="9">
             <el-card shadow="never" class="repay-panel" v-loading="repayLoading">
-              <template #header><span class="repay-head">还款中心（自动试算利息）</span></template>
+              <template #header><span class="repay-head">还款中心（按笔计息 · 随借随还）</span></template>
               <template v-if="repayPreview && repayPreview.usedLimit > 0">
                 <el-radio-group v-model="repayType" size="small" class="repay-types" @change="switchRepay">
                   <el-radio-button :value="'A_TYPE'">A类循环贷</el-radio-button>
                   <el-radio-button :value="'B_TYPE'">B类定向贷</el-radio-button>
                 </el-radio-group>
                 <div class="bank-total">
-                  <div class="bank-total-label">应还合计（元）<span class="bank-total-sub">本金+利息 · 默认全额结清 · 支持部分还款</span></div>
+                  <div class="bank-total-label">应还合计（元）<span class="bank-total-sub">本金 + 按笔累计利息 · 支持部分/按笔/全部结清</span></div>
                   <div class="bank-total-num">¥{{ repayPreview.totalDue }}</div>
+                  <div class="bank-total-split">本金 ¥{{ repayPreview.usedLimit }} ＋ 利息 ¥{{ repayPreview.interestPreview }}</div>
                 </div>
+                <div class="loan-table-title">未结清借款明细（按笔计息 · 先进先出冲抵）</div>
+                <el-table :data="repayPreview.loans || []" size="small" max-height="260" style="margin-bottom:12px">
+                  <el-table-column label="借款日期" width="92">
+                    <template #default="{ row }">{{ row.loanDate }}</template>
+                  </el-table-column>
+                  <el-table-column prop="loanNo" label="借款编号" min-width="130" show-overflow-tooltip />
+                  <el-table-column label="剩余本金" width="84" align="right">
+                    <template #default="{ row }">¥{{ row.remainingPrincipal }}</template>
+                  </el-table-column>
+                  <el-table-column label="天数" width="54" align="center">
+                    <template #default="{ row }">{{ row.borrowDays }}天</template>
+                  </el-table-column>
+                  <el-table-column label="日利率" width="84">
+                    <template #default="{ row }">{{ row.dailyRateText }}</template>
+                  </el-table-column>
+                  <el-table-column label="应还利息" width="78" align="right">
+                    <template #default="{ row }">¥{{ row.interestPreview }}</template>
+                  </el-table-column>
+                  <el-table-column label="本息合计" width="86" align="right">
+                    <template #default="{ row }">¥{{ row.totalDue }}</template>
+                  </el-table-column>
+                  <el-table-column label="操作" width="78" align="center">
+                    <template #default="{ row }">
+                      <el-button size="small" type="warning" plain @click="settleLoan(row)">结清本笔</el-button>
+                    </template>
+                  </el-table-column>
+                </el-table>
                 <div class="repay-rules">
-                  <div class="repay-rules-title">还款规则（模拟，与银行贷款一致）</div>
+                  <div class="repay-rules-title">还款规则（按笔计息，与银行贷款一致）</div>
                   <ul class="repay-rules-list">
-                    <li><b>支持部分还款</b>：还款金额可小于应还合计（最低 0.01 元），无需一次结清；输入金额即按"部分还款"处理</li>
-                    <li>利息按日自动计算：本次利息 = 还款本金 × 年化利率 ÷ 365 × 已用天数，试算实时更新</li>
-                    <li><b>计息起始</b>：取最早一笔提款/放款日，之后再次借款<b>不重置</b>计息起始（合并计息，模拟口径）</li>
-                    <li><b>还本付息</b>：还款需还清本金+利息——全额结清 = 本金 + 按日累计利息（本息合计）；部分还款自定义金额，利息按日随本金结清</li>
+                    <li><b>按笔计息</b>：每笔提款/受托支付独立起息，利息 = 剩余本金 × 年化利率 ÷ 365 × 借款天数；不同日期借款互不影响、各自累计</li>
+                    <li><b>先进先出</b>：部分还款自动冲抵最早那笔借款的本金；也可点「结清本笔」指定结清某一笔（金额=该笔剩余本金）</li>
+                    <li><b>利随本清</b>：被冲抵本金对应的利息随还款一并结清（如借款 10 天结清，利息 = 本金 × 利率 ÷ 365 × 10）</li>
+                    <li><b>支持部分还款</b>：金额可小于应还本金（最低 ¥0.01），无需一次结清；还款后额度即时恢复</li>
                     <li v-if="currentRepayRule">{{ currentRepayRule }}</li>
-                    <li>还款后额度即时恢复（模拟）；A类随借随还可再次提款，无提前还款违约金</li>
                     <li>逾期处理（模拟）：超过额度有效期仍未还清，循环额度停止使用并提示结清</li>
                   </ul>
                 </div>
-                <el-descriptions :column="2" border size="small" style="margin-bottom:12px">
-                  <el-descriptions-item label="应还本金">¥{{ repayPreview.usedLimit }}</el-descriptions-item>
-                  <el-descriptions-item label="应还利息">¥{{ repayPreview.interestPreview }}</el-descriptions-item>
-                  <el-descriptions-item label="计息天数">{{ repayPreview.borrowDays }} 天</el-descriptions-item>
-                  <el-descriptions-item label="年化利率">{{ repayPreview.rateText }}</el-descriptions-item>
-                  <el-descriptions-item label="计息起始">{{ repayPreview.earliestDate || '-' }}</el-descriptions-item>
-                </el-descriptions>
                 <div class="repay-form">
-                  <div class="repay-form-label">还款金额（可部分还款，最低 ¥0.01）</div>
-                  <el-input-number v-model="repayAmount" :min="0.01" :max="Number(repayPreview.totalDue || 0)"
+                  <div class="repay-form-label" v-if="repayLoanNo">
+                    本次操作：结清借款 <b style="color:#e6a23c">{{ repayLoanNo }}</b>（本金 + 该笔利息自动结算）
+                  </div>
+                  <div class="repay-form-label" v-else>还款本金金额（部分还款自动冲最早借款，最低 ¥0.01）</div>
+                  <el-input-number v-model="repayAmount" :min="0.01" :max="Number(repayPreview.usedLimit || 0)"
                     :precision="2" style="width:100%" />
                   <el-button size="small" type="primary" plain style="margin-top:8px;width:100%"
-                    @click="setFullRepay">全额结清（快捷）</el-button>
+                    @click="setFullRepay">全部结清（快捷：本金 + 按笔利息）</el-button>
                 </div>
                 <el-button type="primary" size="large" class="repay-submit" :loading="repaySubmitting" @click="submitRepay">
                   扫码支付还款（模拟）
                 </el-button>
                 <div class="repay-remark">{{ repayPreview.remark }}</div>
               </template>
-              <el-empty v-else description="当前无待还。A类提款或 B类受托支付放款后，可在此一键还清（自动算利息）" />
+              <el-empty v-else description="当前无待还。A类提款或 B类受托支付放款后，可在此查看每笔借款并按笔结清（利息自动计算）" />
             </el-card>
             <PayCashier v-model="repayCashierVisible" :order-no="repayCashierOrderNo" @paid="onRepayPaid" />
           </el-col>
@@ -452,11 +475,12 @@ const currentRepayRule = computed(() => {
 })
 const switchRepay = async (type) => {
   repayType.value = type
+  repayLoanNo.value = ''
   repayLoading.value = true
   try {
     repayPreview.value = await getRepayPreview(type)
-    repayAmount.value = (repayPreview.value && repayPreview.value.totalDue > 0)
-      ? Number(repayPreview.value.totalDue) : 0
+    repayAmount.value = (repayPreview.value && repayPreview.value.usedLimit > 0)
+      ? Number(repayPreview.value.usedLimit) : 0
   } catch (e) {} finally { repayLoading.value = false }
 }
 const loadRepayPanel = async () => {
@@ -465,22 +489,33 @@ const loadRepayPanel = async () => {
   await switchRepay(debt ? debt.creditType : 'A_TYPE')
 }
 const setFullRepay = () => {
-  const full = Number(repayPreview.value?.totalDue || 0)
+  // 全部结清：金额 = 待还本金合计，各笔利息由系统按笔自动结算
+  const full = Number(repayPreview.value?.usedLimit || 0)
+  repayLoanNo.value = ''
   if (repayAmount.value && Math.abs(repayAmount.value - full) < 0.005) {
-    ElMessage.info('当前已是全额结清金额（本金+利息），可直接点击下方「立即还款」')
+    ElMessage.info('当前已是全部结清金额（本金），各笔利息将按笔自动结算，可直接扫码支付')
   } else {
     repayAmount.value = full
-    ElMessage.success('已填入全额结清金额（本金 + 自动计算的利息）')
+    ElMessage.success('已填入全部结清本金，利息 ¥' + (repayPreview.value?.interestPreview ?? 0) + ' 将按笔随本金一并结算')
   }
 }
 const repayCashierVisible = ref(false)
 const repayCashierOrderNo = ref('')
+const repayLoanNo = ref('')
+const settleLoan = (loan) => {
+  // 结清指定借款：本金=剩余本金，利息按该笔借款天数自动结算（利随本清）
+  repayLoanNo.value = loan.loanNo
+  repayAmount.value = Number(loan.remainingPrincipal)
+  ElMessage.info(`将结清借款 ${loan.loanNo}：本金 ¥${loan.remainingPrincipal}，利息 ¥${loan.interestPreview}（${loan.borrowDays} 天）随还款一并结算`)
+}
 const submitRepay = async () => {
   if (!repayAmount.value || repayAmount.value <= 0) { ElMessage.warning('请输入还款金额'); return }
   repaySubmitting.value = true
   try {
     // 两步式还款：创建还款支付订单 → 收银台扫码支付（微信/银行）
-    const order = await createRepayOrder(repayType.value, { amount: repayAmount.value })
+    const payload = { amount: repayAmount.value }
+    if (repayLoanNo.value) payload.loanNo = repayLoanNo.value
+    const order = await createRepayOrder(repayType.value, payload)
     repayCashierOrderNo.value = order.orderNo
     repayCashierVisible.value = true
   } catch (e) {
@@ -613,6 +648,8 @@ onMounted(() => { loadRules(); loadCredit(); loadMerchants(); loadApplications()
 .repay-panel { border-top: 3px solid #409eff; }
 .repay-head { font-weight: 600; color: #303133; }
 .repay-types { margin-bottom: 12px; width: 100%; }
+.bank-total-split { font-size: 12px; color: #909399; margin-top: 4px; }
+.loan-table-title { font-size: 13px; font-weight: 600; color: #606266; margin: 4px 0 8px; }
 .repay-types :deep(.el-radio-button) { width: 50%; }
 .repay-types :deep(.el-radio-button__inner) { width: 100%; }
 .repay-form { margin-top: 4px; }

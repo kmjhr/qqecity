@@ -796,6 +796,7 @@ CREATE TABLE `biz_credit_txn` (
   `interest_amount`  DECIMAL(18,2)  NOT NULL DEFAULT 0 COMMENT '利息金额（还款时计算）',
   `borrow_days`      INT            NOT NULL DEFAULT 0 COMMENT '计息天数（还款时计算）',
   `balance_after`    DECIMAL(18,2)  NULL COMMENT '交易后可用额度',
+  `target_loan_no`   VARCHAR(64)    NULL COMMENT '还款目标借款编号（仅指定结清某笔的REPAY流水记录，FIFO还款为空）',
   `remark`           VARCHAR(500)   NULL COMMENT '备注',
   `txn_time`         DATETIME       NOT NULL COMMENT '交易时间',
   `deleted`          TINYINT        NOT NULL DEFAULT 0 COMMENT '逻辑删除',

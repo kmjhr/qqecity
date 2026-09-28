@@ -15,4 +15,7 @@ public class RepayDTO {
     @NotNull(message = "还款金额不能为空")
     @DecimalMin(value = "0.01", message = "还款金额必须大于0")
     private BigDecimal amount;
+
+    @io.swagger.v3.oas.annotations.media.Schema(description = "指定结清的借款编号（A类=CW流水号/B类=EP受托支付号，不传则按先进先出冲抵）")
+    private String loanNo;
 }

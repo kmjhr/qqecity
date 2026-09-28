@@ -43,6 +43,11 @@ public class BizCreditTxn {
     /** 交易后可用额度 */
     private BigDecimal balanceAfter;
 
+    /**
+     * 还款目标借款编号（仅指定结清某笔的 REPAY 流水记录；FIFO 还款为 null）
+     */
+    private String targetLoanNo;
+
     /** 备注 */
     private String remark;
 
