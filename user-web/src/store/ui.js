@@ -10,7 +10,9 @@ export const useUiStore = defineStore('ui', {
     // 当前侧栏 Tab：msg=消息 / chat=对话
     panelTab: 'msg',
     // 未读消息数
-    unreadCount: 0
+    unreadCount: 0,
+    // 智能对话侧栏是否打开
+    chatOpen: false
   }),
   actions: {
     togglePanel() {
@@ -22,6 +24,14 @@ export const useUiStore = defineStore('ui', {
     },
     closePanel() {
       this.panelOpen = false
+    },
+    openChat() {
+      // 打开对话侧栏时关闭消息侧栏（互斥，避免同时占 400px）
+      this.panelOpen = false
+      this.chatOpen = true
+    },
+    closeChat() {
+      this.chatOpen = false
     },
     setUnread(n) {
       this.unreadCount = Number(n) || 0

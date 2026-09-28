@@ -16,7 +16,6 @@
         text-color="#c0c4cc"
         active-text-color="#409EFF"
       >
-        <div class="menu-group-label">业务模块</div>
         <el-menu-item index="/home">
           <el-icon><HomeFilled /></el-icon>
           <span>首页</span>
@@ -41,7 +40,6 @@
           <el-icon><Lock /></el-icon>
           <span>金融安全</span>
         </el-menu-item>
-        <div class="menu-group-label">交易记录</div>
         <el-menu-item index="/orders">
           <el-icon><List /></el-icon>
           <span>我的订单</span>
@@ -81,12 +79,18 @@
     </el-aside>
 
     <!-- 右侧主区：顶栏 + 内容 + 页脚 -->
-    <el-container class="app-main-wrap" :class="{ 'with-panel': uiStore.panelOpen }">
+    <el-container class="app-main-wrap" :class="{ 'with-panel': uiStore.panelOpen || uiStore.chatOpen }">
       <el-header class="app-header">
         <div class="header-left">
           <div class="page-title">{{ currentTitle }}</div>
         </div>
         <div class="header-right">
+          <!-- 智能对话：点击滑出对话侧栏（消息中心同款，可同时使用系统） -->
+          <el-tooltip content="智能对话" placement="bottom">
+            <el-button circle class="chat-drawer-btn" @click="uiStore.openChat()">
+              <el-icon :size="18"><ChatLineSquare /></el-icon>
+            </el-button>
+          </el-tooltip>
           <!-- 消息铃铛：点击滑出消息侧栏 -->
           <el-badge :value="uiStore.unreadCount" :max="99" :hidden="uiStore.unreadCount === 0"
             class="bell-badge" :class="{ 'has-new': uiStore.unreadCount > 0 }">
@@ -136,6 +140,8 @@
 
     <!-- 消息侧栏（消息 + 对话，可同时使用系统） -->
     <MessagePanel />
+    <!-- 智能对话侧栏（消息中心同款） -->
+    <ChatDrawer />
   </el-container>
 </template>
 
@@ -152,6 +158,7 @@ import { useUserStore } from '@/store/user'
 import { useUiStore } from '@/store/ui'
 import { getUnreadCount } from '@/api/message'
 import MessagePanel from '@/components/MessagePanel.vue'
+import ChatDrawer from '@/components/ChatDrawer.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -385,13 +392,15 @@ function handleCommand(command) {
   align-items: center;
 }
 
-.bell-btn {
+.bell-btn,
+.chat-drawer-btn {
   border: none;
   background: #f5f7fa;
   color: #606266;
 }
 
-.bell-btn:hover {
+.bell-btn:hover,
+.chat-drawer-btn:hover {
   background: #ecf5ff;
   color: #409eff;
 }
