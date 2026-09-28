@@ -12,6 +12,7 @@ import com.icbc.qingqi.security.JwtUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 用户服务
@@ -25,14 +26,18 @@ public class SysUserService {
 
     private final SysUserMapper userMapper;
     private final JwtUtil jwtUtil;
+    private final RegistrationReviewService reviewService;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     @Value("${jwt.access-token-ttl}")
     private Long accessTokenTtl;
 
-    public SysUserService(SysUserMapper userMapper, JwtUtil jwtUtil) {
+    public SysUserService(SysUserMapper userMapper,
+                          JwtUtil jwtUtil,
+                          RegistrationReviewService reviewService) {
         this.userMapper = userMapper;
         this.jwtUtil = jwtUtil;
+        this.reviewService = reviewService;
     }
 
     // ============================================================
@@ -42,16 +47,18 @@ public class SysUserService {
     /**
      * 用户注册（默认注册为普通用户 USER）
      * <p>
-     * 保存 userType 人群类型字段
+     * 流程：AI 智能审核（模拟）→ 通过后落库 → 审核记录留痕 → 发送欢迎站内信。
+     * AI 审核规则见 {@link RegistrationReviewService}：
+     * ① 白名单人群（在校生/毕业2年内/青年创业者，STUDENT/GRADUATE 需学历核验）
+     * ② 同一材料/同一人（身份证号、手机号查重）
+     * ③ 重复注册（用户名/证件号/手机号三重查重）
      */
-    public void register(RegisterDTO dto) {
-        // 检查用户名是否已存在
-        Long count = userMapper.selectCount(
-                new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, dto.getUsername()));
-        if (count != null && count > 0) {
-            throw new BizException(ErrorCode.USER_ALREADY_EXISTS);
-        }
+    @Transactional(rollbackFor = Exception.class)
+    public RegisterReviewVO register(RegisterDTO dto) {
+        // 1. AI 智能审核（模拟）：不通过时抛 2002（重复注册）/3001（非白名单等）
+        RegisterReviewVO review = reviewService.reviewOrThrow(dto);
 
+        // 2. 创建用户（实名/学历信息一并入库）
         SysUser user = new SysUser();
         user.setUsername(dto.getUsername());
         user.setPassword(passwordEncoder.encode(dto.getPassword()));
@@ -59,9 +66,19 @@ public class SysUserService {
         user.setPhone(dto.getPhone());
         user.setEmail(dto.getEmail());
         user.setUserType(dto.getUserType());
+        user.setRealName(dto.getRealName());
+        user.setIdCard(dto.getIdCard());
+        user.setSchool(dto.getSchool());
+        user.setGraduationDate(dto.getGraduationDate());
         user.setRole("USER");
         user.setStatus(1);
         userMapper.insert(user);
+
+        // 3. 审核记录落库（留痕）+ 欢迎站内信
+        review.setUserId(user.getId());
+        reviewService.persist(dto, review, user.getId());
+        reviewService.sendWelcomeMessage(user.getId());
+        return review;
     }
 
     /**

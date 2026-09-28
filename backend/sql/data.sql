@@ -248,3 +248,26 @@ INSERT IGNORE INTO `biz_risk_warning` (`id`, `user_id`, `warning_type`, `warning
 -- ============================================================
 INSERT IGNORE INTO `pay_merchant_account` (`merchant_id`, `balance`, `total_income`, `status`)
 SELECT `id`, 0.00, 0.00, 'ACTIVE' FROM `biz_merchant`;
+
+-- ============================================================
+-- 注册 AI 审核模块演示数据（biz_school / biz_registration_review）
+-- ============================================================
+
+-- 4.1 biz_school 高校库（模拟，学历核验白名单；10 所启用）
+INSERT IGNORE INTO `biz_school` (`id`, `school_name`, `school_code`, `status`) VALUES
+(1, '清华大学', '10003', 1),
+(2, '北京大学', '10001', 1),
+(3, '复旦大学', '10246', 1),
+(4, '浙江大学', '10335', 1),
+(5, '中山大学', '10558', 1),
+(6, '华南理工大学', '10561', 1),
+(7, '暨南大学', '10559', 1),
+(8, '广州大学', '11078', 1),
+(9, '深圳大学', '10590', 1),
+(10, '广东工业大学', '11845', 1);
+
+-- 4.2 biz_registration_review 注册AI审核记录（演示：1 通过 + 1 拒绝-同一人重复注册）
+INSERT IGNORE INTO `biz_registration_review`
+(`id`, `review_no`, `username`, `real_name`, `id_card`, `phone`, `user_type`, `school`, `education_level`, `graduation_date`, `verify_type`, `student_no`, `whitelist_pass`, `whitelist_detail`, `material_pass`, `material_detail`, `result`, `reject_reason`, `user_id`) VALUES
+(1, 'REG20260301001', 'demo_student', '陈晓明', '25d2da474fd52510404f7c443a8d223505eab93f3b6c98a68b346e80f61d79bf', '13911112222', 'STUDENT', '中山大学', 'UNDERGRADUATE', '2026-06-30', 'XUE_XIN_WANG', 'XH20260001', 1, '白名单人群通过：人群类型=STUDENT（在校生）；学校∈高校库（启用）；学历层次合法；学信网在线核验通过（模拟）', 1, '同一材料/同一人审核通过：身份证号、手机号均未注册', 'APPROVED', NULL, NULL),
+(2, 'REG20260301002', 'dup_person', '张青年', 'eb4df26a9b3b08372f624e966a08e7aedd3574a2cc356971b897dd8b6b8da0cd', '13933334444', 'GRADUATE', '华南理工大学', 'MASTER', '2025-06-30', 'STUDENT_CARD', 'XH20220002', 1, '白名单人群通过：人群类型=GRADUATE（毕业2年内）；学校∈高校库（启用）；学历层次合法；毕业日期2025-06-30（毕业2年内）；学生证照片识别通过（模拟）', 0, '同一人命中：该身份证号已注册（重复注册），拒绝本次注册', 'REJECTED', '该证件号已注册（同一人），请直接登录', NULL);

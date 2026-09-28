@@ -93,6 +93,58 @@ CREATE TABLE `sys_login_log` (
   KEY `idx_create_time` (`create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='登录日志表';
 
+-- -------------------------------------------------------------
+-- 4.1 biz_school 高校库（模拟，注册学历核验白名单）
+--     对应《青启e城》注册流程「AI学历审查：学校∈biz_school高校库（启用）」
+-- -------------------------------------------------------------
+DROP TABLE IF EXISTS `biz_school`;
+CREATE TABLE `biz_school` (
+  `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `school_name` VARCHAR(100) NOT NULL COMMENT '学校名称',
+  `school_code` VARCHAR(50)  NULL COMMENT '学校代码',
+  `status`      TINYINT      NOT NULL DEFAULT 1 COMMENT '状态：0停用 1启用',
+  `create_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_school_name` (`school_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='高校库（模拟，学历核验白名单）';
+
+-- -------------------------------------------------------------
+-- 4.2 biz_registration_review 注册AI审核记录表（模拟）
+--     记录每次注册申请的AI审核明细：白名单人群 / 同一材料同一人 / 重复注册
+-- -------------------------------------------------------------
+DROP TABLE IF EXISTS `biz_registration_review`;
+CREATE TABLE `biz_registration_review` (
+  `id`               BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `review_no`        VARCHAR(50)  NOT NULL COMMENT '审核编号（REG+时间戳）',
+  `username`         VARCHAR(50)  NOT NULL COMMENT '申请用户名',
+  `real_name`        VARCHAR(50)  NULL COMMENT '真实姓名',
+  `id_card`          VARCHAR(64)  NULL COMMENT '身份证号（SHA-256哈希，不存明文）',
+  `phone`            VARCHAR(20)  NULL COMMENT '手机号',
+  `user_type`        VARCHAR(20)  NULL COMMENT '人群类型',
+  `school`           VARCHAR(100) NULL COMMENT '学校',
+  `education_level`  VARCHAR(20)  NULL COMMENT '学历层次：UNDERGRADUATE/MASTER/DOCTOR',
+  `graduation_date`  DATE         NULL COMMENT '毕业日期',
+  `verify_type`      VARCHAR(20)  NULL COMMENT '核验方式：XUE_XIN_WANG/STUDENT_CARD',
+  `student_no`       VARCHAR(100) NULL COMMENT '学信档案验证码/学号（模拟）',
+  `whitelist_pass`   TINYINT      NULL COMMENT '白名单人群审核：1通过 0拒绝',
+  `whitelist_detail` VARCHAR(500) NULL COMMENT '白名单审核明细',
+  `material_pass`    TINYINT      NULL COMMENT '同一材料/同一人审核：1通过 0命中重复',
+  `material_detail`  VARCHAR(500) NULL COMMENT '同一材料/同一人审核明细',
+  `result`           VARCHAR(20)  NOT NULL COMMENT '结论：APPROVED/REJECTED',
+  `reject_reason`    VARCHAR(500) NULL COMMENT '拒绝原因',
+  `user_id`          BIGINT       NULL COMMENT '注册成功后的用户ID（拒绝为空）',
+  `deleted`          TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除：0存在 1删除',
+  `create_time`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_review_no` (`review_no`),
+  KEY `idx_username` (`username`),
+  KEY `idx_id_card` (`id_card`),
+  KEY `idx_phone` (`phone`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='注册AI审核记录表（模拟）';
+
+
 -- =============================================================
 -- 二、公共支撑 - 消息中心（1张）
 -- =============================================================

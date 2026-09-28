@@ -1,9 +1,8 @@
 package com.icbc.qingqi.module.user.controller;
 
 import com.icbc.qingqi.common.Result;
-import com.icbc.qingqi.module.user.dto.LoginDTO;
-import com.icbc.qingqi.module.user.dto.RegisterDTO;
-import com.icbc.qingqi.module.user.dto.TokenVO;
+import com.icbc.qingqi.module.user.dto.*;
+import com.icbc.qingqi.module.user.service.RegistrationReviewService;
 import com.icbc.qingqi.module.user.service.SysUserService;
 import com.icbc.qingqi.security.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -14,6 +13,8 @@ import lombok.Data;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 /**
  * 认证接口
  * <p>
@@ -21,6 +22,12 @@ import org.springframework.web.bind.annotation.*;
  * 接口路径：/api/v1/auth/** （白名单，不需要登录）
  * <p>
  * 原 auth/controller/AuthController.java，现合并到 user 模块下
+ * <p>
+ * 注册流程增强（模拟 AI 审核）：
+ * - POST /register/ai-review   注册 AI 预审（不落库、不建号）
+ * - POST /register             正式注册（先过 AI 审核，通过才落库 + 审核留痕 + 欢迎站内信）
+ * - GET  /schools              高校库列表（注册页学校下拉）
+ * - POST /student-card/ocr     学生证照片 AI 识别（模拟）
  */
 @Tag(name = "认证接口")
 @RestController
@@ -28,21 +35,42 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final SysUserService userService;
+    private final RegistrationReviewService reviewService;
     private final JwtUtil jwtUtil;
 
     @Value("${jwt.header}")
     private String header;
 
-    public AuthController(SysUserService userService, JwtUtil jwtUtil) {
+    public AuthController(SysUserService userService,
+                          RegistrationReviewService reviewService,
+                          JwtUtil jwtUtil) {
         this.userService = userService;
+        this.reviewService = reviewService;
         this.jwtUtil = jwtUtil;
     }
 
-    @Operation(summary = "用户注册")
+    @Operation(summary = "用户注册（AI 智能审核，模拟）")
     @PostMapping("/register")
-    public Result<Void> register(@Valid @RequestBody RegisterDTO dto) {
-        userService.register(dto);
-        return Result.success();
+    public Result<RegisterReviewVO> register(@Valid @RequestBody RegisterDTO dto) {
+        return Result.success(userService.register(dto));
+    }
+
+    @Operation(summary = "注册 AI 预审（模拟，不落库不建号）")
+    @PostMapping("/register/ai-review")
+    public Result<RegisterReviewVO> aiReview(@RequestBody RegisterDTO dto) {
+        return Result.success(reviewService.review(dto));
+    }
+
+    @Operation(summary = "高校库列表（注册学历核验白名单，模拟）")
+    @GetMapping("/schools")
+    public Result<List<SchoolVO>> schools() {
+        return Result.success(reviewService.listSchools());
+    }
+
+    @Operation(summary = "学生证照片 AI 识别（模拟）")
+    @PostMapping("/student-card/ocr")
+    public Result<StudentCardOcrVO> studentCardOcr(@RequestBody(required = false) StudentCardOcrDTO dto) {
+        return Result.success(reviewService.mockOcr(dto != null ? dto : new StudentCardOcrDTO()));
     }
 
     @Operation(summary = "用户登录")

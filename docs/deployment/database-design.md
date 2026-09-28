@@ -12,7 +12,7 @@
 
 | 模块 | 表数量 | 表名 |
 | --- | --- | --- |
-| 用户与权限 | 4 | sys_user, sys_role, sys_user_role, sys_login_log |
+| 用户与权限 | 6 | sys_user, sys_role, sys_user_role, sys_login_log, biz_school, biz_registration_review |
 | 消息中心 | 1 | sys_message |
 | 安居金融风控 | 6 | biz_landlord, biz_house, biz_rental_contract, biz_guarantee_application, biz_guarantee, biz_guarantee_claim |
 | 青创e贷 | 4 | biz_merchant, biz_loan_application, biz_credit_limit, biz_entrust_payment |
@@ -80,6 +80,24 @@
 - **用途**：演练每一回合的发言明细（诈骗方话术 / 用户应对 + 该回合安全分），用于回放复盘
 - **核心字段**：`practice_id`（→ biz_scenario_practice.id）、`round_no`、`speaker`（FRAUD/USER）、`content`（发言内容）、`safe_score`（用户回合安全分 0-100）、`hit_words`（命中的词库标签，逗号分隔）
 - **关联接口**：`GET /api/v1/safety/scenario/practice/{practiceNo}`（回放时返回主表+回合明细）
+
+### biz_school 高校库（模拟，注册学历核验白名单）
+
+- **用途**：注册环节「AI 学历审查」的学校白名单（对应注册流程图「学校∈biz_school高校库（启用）」）
+- **核心字段**：`school_name`（唯一）、`school_code`、`status`（0停用 1启用）
+- **审核规则**：注册填写的学校必须命中本表且 `status=1`（启用），否则学历核验不通过
+- **演示数据**：10 所高校（清华大学/北京大学/复旦大学/浙江大学/中山大学/华南理工大学/暨南大学/广州大学/深圳大学/广东工业大学）
+- **关联接口**：`GET /api/v1/auth/schools`（注册页下拉，仅返回启用学校）
+
+### biz_registration_review 注册AI审核记录表（模拟）
+
+- **用途**：记录每次注册申请的 AI 审核明细（白名单人群 / 同一材料同一人 / 重复注册），审核留痕可追溯
+- **核心字段**：`review_no`（唯一）、`id_card`（SHA-256 哈希，不存明文）、`user_type`、`school`、`education_level`、`graduation_date`、`verify_type`（XUE_XIN_WANG/STUDENT_CARD）、`whitelist_pass`+`whitelist_detail`（白名单审核）、`material_pass`+`material_detail`（同一材料/同一人审核）、`result`（APPROVED/REJECTED）、`reject_reason`、`user_id`（注册成功后的用户ID）
+- **审核规则（模拟 AI）**：
+  - 白名单人群：人群类型 ∈ {STUDENT/GRADUATE/ENTREPRENEUR}；STUDENT/GRADUATE 需学历核验（学校∈biz_school启用 + 学历层次合法 + GRADUATE 毕业2年内 + 核验方式有效）
+  - 同一材料/同一人：身份证号已注册 → 同一人；手机号已注册 → 同一材料
+  - 重复注册：用户名 / 证件号 / 手机号三重查重
+- **关联接口**：`POST /api/v1/auth/register/ai-review`（AI 预审，不落库）、`POST /api/v1/auth/register`（正式注册，落库写记录）
 ---
 
 ## 二、核心 ER 关系详述

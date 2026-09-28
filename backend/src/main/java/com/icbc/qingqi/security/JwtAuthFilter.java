@@ -109,7 +109,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         // 认证相关
         if (uri.contains("/auth/login")
                 || uri.contains("/auth/register")
-                || uri.contains("/auth/refresh")) {
+                || uri.contains("/auth/refresh")
+                || uri.contains("/auth/schools")
+                || uri.contains("/auth/student-card")) {
             return true;
         }
         // 接口文档

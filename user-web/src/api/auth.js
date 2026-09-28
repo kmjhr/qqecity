@@ -10,6 +10,21 @@ export function register(data) {
   return request.post('/v1/auth/register', data)
 }
 
+/** 注册 AI 预审（模拟，不落库不建号） */
+export function aiReview(data) {
+  return request.post('/v1/auth/register/ai-review', data)
+}
+
+/** 高校库列表（注册学历核验白名单，模拟） */
+export function getSchools() {
+  return request.get('/v1/auth/schools')
+}
+
+/** 学生证照片 AI 识别（模拟） */
+export function studentCardOcr(data) {
+  return request.post('/v1/auth/student-card/ocr', data)
+}
+
 /** 用户登录 */
 export function login(data) {
   return request.post('/v1/auth/login', data)

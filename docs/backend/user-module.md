@@ -18,3 +18,64 @@
 - 登录成功后签发 JWT，前端存储并在后续请求中通过 `Authorization: Bearer <JWT>` 携带
 - 密码采用 Spring Security `BCryptPasswordEncoder` 加盐散列存储（与 data.sql 演示账号哈希一致）
 - 演示账号（用户名登录）：`admin / 123456`
+
+## 注册 AI 审核（模拟）接口（本次新增）
+
+注册流程增强：模拟 AI 智能审核（白名单人群 / 同一材料同一人 / 重复注册），接口前缀 `/api/v1/auth`，全部为演示规则（不接真实征信/学信网），响应标注 `simulated:true`。
+
+### 接口清单
+
+| # | 接口 | 说明 | 是否公开 |
+| --- | --- | --- | --- |
+| 1 | `POST /register/ai-review` | 注册 AI 预审（不落库、不建号），返回逐项审核结果 | 公开 |
+| 2 | `POST /register` | 正式注册（先过同一套 AI 审核，通过才落库 + 审核留痕 + 欢迎站内信；拒绝返回 2002/3001） | 公开 |
+| 3 | `GET /schools` | 高校库列表（注册页学校下拉，仅启用学校） | 公开 |
+| 4 | `POST /student-card/ocr` | 学生证照片 AI 识别（模拟，回填学校/学号） | 公开 |
+
+### AI 审核规则（模拟）
+
+1. **白名单人群**：人群类型 ∈ {STUDENT 在校生 / GRADUATE 毕业2年内 / ENTREPRENEUR 青年创业者}；STUDENT/GRADUATE 需学历核验：学校 ∈ biz_school 高校库（启用）+ 学历层次合法 + 毕业日期（GRADUATE 毕业2年内 / STUDENT 在校）+ 核验方式有效（学信网在线核验或学生证照片识别，模拟）。OTHER 视为非白名单人群拒绝（3001）
+2. **同一材料/同一人**：身份证号已注册 → 同一人；手机号已注册 → 同一材料
+3. **重复注册**：用户名/证件号/手机号三重查重 → 2002
+
+### 数据表（本次新增）
+
+- `biz_school`：高校库（模拟，学历核验白名单，10 所演示高校）
+- `biz_registration_review`：注册 AI 审核记录（审核留痕；身份证号仅存 SHA-256 哈希，不存明文）
+
+### 请求示例
+
+```json
+// POST /register/ai-review 或 /register
+{
+  "username": "alice2026",
+  "password": "123456",
+  "nickname": "Alice",
+  "phone": "13800001111",
+  "userType": "STUDENT",
+  "realName": "王小明",
+  "idCard": "440106200203045678",
+  "school": "中山大学",
+  "educationLevel": "UNDERGRADUATE",
+  "graduationDate": "2027-06-30",
+  "verifyType": "XUE_XIN_WANG",
+  "studentNo": "XH20260088"
+}
+```
+
+### 返回示例
+
+```json
+// 通过（register 成功时含 userId）
+{"code":0,"message":"success","data":{"reviewNo":"REG202609281841173853","passed":true,
+ "items":[{"code":"WHITELIST_CROWD","name":"白名单人群","pass":true,"detail":"人群类型「在校大学生」属于白名单人群"},
+ {"code":"EDUCATION","name":"学历核验","pass":true,"detail":"学历核验（模拟）：学校「中山大学」∈高校库（启用）；学历层次合法（本科）；毕业日期2027-06-30（在校期间）符合在校生身份；核验方式「学信网在线核验（模拟）」核验通过；"},
+ {"code":"SAME_PERSON","name":"同一材料/同一人","pass":true,"detail":"身份证号、手机号均未注册，未命中重复注册"}],
+ "userId":7,"simulated":true}}
+
+// 拒绝（非白名单 → 3001）
+{"code":3001,"message":"AI 智能审核未通过（模拟）：【白名单人群】人群类型「OTHER」不在白名单人群范围（在校大学生/毕业2年内/青年创业者），暂不支持注册"}
+
+// 拒绝（同一人重复注册 → 2002）
+{"code":2002,"message":"AI 智能审核未通过（模拟）：【同一人】该身份证号已注册（同一人重复注册），请直接登录"}
+```
