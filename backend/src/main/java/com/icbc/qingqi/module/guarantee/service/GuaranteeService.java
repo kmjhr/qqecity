@@ -13,9 +13,13 @@ import com.icbc.qingqi.module.guarantee.entity.*;
 import com.icbc.qingqi.module.guarantee.mapper.*;
 import com.icbc.qingqi.module.message.entity.SysMessage;
 import com.icbc.qingqi.module.message.mapper.SysMessageMapper;
+import com.icbc.qingqi.module.pay.dto.PayOrderVO;
+import com.icbc.qingqi.module.pay.service.PayService;
+import com.icbc.qingqi.module.pay.service.PaySuccessEvent;
 import com.icbc.qingqi.module.user.entity.SysUser;
 import com.icbc.qingqi.module.user.mapper.SysUserMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,6 +54,7 @@ public class GuaranteeService {
     private final BizGuaranteeMapper guaranteeMapper;
     private final SysUserMapper userMapper;
     private final SysMessageMapper messageMapper;
+    private final PayService payService;
 
     // 申请状态
     private static final String STATUS_SUBMITTED = "SUBMITTED";
@@ -82,7 +87,8 @@ public class GuaranteeService {
                             BizGuaranteeApplicationMapper applicationMapper,
                             BizGuaranteeMapper guaranteeMapper,
                             SysUserMapper userMapper,
-                            SysMessageMapper messageMapper) {
+                            SysMessageMapper messageMapper,
+                            PayService payService) {
         this.landlordMapper = landlordMapper;
         this.houseMapper = houseMapper;
         this.contractMapper = contractMapper;
@@ -90,6 +96,7 @@ public class GuaranteeService {
         this.guaranteeMapper = guaranteeMapper;
         this.userMapper = userMapper;
         this.messageMapper = messageMapper;
+        this.payService = payService;
     }
 
     // ============================================================
@@ -456,7 +463,10 @@ public class GuaranteeService {
      * 模拟缴费成功后创建 biz_guarantee（电子保函），申请状态置为 APPROVED。
      */
     @Transactional(rollbackFor = Exception.class)
-    public GuaranteeVO payAndIssue(Long currentUserId, Long applicationId) {
+    /**
+     * G-4 创建保函费支付订单（收银台支付成功后自动开立电子保函）
+     */
+    public PayOrderVO createPayOrder(Long currentUserId, Long applicationId) {
         BizGuaranteeApplication app = getApplication(applicationId);
 
         // 越权校验：仅申请人可缴费
@@ -470,9 +480,38 @@ public class GuaranteeService {
                     "当前申请状态为" + statusName(app.getApplyStatus()) + "，不可缴费");
         }
 
+        // 生成保函费支付订单（待支付，收银台支付）
+        return payService.createBizOrder(currentUserId, PayService.BIZ_GUARANTEE_FEE, app.getId(),
+                "保函费（申请号" + app.getApplyNo() + "）", app.getGuaranteeFee(), null);
+    }
+
+    /**
+     * 支付成功事件监听：保函费支付成功后开立电子保函
+     */
+    @EventListener
+    @Transactional(rollbackFor = Exception.class)
+    public void onPaySuccess(PaySuccessEvent event) {
+        if (!PayService.BIZ_GUARANTEE_FEE.equals(event.getBizType()) || event.getBizId() == null) {
+            return;
+        }
+        log.info("[保函缴费回调] 订单={}, 申请={}, 金额={}（模拟）", event.getOrderNo(), event.getBizId(), event.getAmount());
+        issueGuarantee(event.getBizId());
+    }
+
+    /**
+     * 开立电子保函（缴费成功后的业务主体）
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public GuaranteeVO issueGuarantee(Long applicationId) {
+        BizGuaranteeApplication app = getApplication(applicationId);
+        if (!STATUS_PENDING_PAY.equals(app.getApplyStatus())) {
+            log.info("[保函开函] 申请={} 非待缴费状态，跳过（可能已开函）", applicationId);
+            return null;
+        }
+
         BizRentalContract contract = contractMapper.selectById(app.getContractId());
 
-        // 模拟缴费成功，开立电子保函
+        // 模拟开函
         BizGuarantee guarantee = new BizGuarantee();
         guarantee.setGuaranteeNo(generateNo("GB"));
         guarantee.setApplicationId(app.getId());

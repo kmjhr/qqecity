@@ -7,6 +7,7 @@ import com.icbc.qingqi.module.guarantee.dto.GuaranteeApplicationVO;
 import com.icbc.qingqi.module.guarantee.dto.GuaranteeVO;
 import com.icbc.qingqi.module.guarantee.dto.LandlordSignDTO;
 import com.icbc.qingqi.module.guarantee.service.GuaranteeService;
+import com.icbc.qingqi.module.pay.dto.PayOrderVO;
 import com.icbc.qingqi.security.UserContext;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -86,12 +87,12 @@ public class GuaranteeController {
     //  G-4 缴费出函
     // ============================================================
 
-    @Operation(summary = "G-4 缴纳保函费并开立电子保函",
-            description = "租客缴纳保函费（费率 0.8%—1.5%，模拟缴费），系统开立电子保函并推送房东。")
+    @Operation(summary = "G-4 创建保函费支付订单（收银台支付成功后自动开立电子保函）",
+            description = "租客在收银台缴纳保函费（费率 0.8%—1.5%，模拟支付），支付成功自动开立电子保函并推送房东。")
     @PostMapping("/{id}/pay")
-    public Result<GuaranteeVO> pay(@Parameter(description = "保函申请 ID") @PathVariable Long id) {
+    public Result<PayOrderVO> pay(@Parameter(description = "保函申请 ID") @PathVariable Long id) {
         Long userId = UserContext.getUserId();
-        return Result.success(guaranteeService.payAndIssue(userId, id));
+        return Result.success(guaranteeService.createPayOrder(userId, id));
     }
 
     // ============================================================

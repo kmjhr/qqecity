@@ -62,6 +62,10 @@
               <el-icon><Reading /></el-icon>
               <span>反诈教学</span>
             </el-menu-item>
+            <el-menu-item index="/orders">
+              <el-icon><List /></el-icon>
+              <span>订单中心</span>
+            </el-menu-item>
           </el-sub-menu>
         </el-menu>
 

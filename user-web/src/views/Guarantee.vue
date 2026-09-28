@@ -65,6 +65,7 @@
           </template>
         </el-table-column>
       </el-table>
+      <PayCashier v-model="cashierVisible" :order-no="cashierOrderNo" @paid="onPaid" />
 
       <div class="pagination" v-if="total > 0">
         <el-pagination
@@ -146,6 +147,7 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Wallet, Plus, Refresh } from '@element-plus/icons-vue'
 import { applyGuarantee, getGuaranteePage, getGuaranteeDetail, payGuarantee, getStatusFlow } from '@/api/guarantee'
+import PayCashier from '@/components/PayCashier.vue'
 
 const loading = ref(false)
 const list = ref([])
@@ -233,16 +235,22 @@ const showDetail = async (row) => {
   } catch (e) {}
 }
 
+const cashierVisible = ref(false)
+const cashierOrderNo = ref('')
 const doPay = async (row) => {
   try {
-    await ElMessageBox.confirm(`确认缴纳保函费 ¥${row.guaranteeFee} 并开立电子保函？（模拟缴费，不发生真实资金往来）`, '缴费确认', { type: 'warning' })
-    await payGuarantee(row.id)
-    ElMessage.success('缴费成功，电子保函已开立（模拟）')
-    loadList()
-    if (detailVisible.value) showDetail(row)
+    // 第一步：创建保函费支付订单（待支付）
+    const order = await payGuarantee(row.id)
+    cashierOrderNo.value = order.orderNo
+    cashierVisible.value = true
   } catch (e) {
     if (e !== 'cancel') {}
   }
+}
+const onPaid = () => {
+  ElMessage.success('保函费支付成功，电子保函已开立（模拟）')
+  loadList()
+  if (detailVisible.value && currentDetail.value?.id) showDetail(currentDetail.value)
 }
 
 onMounted(() => { loadFlow(); loadList() })

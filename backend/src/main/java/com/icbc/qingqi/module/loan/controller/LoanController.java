@@ -124,6 +124,12 @@ public class LoanController {
 
     @Operation(summary = "A类循环贷还款",
             description = "归还后额度自动恢复，按实际用款天数和利率计息（年化3.85%模拟）。")
+    @PostMapping("/repay-order")
+    public Result<com.icbc.qingqi.module.pay.dto.PayOrderVO> createRepayOrder(
+            @RequestParam(defaultValue = "A_TYPE") String creditType, @Valid @RequestBody RepayDTO dto) {
+        return Result.success(loanService.createRepayOrder(UserContext.getUserId(), creditType, dto));
+    }
+
     @PostMapping("/repay")
     public Result<CreditTxnVO> repay(@Valid @RequestBody RepayDTO dto) {
         Long userId = UserContext.getUserId();

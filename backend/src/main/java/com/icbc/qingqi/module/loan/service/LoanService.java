@@ -12,7 +12,11 @@ import com.icbc.qingqi.module.loan.entity.*;
 import com.icbc.qingqi.module.loan.mapper.*;
 import com.icbc.qingqi.module.message.entity.SysMessage;
 import com.icbc.qingqi.module.message.mapper.SysMessageMapper;
+import com.icbc.qingqi.module.pay.dto.PayOrderVO;
+import com.icbc.qingqi.module.pay.service.PayService;
+import com.icbc.qingqi.module.pay.service.PaySuccessEvent;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,6 +49,7 @@ public class LoanService {
     private final BizCreditTxnMapper creditTxnMapper;
     private final BizBookkeepingRecordMapper bookkeepingMapper;
     private final SysMessageMapper messageMapper;
+    private final PayService payService;
 
     // 贷款类型
     private static final String TYPE_A = "A_TYPE";
@@ -85,7 +90,8 @@ public class LoanService {
                        BizEntrustPaymentMapper paymentMapper,
                        BizCreditTxnMapper creditTxnMapper,
                        BizBookkeepingRecordMapper bookkeepingMapper,
-                       SysMessageMapper messageMapper) {
+                       SysMessageMapper messageMapper,
+                       PayService payService) {
         this.merchantMapper = merchantMapper;
         this.applicationMapper = applicationMapper;
         this.creditLimitMapper = creditLimitMapper;
@@ -93,6 +99,7 @@ public class LoanService {
         this.creditTxnMapper = creditTxnMapper;
         this.bookkeepingMapper = bookkeepingMapper;
         this.messageMapper = messageMapper;
+        this.payService = payService;
     }
 
     // ============================================================
@@ -422,6 +429,11 @@ public class LoanService {
         payment.setPaymentTime(LocalDateTime.now());
         paymentMapper.insert(payment);
 
+        // 支付中台记账：银行资金直付商户账户（不经过个人钱包）
+        payService.incomeToMerchant(merchant.getId(), dto.getAmount(), payment.getPaymentNo(),
+                PayService.BIZ_ENTRUST_PAY, payment.getPaymentNo(),
+                "受托支付（" + merchant.getMerchantName() + "）");
+
         log.info("[受托支付] 用户={}, 商户={}, 金额={}, 授信类型={}, 资金定向打款至商户（不经过个人账户）【模拟】",
                 userId, merchant.getMerchantName(), dto.getAmount(), app.getLoanType());
 
@@ -473,7 +485,8 @@ public class LoanService {
         txn.setTxnTime(LocalDateTime.now());
         creditTxnMapper.insert(txn);
 
-        log.info("[A类提款] 用户={}, 金额={}, 可用余额={}", userId, dto.getAmount(), limit.getAvailableLimit());
+        // 放款（模拟）：资金直接到账，不经平台钱包（演示口径）
+        log.info("[A类提款] 用户={}, 金额={}, 可用余额={}（放款成功，模拟到账）", userId, dto.getAmount(), limit.getAvailableLimit());
         return toTxnVO(txn);
     }
 
@@ -488,6 +501,9 @@ public class LoanService {
         if (limit.getUsedLimit().compareTo(BigDecimal.ZERO) <= 0) {
             throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "当前无待还本金");
         }
+
+        // 钱包扣款（还本付息，模拟）：余额不足提示充值
+        payService.payFromWallet(userId, dto.getAmount(), "青创e贷A类还款（模拟）", null);
 
         // 找最早一笔未还完的提款记录计算计息天数
         BizCreditTxn earliestWithdraw = creditTxnMapper.selectOne(
@@ -532,6 +548,90 @@ public class LoanService {
         log.info("[A类还款] 用户={}, 本金={}, 利息={}, 天数={}, 可用余额={}",
                 userId, repayPrincipal, interest, borrowDays, limit.getAvailableLimit());
         return toTxnVO(txn);
+    }
+
+    /**
+     * 两步式还款（扫码支付）：创建还款支付订单（LOAN_REPAY），支付成功后由 onLoanRepayPaid 执行还本付息
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public PayOrderVO createRepayOrder(Long userId, String creditType, RepayDTO dto) {
+        boolean aType = TYPE_A.equals(creditType);
+        BizCreditLimit limit = aType ? getActiveACreditLimit(userId) : getActiveBCreditLimit(userId);
+        if (limit.getUsedLimit() == null || limit.getUsedLimit().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, aType ? "当前无待还本金" : "当前无 B类待还本金");
+        }
+        if (dto.getAmount().compareTo(limit.getUsedLimit()) > 0) {
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET,
+                    "还款金额不能超过待还本金（待还：¥" + limit.getUsedLimit() + "）");
+        }
+        String subject = aType ? "青创e贷A类还款（扫码支付）" : "青创e贷B类还款（扫码支付）";
+        log.info("[创建还款订单] 用户={}, 类型={}, 金额={}", userId, creditType, dto.getAmount());
+        return payService.createBizOrder(userId, "LOAN_REPAY", limit.getId(), subject, dto.getAmount(), null);
+    }
+
+    /**
+     * 还款订单支付成功回调：执行还本付息（A/B 双轨，模拟）
+     */
+    @EventListener
+    @Transactional(rollbackFor = Exception.class)
+    public void onLoanRepayPaid(PaySuccessEvent event) {
+        if (!"LOAN_REPAY".equals(event.getBizType())) return;
+        Long limitId = event.getBizId();
+        if (limitId == null) return;
+        BizCreditLimit limit = creditLimitMapper.selectById(limitId);
+        if (limit == null || !Objects.equals(event.getUserId(), limit.getUserId())) return;
+        boolean aType = TYPE_A.equals(limit.getCreditType());
+        BigDecimal rate = aType ? A_TYPE_RATE : B_TYPE_RATE;
+
+        // 计息天数：A 取最早提款日；B 取最早受托支付成功日
+        LocalDate earliest = null;
+        if (aType) {
+            BizCreditTxn w = creditTxnMapper.selectOne(
+                    new LambdaQueryWrapper<BizCreditTxn>()
+                            .eq(BizCreditTxn::getUserId, event.getUserId())
+                            .eq(BizCreditTxn::getTxnType, "WITHDRAW")
+                            .orderByAsc(BizCreditTxn::getTxnTime)
+                            .last("LIMIT 1"));
+            if (w != null && w.getTxnTime() != null) earliest = w.getTxnTime().toLocalDate();
+        } else {
+            BizEntrustPayment pm = paymentMapper.selectOne(
+                    new LambdaQueryWrapper<BizEntrustPayment>()
+                            .eq(BizEntrustPayment::getUserId, event.getUserId())
+                            .eq(BizEntrustPayment::getPaymentStatus, PAY_SUCCESS)
+                            .orderByAsc(BizEntrustPayment::getPaymentTime)
+                            .last("LIMIT 1"));
+            if (pm != null && pm.getPaymentTime() != null) earliest = pm.getPaymentTime().toLocalDate();
+        }
+        int borrowDays = 1;
+        if (earliest != null) {
+            borrowDays = (int) ChronoUnit.DAYS.between(earliest, LocalDate.now());
+            if (borrowDays < 1) borrowDays = 1;
+        }
+
+        // 还本付息：本金 = 订单金额（≤ 待还本金），利息按日累计
+        BigDecimal repayPrincipal = event.getAmount().min(limit.getUsedLimit());
+        BigDecimal interest = repayPrincipal.multiply(rate).multiply(new BigDecimal(borrowDays))
+                .divide(new BigDecimal("365"), 2, RoundingMode.HALF_UP);
+        limit.setUsedLimit(limit.getUsedLimit().subtract(repayPrincipal));
+        limit.setAvailableLimit(limit.getAvailableLimit().add(repayPrincipal));
+        creditLimitMapper.updateById(limit);
+
+        BizCreditTxn txn = new BizCreditTxn();
+        txn.setTxnNo(generateNo("CR"));
+        txn.setUserId(event.getUserId());
+        txn.setCreditLimitId(limit.getId());
+        txn.setTxnType("REPAY");
+        txn.setPrincipalAmount(repayPrincipal);
+        txn.setInterestAmount(interest);
+        txn.setBorrowDays(borrowDays);
+        txn.setBalanceAfter(limit.getAvailableLimit());
+        txn.setRemark((aType ? "A类" : "B类") + "扫码还款（订单" + event.getOrderNo() + "），利息¥" + interest
+                + "（" + borrowDays + "天，年化" + (aType ? "3.85" : "4.35") + "%模拟）");
+        txn.setTxnTime(LocalDateTime.now());
+        creditTxnMapper.insert(txn);
+
+        log.info("[扫码还款成功] 订单={}, 用户={}, 类型={}, 本金={}, 利息={}, 天数={}",
+                event.getOrderNo(), event.getUserId(), limit.getCreditType(), repayPrincipal, interest, borrowDays);
     }
 
     /**
@@ -594,6 +694,10 @@ public class LoanService {
         if (limit.getUsedLimit().compareTo(BigDecimal.ZERO) <= 0) {
             throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "当前无 B类待还本金");
         }
+
+        // 钱包扣款（还本付息，模拟）：余额不足提示充值
+        payService.payFromWallet(userId, dto.getAmount(), "青创e贷B类还款（模拟）", null);
+
         // 最早一笔成功受托支付日起算计息天数
         BizEntrustPayment earliest = paymentMapper.selectOne(
                 new LambdaQueryWrapper<BizEntrustPayment>()

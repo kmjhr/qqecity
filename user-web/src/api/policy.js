@@ -32,3 +32,19 @@ export function getPolicyDetail(id) {
 export function pushPolicies(region) {
   return request.post('/v1/policy/push', null, { params: region ? { region } : {} })
 }
+
+// ============================================================
+// 官方政策入口导航（独立专区：跳转官网）
+// ============================================================
+
+/** 官方入口列表（按地区/类型筛选） */
+export function listPortals(region, portalType) {
+  return request.get('/v1/policy/portals', {
+    params: { ...(region ? { region } : {}), ...(portalType ? { portalType } : {}) }
+  })
+}
+
+/** 官方入口覆盖地区 */
+export function listPortalRegions() {
+  return request.get('/v1/policy/portals/regions')
+}

@@ -111,6 +111,13 @@ const routes = [
         name: 'Teaching',
         component: () => import('@/views/Teaching.vue'),
         meta: { title: '反诈情景教学', requiresAuth: true }
+      },
+      // 模块0 模拟支付中台（订单中心）
+      {
+        path: 'orders',
+        name: 'Orders',
+        component: () => import('@/views/Orders.vue'),
+        meta: { title: '订单中心', requiresAuth: true }
       }
     ]
   },

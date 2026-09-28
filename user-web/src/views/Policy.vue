@@ -8,8 +8,7 @@
             <el-select v-model="region" placeholder="按地区筛选" clearable style="width:160px" @change="loadData">
               <el-option v-for="r in regions" :key="r" :label="r === '全部' ? '全部地区' : r" :value="r === '全部' ? '' : r" />
             </el-select>
-            <span class="auto-tip">匹配政策已自动推送至消息中心（模拟）</span>
-            <el-button type="primary" size="small" @click="handlePush" :loading="pushLoading">
+            <el-button v-if="activeTab !== 'portals'" type="primary" size="small" @click="handlePush" :loading="pushLoading">
               重新推送匹配政策
             </el-button>
           </div>
@@ -17,14 +16,43 @@
       </template>
 
       <el-alert type="info" :closable="false" style="margin-bottom:14px"
-        title="政策库已升级为全国版：覆盖国家层面及 15 省市真实政策（官方来源），仅展示有效期内的政策，无数量限制；系统提取您的人群资质与创业行为关键词自动匹配，符合即自动推送消息中心" />
+        :title="activeTab === 'portals'
+          ? '官方入口专区：汇总全国及各省人社、住建房管、政务、税务等官方政策网站，点击卡片直接跳转官网申报页面'
+          : '政策库覆盖国家层面及15省市真实政策（人工维护、官方来源），仅展示有效期内的政策；系统提取您的人群资质与创业行为关键词自动匹配，符合即自动推送消息中心'" />
 
-      <el-tabs v-model="activeTab">
+      <el-tabs v-model="activeTab" @tab-change="loadData">
         <el-tab-pane label="匹配我的政策" name="matched" />
         <el-tab-pane label="全部政策" name="all" />
+        <el-tab-pane label="官方入口" name="portals" />
       </el-tabs>
 
-      <div v-loading="loading" class="policy-list">
+      <!-- 官方入口专区 -->
+      <div v-if="activeTab === 'portals'" v-loading="loading">
+        <div class="portal-filter">
+          <el-select v-model="portalType" placeholder="按入口类型筛选" clearable style="width:180px" @change="loadPortals">
+            <el-option v-for="t in portalTypes" :key="t.value" :label="t.label" :value="t.value === '全部' ? '' : t.value" />
+          </el-select>
+        </div>
+        <el-row :gutter="16">
+          <el-col :span="8" v-for="p in portals" :key="p.id">
+            <el-card class="portal-card" shadow="hover" @click="openPortal(p)">
+              <div class="policy-head">
+                <el-tag :type="portalTagType(p.portalType)" size="small">{{ p.portalTypeName }}</el-tag>
+                <el-tag type="info" size="small" effect="plain">{{ p.region }}</el-tag>
+              </div>
+              <h3 class="portal-title">{{ p.portalName }}</h3>
+              <p class="portal-desc">{{ p.description }}</p>
+              <div class="policy-footer">
+                <el-button type="primary" link size="small">进入官网 →</el-button>
+              </div>
+            </el-card>
+          </el-col>
+        </el-row>
+        <el-empty v-if="!loading && portals.length === 0" description="暂无官方入口" />
+      </div>
+
+      <!-- 政策列表 -->
+      <div v-else v-loading="loading" class="policy-list">
         <el-row :gutter="16">
           <el-col :span="8" v-for="p in policies" :key="p.id">
             <el-card class="policy-card" :class="{ matched: p.matched }" shadow="hover">
@@ -100,20 +128,35 @@ import {
   matchPolicies,
   matchedPolicies,
   getPolicyDetail,
-  pushPolicies
+  pushPolicies,
+  listPortals
 } from '@/api/policy'
 
 const loading = ref(false)
 const pushLoading = ref(false)
 const policies = ref([])
+const portals = ref([])
 const activeTab = ref('matched')
 const region = ref('')
+const portalType = ref('')
 const regions = ['全部', '全国', '浙江', '广东', '江苏', '上海', '北京', '四川', '湖北',
   '福建', '山东', '湖南', '河南', '安徽', '重庆', '广西', '陕西']
+const portalTypes = [
+  { label: '全部类型', value: '全部' },
+  { label: '人社', value: 'GOV_HR' },
+  { label: '住建房管', value: 'GOV_HOUSING' },
+  { label: '政务服务', value: 'GOV_AFFAIR' },
+  { label: '税务', value: 'GOV_TAX' },
+  { label: '教育高校', value: 'GOV_EDU' }
+]
 const detailVisible = ref(false)
 const current = ref(null)
 
 async function loadData() {
+  if (activeTab.value === 'portals') {
+    loadPortals()
+    return
+  }
   loading.value = true
   try {
     if (activeTab.value === 'matched') {
@@ -130,7 +173,31 @@ async function loadData() {
   }
 }
 
+async function loadPortals() {
+  loading.value = true
+  try {
+    portals.value = await listPortals(region.value || undefined, portalType.value || undefined)
+  } catch (e) {
+  } finally {
+    loading.value = false
+  }
+}
+
 watch(activeTab, loadData)
+
+function openPortal(p) {
+  window.open(p.url, '_blank')
+}
+function portalTagType(t) {
+  return {
+    GOV_HR: 'primary',
+    GOV_HOUSING: 'success',
+    GOV_AFFAIR: 'warning',
+    GOV_TAX: 'danger',
+    GOV_EDU: 'info',
+    GOV_OTHER: 'info'
+  }[t] || 'info'
+}
 
 async function viewDetail(p) {
   try {
@@ -173,10 +240,6 @@ onMounted(loadData)
   display: flex;
   align-items: center;
   gap: 12px;
-}
-.auto-tip {
-  font-size: 12px;
-  color: #909399;
 }
 
 .policy-list {
@@ -251,5 +314,39 @@ onMounted(loadData)
   color: #606266;
   line-height: 1.8;
   margin-bottom: 12px;
+}
+
+/* 官方入口 */
+.portal-filter {
+  margin-bottom: 14px;
+}
+.portal-card {
+  margin-bottom: 16px;
+  border-radius: 8px;
+  border-left: 4px solid #409eff;
+  cursor: pointer;
+  height: 100%;
+  box-sizing: border-box;
+  transition: transform 0.15s;
+}
+.portal-card:hover {
+  transform: translateY(-2px);
+}
+.portal-title {
+  margin: 6px 0;
+  font-size: 15px;
+  color: #303133;
+  line-height: 1.4;
+  min-height: 42px;
+}
+.portal-desc {
+  color: #909399;
+  font-size: 12px;
+  line-height: 1.6;
+  margin-bottom: 8px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 </style>

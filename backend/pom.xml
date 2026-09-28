@@ -31,12 +31,6 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
-        <!-- HTML 解析（政策定时同步：官方栏目页抓取） -->
-        <dependency>
-            <groupId>org.jsoup</groupId>
-            <artifactId>jsoup</artifactId>
-            <version>1.17.2</version>
-        </dependency>
 
         <!-- 参数校验 -->
         <dependency>

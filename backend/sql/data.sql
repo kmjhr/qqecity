@@ -241,3 +241,10 @@ INSERT IGNORE INTO `biz_risk_warning` (`id`, `user_id`, `warning_type`, `warning
 --   banker01      → 人工复审保函申请、人工复核索赔、审核商户白名单
 --   admin         → 管理端全部功能
 -- =============================================================
+
+
+-- ============================================================
+-- 支付中台初始化：为全部商户创建模拟收款账户
+-- ============================================================
+INSERT IGNORE INTO `pay_merchant_account` (`merchant_id`, `balance`, `total_income`, `status`)
+SELECT `id`, 0.00, 0.00, 'ACTIVE' FROM `biz_merchant`;

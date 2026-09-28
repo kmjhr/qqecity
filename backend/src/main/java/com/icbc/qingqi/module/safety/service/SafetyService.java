@@ -5,7 +5,9 @@ import com.icbc.qingqi.module.safety.dto.FraudDetectDTO;
 import com.icbc.qingqi.module.safety.entity.BizAntiFraudContent;
 import com.icbc.qingqi.module.safety.entity.BizFraudDetectionLog;
 import com.icbc.qingqi.module.safety.mapper.BizAntiFraudContentMapper;
+import com.icbc.qingqi.module.safety.mapper.BizAntiFraudAlertMapper;
 import com.icbc.qingqi.module.safety.mapper.BizFraudDetectionLogMapper;
+import com.icbc.qingqi.module.safety.entity.BizAntiFraudAlert;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +27,7 @@ import java.util.*;
 public class SafetyService {
 
     private final BizAntiFraudContentMapper contentMapper;
+    private final BizAntiFraudAlertMapper alertMapper;
     private final BizFraudDetectionLogMapper detectionLogMapper;
 
     // 高危话术关键词 → DANGEROUS
@@ -66,8 +69,10 @@ public class SafetyService {
     );
 
     public SafetyService(BizAntiFraudContentMapper contentMapper,
+                         BizAntiFraudAlertMapper alertMapper,
                          BizFraudDetectionLogMapper detectionLogMapper) {
         this.contentMapper = contentMapper;
+        this.alertMapper = alertMapper;
         this.detectionLogMapper = detectionLogMapper;
     }
 
@@ -202,4 +207,45 @@ public class SafetyService {
                 .matcher(lower)
                 .find();
     }
+
+    // ============================================================
+    //  S-3 实时反诈预警（人工维护·模拟实时，安全教育平台风格）
+    // ============================================================
+
+    public List<BizAntiFraudAlert> listAlerts(String level, String scene) {
+        LambdaQueryWrapper<BizAntiFraudAlert> wrapper = new LambdaQueryWrapper<BizAntiFraudAlert>()
+                .eq(BizAntiFraudAlert::getStatus, 1)
+                .orderByDesc(BizAntiFraudAlert::getPublishTime);
+        if (level != null && !level.isEmpty()) {
+            wrapper.eq(BizAntiFraudAlert::getAlertLevel, level);
+        }
+        if (scene != null && !scene.isEmpty()) {
+            wrapper.eq(BizAntiFraudAlert::getRelateScene, scene);
+        }
+        return alertMapper.selectList(wrapper);
+    }
+
+    // ============================================================
+    //  S-4 典型反诈案例（固定区，与青启e城业务强关联的前置）
+    // ============================================================
+
+    /** 与平台业务关联性强的分类置前：保函租房 → 征信 → 创业贷 → 理财 → 客服 → 通用高发 */
+    private static final List<String> FEATURED_CATEGORY_ORDER = List.of(
+            "租房诈骗", "征信修复", "创业贷款", "虚假投资", "冒充客服", "校园贷", "套路贷",
+            "刷单诈骗", "冒充公检法", "AI换脸");
+
+    public List<BizAntiFraudContent> featuredCases() {
+        List<BizAntiFraudContent> all = contentMapper.selectList(new LambdaQueryWrapper<BizAntiFraudContent>()
+                .eq(BizAntiFraudContent::getStatus, 1)
+                .in(BizAntiFraudContent::getContentType, "ARTICLE", "CASE"));
+        Map<String, Integer> rank = new HashMap<>();
+        for (int i = 0; i < FEATURED_CATEGORY_ORDER.size(); i++) {
+            rank.put(FEATURED_CATEGORY_ORDER.get(i), i);
+        }
+        all.sort(Comparator.comparingInt(
+                (BizAntiFraudContent c) -> rank.getOrDefault(c.getCategory(), 100))
+                .thenComparing(BizAntiFraudContent::getSortOrder));
+        return all.stream().limit(8).collect(java.util.stream.Collectors.toList());
+    }
+
 }

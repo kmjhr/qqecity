@@ -2,6 +2,7 @@ package com.icbc.qingqi.module.safety.controller;
 
 import com.icbc.qingqi.common.Result;
 import com.icbc.qingqi.module.safety.dto.FraudDetectDTO;
+import com.icbc.qingqi.module.safety.entity.BizAntiFraudAlert;
 import com.icbc.qingqi.module.safety.entity.BizAntiFraudContent;
 import com.icbc.qingqi.module.safety.entity.BizFraudDetectionLog;
 import com.icbc.qingqi.module.safety.service.SafetyService;
@@ -14,10 +15,10 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * 模块5 - 青年金融安全
+ * 模块5 - 青年金融安全（安全教育平台风格）
  * <p>
  * 路径：/api/v1/safety/**
- * 覆盖 S-1 ~ S-2：反诈内容列表、骗局甄别（命中关键词即拦截警示并落库）
+ * S-3 实时反诈预警、S-4 典型反诈案例（与平台业务强关联前置）
  */
 @Tag(name = "青年金融安全")
 @RestController
@@ -28,6 +29,20 @@ public class SafetyController {
 
     public SafetyController(SafetyService safetyService) {
         this.safetyService = safetyService;
+    }
+
+    @Operation(summary = "S-3 实时反诈预警列表（人工维护·模拟实时）")
+    @GetMapping("/alerts")
+    public Result<List<BizAntiFraudAlert>> listAlerts(
+            @RequestParam(required = false) String level,
+            @RequestParam(required = false) String scene) {
+        return Result.success(safetyService.listAlerts(level, scene));
+    }
+
+    @Operation(summary = "S-4 典型反诈案例（与青启e城业务强关联的前置）")
+    @GetMapping("/featured-cases")
+    public Result<List<BizAntiFraudContent>> featuredCases() {
+        return Result.success(safetyService.featuredCases());
     }
 
     @Operation(summary = "S-1 反诈内容列表")

@@ -47,6 +47,9 @@ export function withdrawCredit(data) {
 }
 
 /** A类循环贷还款 */
+export function createRepayOrder(creditType, data) {
+  return request.post(`/v1/loan/repay-order?creditType=${creditType}`, data)
+}
 export function repayCredit(data) {
   return request.post('/v1/loan/repay', data)
 }

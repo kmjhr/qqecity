@@ -201,12 +201,13 @@
                     @click="setFullRepay">全额结清（快捷）</el-button>
                 </div>
                 <el-button type="primary" size="large" class="repay-submit" :loading="repaySubmitting" @click="submitRepay">
-                  立即还款（模拟）
+                  扫码支付还款（模拟）
                 </el-button>
                 <div class="repay-remark">{{ repayPreview.remark }}</div>
               </template>
               <el-empty v-else description="当前无待还。A类提款或 B类受托支付放款后，可在此一键还清（自动算利息）" />
             </el-card>
+            <PayCashier v-model="repayCashierVisible" :order-no="repayCashierOrderNo" @paid="onRepayPaid" />
           </el-col>
         </el-row>
       </el-tab-pane>
@@ -364,7 +365,8 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Money, Refresh } from '@element-plus/icons-vue'
 import { getProductRules, preCheck, getCreditLimit, entrustPayment, getMerchants, getLoanApplications,
-  withdrawCredit, repayCredit, getCreditTxns, getRepayPreview, entrustRepay } from '@/api/loan'
+  withdrawCredit, repayCredit, getCreditTxns, getRepayPreview, entrustRepay, createRepayOrder } from '@/api/loan'
+import PayCashier from '@/components/PayCashier.vue'
 
 const activeTab = ref('precheck')
 
@@ -471,19 +473,24 @@ const setFullRepay = () => {
     ElMessage.success('已填入全额结清金额（本金 + 自动计算的利息）')
   }
 }
+const repayCashierVisible = ref(false)
+const repayCashierOrderNo = ref('')
 const submitRepay = async () => {
   if (!repayAmount.value || repayAmount.value <= 0) { ElMessage.warning('请输入还款金额'); return }
   repaySubmitting.value = true
   try {
-    const res = repayType.value === 'B_TYPE'
-      ? await entrustRepay({ amount: repayAmount.value })
-      : await repayCredit({ amount: repayAmount.value })
-    ElMessage.success(`还款成功（模拟，本金¥${res.principalAmount || 0}，利息¥${res.interestAmount || 0}，额度已恢复）`)
-    loadCredit()
-    loadRepayPanel()
+    // 两步式还款：创建还款支付订单 → 收银台扫码支付（微信/银行）
+    const order = await createRepayOrder(repayType.value, { amount: repayAmount.value })
+    repayCashierOrderNo.value = order.orderNo
+    repayCashierVisible.value = true
   } catch (e) {
-    ElMessage.error(e?.message || '还款失败，请稍后重试')
+    ElMessage.error(e?.message || '创建还款订单失败，请稍后重试')
   } finally { repaySubmitting.value = false }
+}
+const onRepayPaid = () => {
+  ElMessage.success('还款成功（模拟扫码支付，额度已恢复）')
+  loadCredit()
+  loadRepayPanel()
 }
 const openTxns = async (c) => {
   currentLimit.value = c
@@ -498,7 +505,7 @@ const submitCreditAction = async () => {
     const amount = creditAmount.value
     if (!amount || amount <= 0) return
     const res = await withdrawCredit({ amount })
-    ElMessage.success('提款成功（模拟，按日计息）')
+    ElMessage.success('提款成功（模拟），贷款资金已放款到账（演示口径：不经平台钱包），按日计息')
     creditDialog.value = false
     loadCredit()
     loadRepayPanel()
