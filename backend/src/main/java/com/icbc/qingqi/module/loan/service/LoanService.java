@@ -1230,13 +1230,22 @@ public class LoanService {
 
 
     /**
-     * 查询循环贷流水
+     * 查询循环贷流水（可按额度类型 A_TYPE/B_TYPE 过滤）
      */
-    public List<CreditTxnVO> listCreditTxns(Long userId) {
-        List<BizCreditTxn> txns = creditTxnMapper.selectList(
-                new LambdaQueryWrapper<BizCreditTxn>()
-                        .eq(BizCreditTxn::getUserId, userId)
-                        .orderByDesc(BizCreditTxn::getTxnTime));
+    public List<CreditTxnVO> listCreditTxns(Long userId, String creditType) {
+        LambdaQueryWrapper<BizCreditTxn> wrapper = new LambdaQueryWrapper<BizCreditTxn>()
+                .eq(BizCreditTxn::getUserId, userId);
+        if (creditType != null && !creditType.isEmpty()) {
+            List<BizCreditLimit> limits = creditLimitMapper.selectList(
+                    new LambdaQueryWrapper<BizCreditLimit>()
+                            .eq(BizCreditLimit::getUserId, userId)
+                            .eq(BizCreditLimit::getCreditType, creditType));
+            if (limits.isEmpty()) return List.of();
+            List<Long> limitIds = limits.stream().map(BizCreditLimit::getId).toList();
+            wrapper.in(BizCreditTxn::getCreditLimitId, limitIds);
+        }
+        wrapper.orderByDesc(BizCreditTxn::getTxnTime);
+        List<BizCreditTxn> txns = creditTxnMapper.selectList(wrapper);
         return txns.stream().map(this::toTxnVO).toList();
     }
 
@@ -1579,7 +1588,33 @@ public class LoanService {
     private CreditTxnVO toTxnVO(BizCreditTxn txn) {
         CreditTxnVO vo = new CreditTxnVO();
         BeanUtil.copyProperties(txn, vo);
-        vo.setTxnTypeName("WITHDRAW".equals(txn.getTxnType()) ? "提款" : "还款");
+        boolean isWithdraw = "WITHDRAW".equals(txn.getTxnType());
+        // 额度类型名（A类循环贷 / B类定向贷）
+        String limitType = null;
+        if (txn.getCreditLimitId() != null) {
+            BizCreditLimit limit = creditLimitMapper.selectById(txn.getCreditLimitId());
+            if (limit != null) {
+                limitType = limit.getCreditType();
+                vo.setCreditTypeName(TYPE_A.equals(limitType) ? "A类循环贷" : "B类定向贷");
+            }
+        }
+        vo.setTxnTypeName(isWithdraw ? (TYPE_A.equals(limitType) ? "提款" : "受托支付") : "还款");
+        // 业务说明（让用户看得懂）
+        String remark = txn.getRemark();
+        if (isWithdraw) {
+            if (TYPE_A.equals(limitType)) {
+                vo.setTxnDesc("循环贷提款放款（模拟到账）");
+            } else {
+                vo.setTxnDesc("定向贷受托支付放款（模拟直付商户）");
+            }
+            if (remark != null && !remark.isBlank()) vo.setTxnDesc(vo.getTxnDesc() + "，" + remark);
+        } else {
+            String pA = txn.getPrincipalAmount() == null ? "0.00" : txn.getPrincipalAmount().toPlainString();
+            String iA = txn.getInterestAmount() == null ? "0.00" : txn.getInterestAmount().toPlainString();
+            StringBuilder d = new StringBuilder("还款还本付息：本金 ¥" + pA + " + 利息 ¥" + iA);
+            if (remark != null && !remark.isBlank()) d.append("，").append(remark);
+            vo.setTxnDesc(d.toString());
+        }
         return vo;
     }
 

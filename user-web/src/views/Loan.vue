@@ -16,388 +16,487 @@
       </div>
     </el-card>
 
-    <!-- 办理流程：4 个 tab 的关系与顺序 -->
-    <el-card shadow="never" class="flow-card">
-      <div class="flow-head">
-        <span class="flow-title">青创e贷办理流程</span>
-        <span class="flow-hint">B类新手：① 申请办理（预审+申请）→ ② 我的额度 → ③ 受托支付放款；A类老手：直接在「我的额度」随借随还</span>
-      </div>
-      <el-steps :active="flowStep" align-center finish-status="success" class="flow-steps">
-        <el-step v-for="(s, i) in flowSteps" :key="s.key" :title="s.title" :description="s.desc"
-          :style="{ cursor: 'pointer' }" @click="activeTab = s.key" />
-      </el-steps>
-    </el-card>
-
-    <!-- A/B 双轨产品介绍 -->
-    <el-row :gutter="20" class="intro-row" v-loading="rulesLoading">
-      <el-col :xs="24" :md="12" v-for="p in [rules.productA, rules.productB]" :key="p?.name">
-        <el-card shadow="hover" class="product-card" :class="p === rules.productA ? 'card-a' : 'card-b'">
-          <template #header>
-            <div class="product-head">
-              <span class="product-name">{{ p?.name }}</span>
-              <el-tag size="small" :type="p === rules.productA ? 'primary' : 'warning'">
-                {{ p === rules.productA ? 'A类 · 随借随还' : 'B类 · 受托支付' }}
-              </el-tag>
-            </div>
-            <div class="product-slogan">{{ p?.slogan }}</div>
-          </template>
-          <el-descriptions :column="1" border size="small" v-if="p">
-            <el-descriptions-item label="适用对象">{{ p.target }}</el-descriptions-item>
-            <el-descriptions-item label="授信额度">{{ p.limitDesc }}</el-descriptions-item>
-            <el-descriptions-item label="年化利率">{{ p.rateDesc }}</el-descriptions-item>
-            <el-descriptions-item label="期限">{{ p.termDesc }}</el-descriptions-item>
-            <el-descriptions-item label="计息方式">{{ p.interestDesc }}</el-descriptions-item>
-            <el-descriptions-item label="还款方式">{{ p.repayDesc }}</el-descriptions-item>
-            <el-descriptions-item label="准入规则">{{ p.accessDesc }}</el-descriptions-item>
-            <el-descriptions-item label="资金流向">
-              <span class="fund-flow">{{ p.fundFlowDesc }}</span>
-            </el-descriptions-item>
-          </el-descriptions>
-          <div class="rule-block" v-if="p">
-            <div class="rule-title">详细规则</div>
-            <ol class="rule-list">
-              <li v-for="(r, i) in p.rules" :key="i">{{ r }}</li>
-            </ol>
-            <el-button size="small" type="primary" plain @click="openRisk(p)">
-              查看 {{ p === rules.productA ? 'A类' : 'B类' }} 专属风险提示
-            </el-button>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
-
+    <!-- ================= A/B 两大分区：按各自的办理流程分布功能区 ================= -->
     <el-tabs v-model="activeTab" class="main-tabs">
-      <!-- L-1 申请办理（预审 + 申请合并） -->
-      <el-tab-pane label="申请办理" name="apply">
-        <el-alert type="info" :closable="false" style="margin-bottom:16px"
-          title="① 申请办理：B类免费预审（不查征信）→ 提交申请 → 审批通过后到「受托支付」放款；A类老手可直接到「我的额度」随借随还" />
-        <el-row :gutter="20">
-          <el-col :xs="24" :md="14">
-            <el-card shadow="never">
-              <template #header><span>B类免费预审（不查征信 · 模拟）</span></template>
-              <el-form ref="precheckFormRef" :model="precheckForm" :rules="precheckRules" label-width="110px">
-                <el-form-item label="人群资质" prop="crowdType">
-                  <el-select v-model="precheckForm.crowdType" placeholder="请选择" style="width:100%">
-                    <el-option v-for="c in crowdOptions" :key="c.value" :label="c.label" :value="c.value" />
-                  </el-select>
-                </el-form-item>
-                <el-form-item label="贷款用途">
-                  <el-select v-model="precheckForm.purpose" placeholder="请选择" style="width:100%">
-                    <el-option label="设备采购" value="EQUIPMENT" />
-                    <el-option label="原材料进货" value="MATERIAL" />
-                    <el-option label="场地租金" value="RENT" />
-                    <el-option label="运营周转" value="OPERATION" />
-                    <el-option label="其他" value="OTHER" />
-                  </el-select>
-                </el-form-item>
-                <el-form-item label="期望金额">
-                  <el-input-number v-model="precheckForm.applyAmount" :min="1000" :max="50000" :step="1000" style="width:100%" />
-                </el-form-item>
-                <el-form-item label="创业计划" prop="businessPlan">
-                  <el-input v-model="precheckForm.businessPlan" type="textarea" :rows="4" placeholder="简述你的创业计划、经营内容、还款来源等" />
-                </el-form-item>
-                <el-form-item>
-                  <el-button type="primary" :loading="prechecking" @click="submitPrecheck">提交预审（不查征信 · 模拟）</el-button>
-                </el-form-item>
-              </el-form>
-            </el-card>
-          </el-col>
-          <el-col :xs="24" :md="10">
-            <el-card shadow="never" v-loading="prechecking" style="margin-bottom:16px">
-              <template #header><span>预审结果</span></template>
-              <div v-if="precheckResult" class="precheck-result">
-                <el-result :icon="precheckResult.preCheckResult === 'ELIGIBLE' ? 'success' : 'warning'"
-                  :title="precheckResult.preCheckResultName"
-                  :sub-title="`申请编号：${precheckResult.applyNo}`">
-                  <template #extra>
-                    <div class="amount-range">
-                      <div class="amount-item">
-                        <span class="label">预审额度区间</span>
-                        <span class="value">¥{{ precheckResult.preCheckMinAmount }} ~ ¥{{ precheckResult.preCheckMaxAmount }}</span>
-                      </div>
-                      <div class="detail" v-if="precheckResult.preCheckDetail">{{ precheckResult.preCheckDetail }}</div>
-                    </div>
-                  </template>
-                </el-result>
-              </div>
-              <el-empty v-else description="提交预审后查看结果（不查征信）" :image-size="70" />
-            </el-card>
-            <el-card shadow="never">
-              <template #header>
-                <div class="app-card-head">
-                  <span>我的申请（跟踪审批）</span>
-                  <el-button size="small" @click="loadApplications"><el-icon><Refresh /></el-icon>刷新</el-button>
-                </div>
-              </template>
-              <el-table v-loading="appLoading" :data="applications" stripe empty-text="暂无贷款申请，请先提交预审" max-height="300">
-                <el-table-column prop="applyNo" label="申请编号" width="150" />
-                <el-table-column prop="loanType" label="类型" width="70" />
-                <el-table-column prop="applyAmount" label="申请金额" width="100" align="right">
-                  <template #default="{ row }">¥{{ row.applyAmount || '-' }}</template>
-                </el-table-column>
-                <el-table-column prop="approveAmount" label="获批金额" width="100" align="right">
-                  <template #default="{ row }"><b style="color:#67c23a">¥{{ row.approveAmount || '-' }}</b></template>
-                </el-table-column>
-                <el-table-column prop="applyStatus" label="状态" width="100" align="center">
-                  <template #default="{ row }"><el-tag size="small" :type="statusTagType(row.applyStatus)">{{ row.applyStatus }}</el-tag></template>
-                </el-table-column>
-                <el-table-column prop="submitTime" label="提交时间" min-width="150" />
-              </el-table>
-            </el-card>
-          </el-col>
-        </el-row>
-      </el-tab-pane>
-
-      <!-- L-2 我的额度（A/B 双轨 + A类随借随还操作） -->
-      <el-tab-pane label="我的额度" name="credit">
-        <el-alert type="success" :closable="false" style="margin-bottom:16px"
-          title="A类 = 5万循环额度可直接提款/还款（随借随还，按日计息）；B类 = 定向小额额度，须走「受托支付」放款" />
-        <!-- 观察期·数据回流联动看板（模块3/4） -->
-        <el-card v-if="obsProgress && obsProgress.hasBCredit" shadow="never" class="obs-banner" v-loading="obsLoading">
-          <div class="obs-head">
-            <div class="obs-title">B转A 观察期 · 经营数据回流进度
-              <el-tag size="small" :type="obsProgress.observationStatus === 'PROMOTED' ? 'success' : 'warning'" style="margin-left:8px">
-                {{ obsProgress.observationStatusName }}
-              </el-tag>
-            </div>
-            <div class="obs-total">综合进度 <b :style="{ color: obsProgress.eligible ? '#67c23a' : '#e6a23c' }">{{ obsProgress.totalPercent }}%</b>
-              <span class="obs-sub">（流水40% + 记账30% + 现金流30%，≥60%达标）</span>
-            </div>
+      <!-- ========== A 区：A类循环贷（随借随还） ========== -->
+      <el-tab-pane label="A类 · 循环贷（随借随还）" name="tabA">
+        <el-card shadow="never" class="zone-card">
+          <div class="zone-head zone-head-a">
+            <div class="zone-title">A类循环贷 · 随借随还</div>
+            <div class="zone-desc">有画像即可贷：循环额度最高 ¥50,000（年化 3.85%），提款后按日计息，随借随还无违约金；还款后额度即时恢复</div>
           </div>
-          <el-row :gutter="12" style="margin-top:10px">
-            <el-col :span="8"><div class="obs-item"><span>受托支付回流</span><b>¥{{ obsProgress.flowAmount }}/¥{{ obsProgress.flowThreshold }}</b></div></el-col>
-            <el-col :span="8"><div class="obs-item"><span>AI记账笔数</span><b>{{ obsProgress.bookCount }}/{{ obsProgress.bookThreshold }}笔</b></div></el-col>
-            <el-col :span="8"><div class="obs-item"><span>现金流健康度</span><b>{{ obsProgress.cashScore }}分（{{ obsProgress.cashLevelName }}）</b></div></el-col>
-          </el-row>
-          <el-button v-if="obsProgress.observationStatus === 'OBSERVING' && obsProgress.eligible" type="success" size="small"
-            :loading="obsPromoting" style="margin-top:10px" @click="doApplyPromotion">一键申请转A（提额至5万）</el-button>
-          <div v-if="obsProgress.observationStatus !== 'OBSERVING'" class="obs-tip" style="margin-top:10px">{{ obsProgress.message }}</div>
-          <el-alert v-if="obsProgress.observationStatus === 'OBSERVING' && !obsProgress.eligible" type="info" :closable="false" style="margin-top:10px" :title="obsProgress.message" />
-        </el-card>
-        <el-row :gutter="16">
-          <el-col :span="15">
-            <div class="credit-grid" v-loading="creditLoading">
-              <el-card v-for="c in creditList" :key="c.id" shadow="hover" class="credit-card" :class="c.creditType">
-                <div class="credit-type">{{ c.creditTypeName }}</div>
-                <div class="credit-total">¥{{ c.totalLimit }}</div>
-                <div class="credit-row"><span>可用额度</span><b>¥{{ c.availableLimit }}</b></div>
-                <div class="credit-row"><span>已用额度</span><span>¥{{ c.usedLimit }}</span></div>
-                <div class="credit-row"><span>年化利率</span><span>{{ (Number(c.interestRate) * 100).toFixed(2) }}%</span></div>
-                <div class="credit-row"><span>状态</span><el-tag size="small" :type="c.status === 'ACTIVE' ? 'success' : 'info'">{{ c.statusName }}</el-tag></div>
-                <div class="credit-row" v-if="c.repayInfo && c.usedLimit > 0">
-                  <span>应还利息（试算）</span><span style="color:#f56c6c">¥{{ c.repayInfo.interestPreview }}</span>
-                </div>
-                <div class="credit-row" v-if="c.repayInfo && c.usedLimit > 0">
-                  <span>应还合计（本金+利息）</span><b style="color:#f56c6c">¥{{ c.repayInfo.totalDue }}</b>
-                </div>
-                <div class="credit-remark">{{ c.remark }}</div>
-                <div class="credit-actions" v-if="c.creditType === 'A_TYPE' && c.status === 'ACTIVE'">
-                  <el-button size="small" type="primary" @click="openWithdraw(c)">提款</el-button>
-                  <el-button size="small" @click="openTxns(c)">流水</el-button>
-                  <el-button size="small" type="warning" plain @click="switchRepay(c.creditType)">去还款</el-button>
-                </div>
-                <template v-else-if="c.creditType === 'B_TYPE'">
-                  <div class="credit-actions" v-if="c.status === 'ACTIVE'">
-                    <el-button size="small" @click="openTxns(c)">流水</el-button>
-                    <el-button size="small" type="warning" :disabled="!c.usedLimit || c.usedLimit <= 0" @click="switchRepay(c.creditType)">去还款</el-button>
-                  </div>
-                  <el-tag v-if="!c.usedLimit || c.usedLimit <= 0" size="small" type="warning" class="b-flow-tag">放款请到「受托支付」页（放款后可在右侧还款）</el-tag>
-                </template>
-              </el-card>
-            </div>
-            <el-empty v-if="!creditLoading && !creditList.length" description="暂无授信额度，可先进行 B类预审" />
-          </el-col>
-          <el-col :span="9">
-            <el-card shadow="never" class="repay-panel" v-loading="repayLoading">
-              <template #header><span class="repay-head">还款中心（按笔计息 · 还本付息）</span></template>
-              <template v-if="repayPreview && repayPreview.usedLimit > 0">
-                <el-radio-group v-model="repayType" size="small" class="repay-types" @change="switchRepay">
-                  <el-radio-button :value="'A_TYPE'">A类循环贷</el-radio-button>
-                  <el-radio-button :value="'B_TYPE'">B类定向贷</el-radio-button>
-                </el-radio-group>
-                <div class="bank-total">
-                  <div class="bank-total-label">应还合计（元）<span class="bank-total-sub">本金 + 按笔累计利息 · 支持部分/按笔/全部结清</span></div>
-                  <div class="bank-total-num">¥{{ repayPreview.totalDue }}</div>
-                  <div class="bank-total-split">本金 ¥{{ repayPreview.usedLimit }} ＋ 利息 ¥{{ repayPreview.interestPreview }}</div>
-                </div>
-                <div class="loan-table-title">未结清借款明细（按笔计息 · 先进先出冲抵）</div>
-                <el-table :data="repayPreview.loans || []" size="small" max-height="240" style="margin-bottom:8px">
-                  <el-table-column label="借款日期" width="92">
-                    <template #default="{ row }">{{ row.loanDate }}</template>
-                  </el-table-column>
-                  <el-table-column prop="loanNo" label="借款编号" min-width="130" show-overflow-tooltip />
-                  <el-table-column label="剩余本金" width="84" align="right">
-                    <template #default="{ row }">¥{{ row.remainingPrincipal }}</template>
-                  </el-table-column>
-                  <el-table-column label="天数" width="54" align="center">
-                    <template #default="{ row }">{{ row.borrowDays }}天</template>
-                  </el-table-column>
-                  <el-table-column label="日利率" width="84">
-                    <template #default="{ row }">{{ row.dailyRateText }}</template>
-                  </el-table-column>
-                  <el-table-column label="应还利息" width="78" align="right">
-                    <template #default="{ row }">¥{{ row.interestPreview }}</template>
-                  </el-table-column>
-                  <el-table-column label="本息合计" width="86" align="right">
-                    <template #default="{ row }">¥{{ row.totalDue }}</template>
-                  </el-table-column>
-                  <el-table-column label="操作" width="78" align="center">
-                    <template #default="{ row }">
-                      <el-button size="small" type="warning" plain @click="settleLoan(row)">结清本笔</el-button>
-                    </template>
-                  </el-table-column>
-                </el-table>
-                <div class="repay-rules">
-                  <div class="repay-rules-title">还款规则（按笔计息 · 利随本清）</div>
-                  <ul class="repay-rules-list">
-                    <li><b>按笔计息</b>：每笔借款独立起息，利息=剩余本金×年化÷365×天数，不同日期借款互不影响</li>
-                    <li><b>先进先出</b>：部分还款自动冲最早借款；也可点「结清本笔」指定结清某一笔</li>
-                    <li><b>利随本清</b>：利息随本金一并支付（如借款 10 天结清，利息=本金×利率÷365×10）</li>
-                    <li><b>部分还款</b>：金额可小于应还本金（≥¥0.01），无需一次结清，额度即时恢复</li>
-                    <li v-if="currentRepayRule">{{ currentRepayRule }}</li>
-                  </ul>
-                </div>
-                <div class="repay-form">
-                  <div class="repay-form-label" v-if="repayLoanNo">
-                    本次操作：结清借款 <b style="color:#e6a23c">{{ repayLoanNo }}</b>（本息合计，一次付清）
-                  </div>
-                  <div class="repay-form-label" v-else>还款金额（本息合计：本金 + 利息，输入多少付多少）</div>
-                  <el-input-number v-model="repayAmount" :min="0.01" :max="Number(repayPreview.totalDue || 0)"
-                    :precision="2" style="width:100%" />
-                  <div class="repay-fee-tip">
-                    支付 <b style="color:#e6a23c">¥{{ repayTotalPreview.actual }}</b>
-                    ＝ 本金 <b>¥{{ repayTotalPreview.principal }}</b> ＋ 利息 <b style="color:#f56c6c">¥{{ repayTotalPreview.interest }}</b>
-                    <span class="repay-fee-sub">（输入含息金额，系统按先进先出自动拆分，利息随还）</span>
-                  </div>
-                  <el-button size="small" type="primary" plain style="margin-top:8px;width:100%"
-                    @click="setFullRepay">全部结清（本息合计 ¥{{ repayPreview.totalDue }}）</el-button>
-                </div>
-                <el-button type="primary" size="large" class="repay-submit" :loading="repaySubmitting" @click="submitRepay('')">
-                  扫码支付还款（本息一并支付）
-                </el-button>
-                <el-button type="success" size="large" class="repay-submit" :loading="repaySubmitting"
-                  :disabled="!repayGuard || Number(repayGuard.balance) <= 0" @click="submitRepay('REPAY_GUARD')">
-                  还款保障金一键还款<template v-if="repayGuard">（可用 ¥{{ repayGuard.balance }}，覆盖 {{ repayGuard.coverage }}% 待还）</template>
-                </el-button>
-                <div class="repay-remark">{{ repayPreview.remark }}</div>
-              </template>
-              <el-empty v-else description="当前无待还。A类提款或 B类受托支付放款后，可在此查看每笔借款并按笔结清（利息自动计算）" />
-            </el-card>
-            <PayCashier v-model="repayCashierVisible" :order-no="repayCashierOrderNo" @paid="onRepayPaid" />
-          </el-col>
-        </el-row>
-      </el-tab-pane>
+          <el-steps :active="aStep" finish-status="success" align-center class="zone-steps">
+            <el-step title="① 提款" description="从循环额度分次提款（单笔≥¥1000）" />
+            <el-step title="② 随借随还" description="按实际用款天数计息（3.85%÷365）" />
+            <el-step title="③ 还款结清" description="可部分/按笔/全部结清，额度即时恢复" />
+          </el-steps>
 
-
-      <!-- L-3 受托支付（第4步：审批通过后放款） -->
-      <el-tab-pane label="受托支付" name="entrust">
-        <el-alert type="warning" :closable="false" style="margin-bottom:16px"
-          title="B类放款方式：申请审批通过后，银行不把钱打给您，而是直接打给您选择的商户（专款专用、防挪用）；您仍需按期还本付息（模拟，无真实资金）" />
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-card shadow="never">
-              <el-form ref="entrustFormRef" :model="entrustForm" :rules="entrustRules" label-width="110px">
-                <el-form-item label="关联申请" prop="loanApplicationId">
-                  <el-select v-model="entrustForm.loanApplicationId" placeholder="选择已获批的贷款申请" style="width:100%" filterable @change="onAppSelected">
-                    <el-option v-for="a in approvedApps" :key="a.id" :label="`${a.applyNo}（获批¥${a.approveAmount || a.preCheckMaxAmount}）`" :value="a.id" />
-                  </el-select>
-                </el-form-item>
-                <div v-if="selectedApp" class="app-amount-tip">
-                  该申请可用放款额度：<b>¥{{ selectedApp.approveAmount || selectedApp.preCheckMaxAmount }}</b>
-                  <span class="tip-sub">（支付金额不得超过此额度）</span>
+          <el-row :gutter="20">
+            <el-col :xs="24" :md="15">
+              <!-- A类额度卡 -->
+              <div v-if="aCredit" class="credit-card card-a">
+                <div class="credit-type">{{ aCredit.creditTypeName }}</div>
+                <div class="credit-total">¥{{ aCredit.totalLimit }}</div>
+                <div class="credit-row"><span>可用额度</span><b>¥{{ aCredit.availableLimit }}</b></div>
+                <div class="credit-row"><span>已用额度</span><span>¥{{ aCredit.usedLimit }}</span></div>
+                <div class="credit-row"><span>年化利率</span><span>{{ (Number(aCredit.interestRate) * 100).toFixed(2) }}%</span></div>
+                <div class="credit-row"><span>状态</span><el-tag size="small" :type="aCredit.status === 'ACTIVE' ? 'success' : 'info'">{{ aCredit.statusName }}</el-tag></div>
+                <div class="credit-row" v-if="aCredit.repayInfo && aCredit.usedLimit > 0">
+                  <span>应还利息（试算）</span><span style="color:#f56c6c">¥{{ aCredit.repayInfo.interestPreview }}</span>
                 </div>
-                <el-form-item label="收款商户" prop="merchantId">
-                  <el-select v-model="entrustForm.merchantId" placeholder="选择定向商户" style="width:100%">
-                    <el-option v-for="m in merchants" :key="m.id"
-                      :label="`${m.merchantName}（${merchantTypeName(m.merchantType)}·${merchantSourceName(m.merchantSource)}）`" :value="m.id" />
-                  </el-select>
-                </el-form-item>
-                <el-form-item label="支付金额" prop="amount">
-                  <el-input-number v-model="entrustForm.amount" :min="0.01" :max="appMaxAmount" :precision="2" style="width:100%" />
-                </el-form-item>
-                <el-form-item label="用途说明">
-                  <el-input v-model="entrustForm.purpose" placeholder="资金用途说明" />
-                </el-form-item>
-                <el-form-item>
-                  <el-button type="primary" :loading="paying" @click="submitEntrust">确认受托支付（模拟）</el-button>
-                </el-form-item>
-              </el-form>
-            </el-card>
-          </el-col>
-          <el-col :span="12">
-            <el-card shadow="never">
-              <template #header>
-                <div class="app-card-head">
-                  <span>定向打款商户</span>
-                  <el-button size="small" type="primary" plain @click="merchantDialog = true">
-                    <el-icon><Money /></el-icon>&nbsp;添加自定义商户
-                  </el-button>
+                <div class="credit-row" v-if="aCredit.repayInfo && aCredit.usedLimit > 0">
+                  <span>应还合计（本金+利息）</span><b style="color:#f56c6c">¥{{ aCredit.repayInfo.totalDue }}</b>
                 </div>
-              </template>
-              <el-table :data="merchants" size="small" empty-text="暂无商户" max-height="220">
-                <el-table-column prop="merchantName" label="商户名称" />
-                <el-table-column label="来源" width="96" align="center">
-                  <template #default="{ row }">
-                    <el-tag size="small" :type="row.merchantSource === 'USER_CUSTOM' ? 'warning' : 'success'">
-                      {{ merchantSourceName(row.merchantSource) }}
-                    </el-tag>
-                  </template>
-                </el-table-column>
-                <el-table-column label="分类" width="90">
-                  <template #default="{ row }">{{ merchantTypeName(row.merchantType) }}</template>
-                </el-table-column>
-                <el-table-column prop="contactPhone" label="联系电话" width="118" />
-              </el-table>
-              <div class="merchant-tip">平台通用商户可直接打款；「我的自定义」商户仅你本人可用，且<b>每次打款前均需银行复核</b>（复核通过后直付商户）</div>
+                <div class="credit-remark">{{ aCredit.remark }}</div>
+                <div class="credit-actions" v-if="aCredit.status === 'ACTIVE'">
+                  <el-button size="small" type="primary" @click="openWithdraw(aCredit)">提款</el-button>
+                  <el-button size="small" @click="openTxns(aCredit)">流水</el-button>
+                  <el-button size="small" type="warning" plain :disabled="!aCredit.usedLimit || aCredit.usedLimit <= 0" @click="switchRepay('A_TYPE')">去还款</el-button>
+                </div>
+              </div>
+              <el-empty v-else-if="!creditLoading" description="暂无A类额度（B类观察期数据回流达标后可一键转A）" />
 
-              <el-collapse style="margin-top:10px">
-                <el-collapse-item title="我的自定义商户（申请/审核状态）" name="my">
-                  <el-table :data="myMerchants" size="small" empty-text="暂无自定义商户申请" max-height="200">
-                    <el-table-column prop="merchantName" label="商户名称" />
-                    <el-table-column label="状态" width="90" align="center">
-                      <template #default="{ row }">
-                        <el-tag size="small" :type="merchantVerifyTag(row.verifyStatus)">{{ merchantVerifyName(row.verifyStatus) }}</el-tag>
-                      </template>
-                    </el-table-column>
-                    <el-table-column prop="reviewRemark" label="审核意见" min-width="120" show-overflow-tooltip />
-                  </el-table>
+              <!-- A类产品规则（折叠） -->
+              <el-collapse style="margin-top:14px">
+                <el-collapse-item title="A类 · 产品规则与风险提示" name="rulesA">
+                  <el-descriptions :column="1" border size="small" v-if="rules.productA">
+                    <el-descriptions-item label="适用对象">{{ rules.productA.target }}</el-descriptions-item>
+                    <el-descriptions-item label="授信额度">{{ rules.productA.limitDesc }}</el-descriptions-item>
+                    <el-descriptions-item label="年化利率">{{ rules.productA.rateDesc }}</el-descriptions-item>
+                    <el-descriptions-item label="期限">{{ rules.productA.termDesc }}</el-descriptions-item>
+                    <el-descriptions-item label="计息方式">{{ rules.productA.interestDesc }}</el-descriptions-item>
+                    <el-descriptions-item label="还款方式">{{ rules.productA.repayDesc }}</el-descriptions-item>
+                    <el-descriptions-item label="准入规则">{{ rules.productA.accessDesc }}</el-descriptions-item>
+                    <el-descriptions-item label="资金流向"><span class="fund-flow">{{ rules.productA.fundFlowDesc }}</span></el-descriptions-item>
+                  </el-descriptions>
+                  <div class="rule-block">
+                    <div class="rule-title">详细规则</div>
+                    <ol class="rule-list">
+                      <li v-for="(r, i) in rules.productA?.rules || []" :key="i">{{ r }}</li>
+                    </ol>
+                    <el-button size="small" type="primary" plain @click="openRisk(rules.productA)">查看 A类 专属风险提示</el-button>
+                  </div>
                 </el-collapse-item>
               </el-collapse>
-            </el-card>
+            </el-col>
 
-            <el-card shadow="never" style="margin-top:16px">
-              <template #header><span>打款记录（含复核状态）</span></template>
-              <el-table :data="entrustRecords" size="small" empty-text="暂无打款记录" max-height="220">
-                <el-table-column prop="recordNo" label="记录号" width="180" show-overflow-tooltip />
-                <el-table-column prop="merchantName" label="收款商户" min-width="120" show-overflow-tooltip />
-                <el-table-column label="状态" width="110" align="center">
-                  <template #default="{ row }">
-                    <el-tag size="small" :type="recordStatusTag(row)">{{ recordStatusName(row) }}</el-tag>
-                  </template>
-                </el-table-column>
-                <el-table-column prop="amount" label="金额" width="90" align="right">
-                  <template #default="{ row }">¥{{ row.amount }}</template>
-                </el-table-column>
-                <el-table-column prop="purpose" label="用途" min-width="100" show-overflow-tooltip />
-                <el-table-column label="时间" width="150">
-                  <template #default="{ row }">{{ row.recordTime || '-' }}</template>
-                </el-table-column>
-              </el-table>
-            </el-card>
-          </el-col>
-        </el-row>
-        <el-card shadow="never" style="margin-top:16px" v-if="entrustResult">
-          <template #header><span>支付结果</span></template>
-          <el-descriptions :column="2" border>
-            <el-descriptions-item label="支付编号">{{ entrustResult.paymentNo }}</el-descriptions-item>
-            <el-descriptions-item label="收款商户">{{ entrustResult.merchantName }}</el-descriptions-item>
-            <el-descriptions-item label="支付金额">¥{{ entrustResult.amount }}</el-descriptions-item>
-            <el-descriptions-item label="状态">
-              <el-tag :type="entrustResult.paymentStatus === 'SUCCESS' ? 'success' : 'warning'">{{ entrustResult.paymentStatusName }}</el-tag>
-            </el-descriptions-item>
-            <el-descriptions-item v-if="entrustResult.reviewNo" label="复核单号">{{ entrustResult.reviewNo }}</el-descriptions-item>
-            <el-descriptions-item label="资金路径" :span="2">{{ entrustResult.fundPath }}</el-descriptions-item>
-          </el-descriptions>
+            <el-col :xs="24" :md="9">
+              <!-- A类还款中心 -->
+              <el-card shadow="never" class="repay-panel" v-loading="repayLoading">
+                <template #header><span class="repay-head">A类还款中心（按笔计息 · 还本付息）</span></template>
+                <template v-if="repayPreview && repayType === 'A_TYPE' && repayPreview.usedLimit > 0">
+                  <div class="bank-total">
+                    <div class="bank-total-label">应还合计（元）<span class="bank-total-sub">本金 + 按笔累计利息 · 支持部分/按笔/全部结清</span></div>
+                    <div class="bank-total-num">¥{{ repayPreview.totalDue }}</div>
+                    <div class="bank-total-split">本金 ¥{{ repayPreview.usedLimit }} ＋ 利息 ¥{{ repayPreview.interestPreview }}</div>
+                  </div>
+                  <div class="loan-table-title">未结清借款明细（按笔计息 · 先进先出冲抵）</div>
+                  <el-table :data="repayPreview.loans || []" size="small" max-height="200" style="margin-bottom:8px">
+                    <el-table-column label="借款日期" width="92">
+                      <template #default="{ row }">{{ row.loanDate }}</template>
+                    </el-table-column>
+                    <el-table-column prop="loanNo" label="借款编号" min-width="120" show-overflow-tooltip />
+                    <el-table-column label="剩余本金" width="82" align="right">
+                      <template #default="{ row }">¥{{ row.remainingPrincipal }}</template>
+                    </el-table-column>
+                    <el-table-column label="天数" width="52" align="center">
+                      <template #default="{ row }">{{ row.borrowDays }}天</template>
+                    </el-table-column>
+                    <el-table-column label="应还利息" width="76" align="right">
+                      <template #default="{ row }">¥{{ row.interestPreview }}</template>
+                    </el-table-column>
+                    <el-table-column label="本息合计" width="84" align="right">
+                      <template #default="{ row }">¥{{ row.totalDue }}</template>
+                    </el-table-column>
+                    <el-table-column label="操作" width="76" align="center">
+                      <template #default="{ row }">
+                        <el-button size="small" type="warning" plain @click="settleLoan(row)">结清本笔</el-button>
+                      </template>
+                    </el-table-column>
+                  </el-table>
+                  <div class="repay-rules">
+                    <div class="repay-rules-title">还款规则（按笔计息 · 利随本清）</div>
+                    <ul class="repay-rules-list">
+                      <li><b>按笔计息</b>：每笔借款独立起息，利息=剩余本金×年化÷365×天数，不同日期借款互不影响</li>
+                      <li><b>先进先出</b>：部分还款自动冲最早借款；也可点「结清本笔」指定结清某一笔</li>
+                      <li><b>利随本清</b>：利息随本金一并支付</li>
+                      <li><b>部分还款</b>：金额可小于应还本金（≥¥0.01），无需一次结清，额度即时恢复</li>
+                    </ul>
+                  </div>
+                  <div class="repay-form">
+                    <div class="repay-form-label" v-if="repayLoanNo">
+                      本次操作：结清借款 <b style="color:#e6a23c">{{ repayLoanNo }}</b>（本息合计，一次付清）
+                    </div>
+                    <div class="repay-form-label" v-else>还款金额（本息合计：本金 + 利息，输入多少付多少）</div>
+                    <el-input-number v-model="repayAmount" :min="0.01" :max="Number(repayPreview.totalDue || 0)"
+                      :precision="2" style="width:100%" />
+                    <div class="repay-fee-tip">
+                      支付 <b style="color:#e6a23c">¥{{ repayTotalPreview.actual }}</b>
+                      ＝ 本金 <b>¥{{ repayTotalPreview.principal }}</b> ＋ 利息 <b style="color:#f56c6c">¥{{ repayTotalPreview.interest }}</b>
+                      <span class="repay-fee-sub">（输入含息金额，系统按先进先出自动拆分，利息随还）</span>
+                    </div>
+                    <el-button size="small" type="primary" plain style="margin-top:8px;width:100%"
+                      @click="setFullRepay">全部结清（本息合计 ¥{{ repayPreview.totalDue }}）</el-button>
+                  </div>
+                  <el-button type="primary" size="large" class="repay-submit" :loading="repaySubmitting" @click="submitRepay('')">
+                    扫码支付还款（本息一并支付）
+                  </el-button>
+                  <el-button type="success" size="large" class="repay-submit" :loading="repaySubmitting"
+                    :disabled="!repayGuard || Number(repayGuard.balance) <= 0" @click="submitRepay('REPAY_GUARD')">
+                    还款保障金一键还款<template v-if="repayGuard">（可用 ¥{{ repayGuard.balance }}，覆盖 {{ repayGuard.coverage }}% 待还）</template>
+                  </el-button>
+                  <div class="repay-remark">{{ repayPreview.remark }}</div>
+                </template>
+                <el-empty v-else description="A类当前无待还。提款后在此查看每笔借款并按笔结清（利息自动计算）" />
+              </el-card>
+            </el-col>
+          </el-row>
+        </el-card>
+      </el-tab-pane>
+
+      <!-- ========== B 区：B类定向贷（两步式受托支付） ========== -->
+      <el-tab-pane label="B类 · 定向贷（受托支付）" name="tabB">
+        <el-card shadow="never" class="zone-card">
+          <div class="zone-head zone-head-b">
+            <div class="zone-title">B类定向贷 · 两步式受托支付</div>
+            <div class="zone-desc">零历史也能贷：免费预审（不查征信）→ 审批通过 → 100%受托支付直付白名单商户，专款专用；提款后进入 6 个月观察期，经营数据回流达标可一键转A</div>
+          </div>
+          <el-steps :active="bStep" finish-status="success" align-center class="zone-steps">
+            <el-step title="① 预审+申请" description="免费预审（不查征信），获批才有钱可用" />
+            <el-step title="② 获批额度" description="定向小额额度（¥5,000~¥20,000）" />
+            <el-step title="③ 受托支付" description="银行直付商户账户，不经过个人账户" />
+            <el-step title="④ 还款结清" description="按期/提前还本付息，支持保障金还款" />
+          </el-steps>
+
+          <!-- ① 预审 + 申请 -->
+          <el-row :gutter="20" class="zone-row">
+            <el-col :xs="24" :md="14">
+              <el-card shadow="never">
+                <template #header><span>B类免费预审（不查征信 · 模拟）</span></template>
+                <el-form ref="precheckFormRef" :model="precheckForm" :rules="precheckRules" label-width="110px">
+                  <el-form-item label="人群资质" prop="crowdType">
+                    <el-select v-model="precheckForm.crowdType" placeholder="请选择" style="width:100%">
+                      <el-option v-for="c in crowdOptions" :key="c.value" :label="c.label" :value="c.value" />
+                    </el-select>
+                  </el-form-item>
+                  <el-form-item label="贷款用途">
+                    <el-select v-model="precheckForm.purpose" placeholder="请选择" style="width:100%">
+                      <el-option label="设备采购" value="EQUIPMENT" />
+                      <el-option label="原材料进货" value="MATERIAL" />
+                      <el-option label="场地租金" value="RENT" />
+                      <el-option label="运营周转" value="OPERATION" />
+                      <el-option label="其他" value="OTHER" />
+                    </el-select>
+                  </el-form-item>
+                  <el-form-item label="期望金额">
+                    <el-input-number v-model="precheckForm.applyAmount" :min="1000" :max="50000" :step="1000" style="width:100%" />
+                  </el-form-item>
+                  <el-form-item label="创业计划" prop="businessPlan">
+                    <el-input v-model="precheckForm.businessPlan" type="textarea" :rows="4" placeholder="简述你的创业计划、经营内容、还款来源等" />
+                  </el-form-item>
+                  <el-form-item>
+                    <el-button type="primary" :loading="prechecking" @click="submitPrecheck">提交预审（不查征信 · 模拟）</el-button>
+                  </el-form-item>
+                </el-form>
+              </el-card>
+            </el-col>
+            <el-col :xs="24" :md="10">
+              <el-card shadow="never" v-loading="prechecking" style="margin-bottom:16px">
+                <template #header><span>预审结果</span></template>
+                <div v-if="precheckResult" class="precheck-result">
+                  <el-result :icon="precheckResult.preCheckResult === 'ELIGIBLE' ? 'success' : 'warning'"
+                    :title="precheckResult.preCheckResultName"
+                    :sub-title="`申请编号：${precheckResult.applyNo}`">
+                    <template #extra>
+                      <div class="amount-range">
+                        <div class="amount-item">
+                          <span class="label">预审额度区间</span>
+                          <span class="value">¥{{ precheckResult.preCheckMinAmount }} ~ ¥{{ precheckResult.preCheckMaxAmount }}</span>
+                        </div>
+                        <div class="detail" v-if="precheckResult.preCheckDetail">{{ precheckResult.preCheckDetail }}</div>
+                      </div>
+                    </template>
+                  </el-result>
+                </div>
+                <el-empty v-else description="提交预审后查看结果（不查征信）" :image-size="70" />
+              </el-card>
+              <el-card shadow="never">
+                <template #header>
+                  <div class="app-card-head">
+                    <span>我的申请（跟踪审批）</span>
+                    <el-button size="small" @click="loadApplications"><el-icon><Refresh /></el-icon>刷新</el-button>
+                  </div>
+                </template>
+                <el-table v-loading="appLoading" :data="applications" stripe empty-text="暂无贷款申请，请先提交预审" max-height="280">
+                  <el-table-column prop="applyNo" label="申请编号" width="150" />
+                  <el-table-column prop="loanType" label="类型" width="70" />
+                  <el-table-column prop="applyAmount" label="申请金额" width="96" align="right">
+                    <template #default="{ row }">¥{{ row.applyAmount || '-' }}</template>
+                  </el-table-column>
+                  <el-table-column prop="approveAmount" label="获批金额" width="96" align="right">
+                    <template #default="{ row }"><b style="color:#67c23a">¥{{ row.approveAmount || '-' }}</b></template>
+                  </el-table-column>
+                  <el-table-column prop="applyStatus" label="状态" width="90" align="center">
+                    <template #default="{ row }"><el-tag size="small" :type="statusTagType(row.applyStatus)">{{ row.applyStatus }}</el-tag></template>
+                  </el-table-column>
+                  <el-table-column prop="submitTime" label="提交时间" min-width="140" />
+                </el-table>
+              </el-card>
+            </el-col>
+          </el-row>
+
+          <!-- ② 获批额度 + 观察期 -->
+          <el-row :gutter="20" class="zone-row">
+            <el-col :xs="24" :md="15">
+              <div v-if="bCredit" class="credit-card card-b">
+                <div class="credit-type">{{ bCredit.creditTypeName }}</div>
+                <div class="credit-total">¥{{ bCredit.totalLimit }}</div>
+                <div class="credit-row"><span>可用额度</span><b>¥{{ bCredit.availableLimit }}</b></div>
+                <div class="credit-row"><span>已用额度</span><span>¥{{ bCredit.usedLimit }}</span></div>
+                <div class="credit-row"><span>年化利率</span><span>{{ (Number(bCredit.interestRate) * 100).toFixed(2) }}%</span></div>
+                <div class="credit-row"><span>状态</span><el-tag size="small" :type="bCredit.status === 'ACTIVE' ? 'success' : 'info'">{{ bCredit.statusName }}</el-tag></div>
+                <div class="credit-row" v-if="bCredit.repayInfo && bCredit.usedLimit > 0">
+                  <span>应还利息（试算）</span><span style="color:#f56c6c">¥{{ bCredit.repayInfo.interestPreview }}</span>
+                </div>
+                <div class="credit-row" v-if="bCredit.repayInfo && bCredit.usedLimit > 0">
+                  <span>应还合计（本金+利息）</span><b style="color:#f56c6c">¥{{ bCredit.repayInfo.totalDue }}</b>
+                </div>
+                <div class="credit-remark">{{ bCredit.remark }}</div>
+                <div class="credit-actions" v-if="bCredit.status === 'ACTIVE'">
+                  <el-button size="small" @click="openTxns(bCredit)">流水</el-button>
+                  <el-button size="small" type="warning" :disabled="!bCredit.usedLimit || bCredit.usedLimit <= 0" @click="switchRepay('B_TYPE')">去还款</el-button>
+                </div>
+              </div>
+              <el-empty v-else-if="!creditLoading" description="暂无B类额度（请先完成 ① 预审+申请）" />
+
+              <!-- 观察期·数据回流联动看板 -->
+              <el-card v-if="obsProgress && obsProgress.hasBCredit" shadow="never" class="obs-banner" v-loading="obsLoading" style="margin-top:14px">
+                <div class="obs-head">
+                  <div class="obs-title">B转A 观察期 · 经营数据回流进度
+                    <el-tag size="small" :type="obsProgress.observationStatus === 'PROMOTED' ? 'success' : 'warning'" style="margin-left:8px">
+                      {{ obsProgress.observationStatusName }}
+                    </el-tag>
+                  </div>
+                  <div class="obs-total">综合进度 <b :style="{ color: obsProgress.eligible ? '#67c23a' : '#e6a23c' }">{{ obsProgress.totalPercent }}%</b>
+                    <span class="obs-sub">（流水40% + 记账30% + 现金流30%，≥60%达标）</span>
+                  </div>
+                </div>
+                <el-row :gutter="12" style="margin-top:10px">
+                  <el-col :span="8"><div class="obs-item"><span>受托支付回流</span><b>¥{{ obsProgress.flowAmount }}/¥{{ obsProgress.flowThreshold }}</b></div></el-col>
+                  <el-col :span="8"><div class="obs-item"><span>AI记账笔数</span><b>{{ obsProgress.bookCount }}/{{ obsProgress.bookThreshold }}笔</b></div></el-col>
+                  <el-col :span="8"><div class="obs-item"><span>现金流健康度</span><b>{{ obsProgress.cashScore }}分（{{ obsProgress.cashLevelName }}）</b></div></el-col>
+                </el-row>
+                <el-button v-if="obsProgress.observationStatus === 'OBSERVING' && obsProgress.eligible" type="success" size="small"
+                  :loading="obsPromoting" style="margin-top:10px" @click="doApplyPromotion">一键申请转A（提额至5万）</el-button>
+                <div v-if="obsProgress.observationStatus !== 'OBSERVING'" class="obs-tip" style="margin-top:10px">{{ obsProgress.message }}</div>
+                <el-alert v-if="obsProgress.observationStatus === 'OBSERVING' && !obsProgress.eligible" type="info" :closable="false" style="margin-top:10px" :title="obsProgress.message" />
+              </el-card>
+
+              <!-- B类产品规则（折叠） -->
+              <el-collapse style="margin-top:14px">
+                <el-collapse-item title="B类 · 产品规则与风险提示" name="rulesB">
+                  <el-descriptions :column="1" border size="small" v-if="rules.productB">
+                    <el-descriptions-item label="适用对象">{{ rules.productB.target }}</el-descriptions-item>
+                    <el-descriptions-item label="授信额度">{{ rules.productB.limitDesc }}</el-descriptions-item>
+                    <el-descriptions-item label="年化利率">{{ rules.productB.rateDesc }}</el-descriptions-item>
+                    <el-descriptions-item label="期限">{{ rules.productB.termDesc }}</el-descriptions-item>
+                    <el-descriptions-item label="计息方式">{{ rules.productB.interestDesc }}</el-descriptions-item>
+                    <el-descriptions-item label="还款方式">{{ rules.productB.repayDesc }}</el-descriptions-item>
+                    <el-descriptions-item label="准入规则">{{ rules.productB.accessDesc }}</el-descriptions-item>
+                    <el-descriptions-item label="资金流向"><span class="fund-flow">{{ rules.productB.fundFlowDesc }}</span></el-descriptions-item>
+                  </el-descriptions>
+                  <div class="rule-block">
+                    <div class="rule-title">详细规则</div>
+                    <ol class="rule-list">
+                      <li v-for="(r, i) in rules.productB?.rules || []" :key="i">{{ r }}</li>
+                    </ol>
+                    <el-button size="small" type="primary" plain @click="openRisk(rules.productB)">查看 B类 专属风险提示</el-button>
+                  </div>
+                </el-collapse-item>
+              </el-collapse>
+            </el-col>
+
+            <el-col :xs="24" :md="9">
+              <!-- B类还款中心 -->
+              <el-card shadow="never" class="repay-panel" v-loading="repayLoading">
+                <template #header><span class="repay-head">B类还款中心（按笔计息 · 还本付息）</span></template>
+                <template v-if="repayPreview && repayType === 'B_TYPE' && repayPreview.usedLimit > 0">
+                  <div class="bank-total">
+                    <div class="bank-total-label">应还合计（元）<span class="bank-total-sub">本金 + 按笔累计利息 · 支持部分/按笔/全部结清</span></div>
+                    <div class="bank-total-num">¥{{ repayPreview.totalDue }}</div>
+                    <div class="bank-total-split">本金 ¥{{ repayPreview.usedLimit }} ＋ 利息 ¥{{ repayPreview.interestPreview }}</div>
+                  </div>
+                  <div class="loan-table-title">未结清借款明细（按笔计息 · 先进先出冲抵）</div>
+                  <el-table :data="repayPreview.loans || []" size="small" max-height="200" style="margin-bottom:8px">
+                    <el-table-column label="借款日期" width="92">
+                      <template #default="{ row }">{{ row.loanDate }}</template>
+                    </el-table-column>
+                    <el-table-column prop="loanNo" label="借款编号" min-width="120" show-overflow-tooltip />
+                    <el-table-column label="剩余本金" width="82" align="right">
+                      <template #default="{ row }">¥{{ row.remainingPrincipal }}</template>
+                    </el-table-column>
+                    <el-table-column label="天数" width="52" align="center">
+                      <template #default="{ row }">{{ row.borrowDays }}天</template>
+                    </el-table-column>
+                    <el-table-column label="应还利息" width="76" align="right">
+                      <template #default="{ row }">¥{{ row.interestPreview }}</template>
+                    </el-table-column>
+                    <el-table-column label="本息合计" width="84" align="right">
+                      <template #default="{ row }">¥{{ row.totalDue }}</template>
+                    </el-table-column>
+                    <el-table-column label="操作" width="76" align="center">
+                      <template #default="{ row }">
+                        <el-button size="small" type="warning" plain @click="settleLoan(row)">结清本笔</el-button>
+                      </template>
+                    </el-table-column>
+                  </el-table>
+                  <div class="repay-rules">
+                    <div class="repay-rules-title">还款规则（按笔计息 · 利随本清）</div>
+                    <ul class="repay-rules-list">
+                      <li><b>按笔计息</b>：每笔受托支付独立起息，利息=剩余本金×年化÷365×天数</li>
+                      <li><b>先进先出</b>：部分还款自动冲最早借款；也可点「结清本笔」指定结清某一笔</li>
+                      <li><b>利随本清</b>：利息随本金一并支付</li>
+                      <li><b>部分还款</b>：金额可小于应还本金（≥¥0.01），无需一次结清</li>
+                    </ul>
+                  </div>
+                  <div class="repay-form">
+                    <div class="repay-form-label" v-if="repayLoanNo">
+                      本次操作：结清借款 <b style="color:#e6a23c">{{ repayLoanNo }}</b>（本息合计，一次付清）
+                    </div>
+                    <div class="repay-form-label" v-else>还款金额（本息合计：本金 + 利息，输入多少付多少）</div>
+                    <el-input-number v-model="repayAmount" :min="0.01" :max="Number(repayPreview.totalDue || 0)"
+                      :precision="2" style="width:100%" />
+                    <div class="repay-fee-tip">
+                      支付 <b style="color:#e6a23c">¥{{ repayTotalPreview.actual }}</b>
+                      ＝ 本金 <b>¥{{ repayTotalPreview.principal }}</b> ＋ 利息 <b style="color:#f56c6c">¥{{ repayTotalPreview.interest }}</b>
+                      <span class="repay-fee-sub">（输入含息金额，系统按先进先出自动拆分，利息随还）</span>
+                    </div>
+                    <el-button size="small" type="primary" plain style="margin-top:8px;width:100%"
+                      @click="setFullRepay">全部结清（本息合计 ¥{{ repayPreview.totalDue }}）</el-button>
+                  </div>
+                  <el-button type="primary" size="large" class="repay-submit" :loading="repaySubmitting" @click="submitRepay('')">
+                    扫码支付还款（本息一并支付）
+                  </el-button>
+                  <el-button type="success" size="large" class="repay-submit" :loading="repaySubmitting"
+                    :disabled="!repayGuard || Number(repayGuard.balance) <= 0" @click="submitRepay('REPAY_GUARD')">
+                    还款保障金一键还款<template v-if="repayGuard">（可用 ¥{{ repayGuard.balance }}，覆盖 {{ repayGuard.coverage }}% 待还）</template>
+                  </el-button>
+                  <div class="repay-remark">{{ repayPreview.remark }}</div>
+                </template>
+                <el-empty v-else description="B类当前无待还。受托支付放款后在此查看每笔借款并按笔结清（利息自动计算）" />
+              </el-card>
+            </el-col>
+          </el-row>
+
+          <!-- ③ 受托支付放款 -->
+          <el-row :gutter="20" class="zone-row">
+            <el-col :xs="24" :md="12">
+              <el-card shadow="never">
+                <template #header><span>③ 受托支付放款（银行直付商户）</span></template>
+                <el-alert type="warning" :closable="false" style="margin-bottom:12px"
+                  title="银行不把钱打给您，而是直接打给您选择的商户（专款专用、防挪用）；您仍需按期还本付息（模拟，无真实资金）" />
+                <el-form ref="entrustFormRef" :model="entrustForm" :rules="entrustRules" label-width="110px">
+                  <el-form-item label="关联申请" prop="loanApplicationId">
+                    <el-select v-model="entrustForm.loanApplicationId" placeholder="选择已获批的贷款申请" style="width:100%" filterable @change="onAppSelected">
+                      <el-option v-for="a in approvedApps" :key="a.id" :label="`${a.applyNo}（获批¥${a.approveAmount || a.preCheckMaxAmount}）`" :value="a.id" />
+                    </el-select>
+                  </el-form-item>
+                  <div v-if="selectedApp" class="app-amount-tip">
+                    该申请可用放款额度：<b>¥{{ selectedApp.approveAmount || selectedApp.preCheckMaxAmount }}</b>
+                    <span class="tip-sub">（支付金额不得超过此额度）</span>
+                  </div>
+                  <el-form-item label="收款商户" prop="merchantId">
+                    <el-select v-model="entrustForm.merchantId" placeholder="选择定向商户" style="width:100%">
+                      <el-option v-for="m in merchants" :key="m.id"
+                        :label="`${m.merchantName}（${merchantTypeName(m.merchantType)}·${merchantSourceName(m.merchantSource)}）`" :value="m.id" />
+                    </el-select>
+                  </el-form-item>
+                  <el-form-item label="支付金额" prop="amount">
+                    <el-input-number v-model="entrustForm.amount" :min="0.01" :max="appMaxAmount" :precision="2" style="width:100%" />
+                  </el-form-item>
+                  <el-form-item label="用途说明">
+                    <el-input v-model="entrustForm.purpose" placeholder="资金用途说明" />
+                  </el-form-item>
+                  <el-form-item>
+                    <el-button type="primary" :loading="paying" @click="submitEntrust">确认受托支付（模拟）</el-button>
+                  </el-form-item>
+                </el-form>
+                <el-card shadow="never" style="margin-top:4px" v-if="entrustResult">
+                  <template #header><span>支付结果</span></template>
+                  <el-descriptions :column="2" border size="small">
+                    <el-descriptions-item label="支付编号">{{ entrustResult.paymentNo }}</el-descriptions-item>
+                    <el-descriptions-item label="收款商户">{{ entrustResult.merchantName }}</el-descriptions-item>
+                    <el-descriptions-item label="支付金额">¥{{ entrustResult.amount }}</el-descriptions-item>
+                    <el-descriptions-item label="状态">
+                      <el-tag :type="entrustResult.paymentStatus === 'SUCCESS' ? 'success' : 'warning'">{{ entrustResult.paymentStatusName }}</el-tag>
+                    </el-descriptions-item>
+                    <el-descriptions-item v-if="entrustResult.reviewNo" label="复核单号">{{ entrustResult.reviewNo }}</el-descriptions-item>
+                    <el-descriptions-item label="资金路径" :span="2">{{ entrustResult.fundPath }}</el-descriptions-item>
+                  </el-descriptions>
+                </el-card>
+              </el-card>
+            </el-col>
+            <el-col :xs="24" :md="12">
+              <el-card shadow="never">
+                <template #header>
+                  <div class="app-card-head">
+                    <span>定向打款商户</span>
+                    <el-button size="small" type="primary" plain @click="merchantDialog = true">
+                      <el-icon><Money /></el-icon>&nbsp;添加自定义商户
+                    </el-button>
+                  </div>
+                </template>
+                <el-table :data="merchants" size="small" empty-text="暂无商户" max-height="180">
+                  <el-table-column prop="merchantName" label="商户名称" />
+                  <el-table-column label="来源" width="92" align="center">
+                    <template #default="{ row }">
+                      <el-tag size="small" :type="row.merchantSource === 'USER_CUSTOM' ? 'warning' : 'success'">
+                        {{ merchantSourceName(row.merchantSource) }}
+                      </el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="分类" width="86">
+                    <template #default="{ row }">{{ merchantTypeName(row.merchantType) }}</template>
+                  </el-table-column>
+                  <el-table-column prop="contactPhone" label="联系电话" width="112" />
+                </el-table>
+                <div class="merchant-tip">平台通用商户可直接打款；「我的自定义」商户仅你本人可用，且<b>每次打款前均需银行复核</b>（复核通过后直付商户）</div>
+                <el-collapse style="margin-top:10px">
+                  <el-collapse-item title="我的自定义商户（申请/审核状态）" name="my">
+                    <el-table :data="myMerchants" size="small" empty-text="暂无自定义商户申请" max-height="160">
+                      <el-table-column prop="merchantName" label="商户名称" />
+                      <el-table-column label="状态" width="88" align="center">
+                        <template #default="{ row }">
+                          <el-tag size="small" :type="merchantVerifyTag(row.verifyStatus)">{{ merchantVerifyName(row.verifyStatus) }}</el-tag>
+                        </template>
+                      </el-table-column>
+                      <el-table-column prop="reviewRemark" label="审核意见" min-width="110" show-overflow-tooltip />
+                    </el-table>
+                  </el-collapse-item>
+                </el-collapse>
+              </el-card>
+
+              <el-card shadow="never" style="margin-top:16px">
+                <template #header><span>打款记录（含复核状态）</span></template>
+                <el-table :data="entrustRecords" size="small" empty-text="暂无打款记录" max-height="180">
+                  <el-table-column prop="recordNo" label="记录号" width="176" show-overflow-tooltip />
+                  <el-table-column prop="merchantName" label="收款商户" min-width="110" show-overflow-tooltip />
+                  <el-table-column label="状态" width="104" align="center">
+                    <template #default="{ row }">
+                      <el-tag size="small" :type="recordStatusTag(row)">{{ recordStatusName(row) }}</el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="amount" label="金额" width="84" align="right">
+                    <template #default="{ row }">¥{{ row.amount }}</template>
+                  </el-table-column>
+                  <el-table-column prop="purpose" label="用途" min-width="90" show-overflow-tooltip />
+                  <el-table-column label="时间" width="140">
+                    <template #default="{ row }">{{ row.recordTime || '-' }}</template>
+                  </el-table-column>
+                </el-table>
+              </el-card>
+            </el-col>
+          </el-row>
         </el-card>
       </el-tab-pane>
     </el-tabs>
@@ -440,8 +539,8 @@
       </el-form>
     </el-dialog>
 
-    <!-- A类随借随还：提款/还款/流水弹窗 -->
-    <el-dialog v-model="creditDialog" :title="creditDialogTitle" width="560px">
+    <!-- 提款/流水弹窗 -->
+    <el-dialog v-model="creditDialog" :title="creditDialogTitle" width="640px">
       <template v-if="creditDialogType === 'withdraw'">
         <div class="dialog-tip">从 A类循环额度提款，按日计息（年化3.85%），可用额度 ¥{{ currentLimit?.availableLimit }}</div>
         <el-form label-width="90px">
@@ -455,12 +554,28 @@
         </el-form>
       </template>
       <template v-else>
-        <el-table :data="txnList" size="small" empty-text="暂无流水" max-height="320">
-          <el-table-column prop="txnNo" label="流水号" width="180" />
-          <el-table-column prop="txnType" label="类型" width="90" />
-          <el-table-column prop="principalAmount" label="金额" align="right" />
-          <el-table-column prop="interestAmount" label="利息" align="right" />
-          <el-table-column prop="txnTime" label="时间" />
+        <el-table :data="txnList" size="small" empty-text="暂无流水" max-height="340">
+          <el-table-column label="时间" width="150">
+            <template #default="{ row }">{{ (row.txnTime || '').replace('T', ' ') }}</template>
+          </el-table-column>
+          <el-table-column label="类型" width="80" align="center">
+            <template #default="{ row }">
+              <el-tag size="small" :type="row.txnType === 'WITHDRAW' ? 'primary' : 'success'">{{ row.txnTypeName }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="说明" min-width="180">
+            <template #default="{ row }">{{ row.txnDesc || row.remark || '-' }}</template>
+          </el-table-column>
+          <el-table-column label="金额" width="90" align="right">
+            <template #default="{ row }"><b>¥{{ row.principalAmount }}</b></template>
+          </el-table-column>
+          <el-table-column label="利息" width="76" align="right">
+            <template #default="{ row }">¥{{ row.interestAmount }}</template>
+          </el-table-column>
+          <el-table-column label="余额" width="88" align="right">
+            <template #default="{ row }">¥{{ row.balanceAfter }}</template>
+          </el-table-column>
+          <el-table-column prop="txnNo" label="流水号" width="170" show-overflow-tooltip />
         </el-table>
       </template>
       <template #footer>
@@ -471,7 +586,7 @@
     </el-dialog>
 
     <!-- 风险揭示弹窗 -->
-    <el-dialog v-model="riskDialog" title="贷款风险揭示（与银行信贷产品一致）" width="720px">
+    <el-dialog v-model="riskDialog" title="贷款风险揭示" width="720px">
       <div v-if="currentRisk" class="risk-panel">
         <div class="risk-panel-title">{{ currentRisk.name }}</div>
         <ul class="risk-list">
@@ -485,11 +600,13 @@
         </ul>
       </div>
     </el-dialog>
+
+    <PayCashier v-model="repayCashierVisible" :order-no="repayCashierOrderNo" @paid="onRepayPaid" />
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Money, Refresh } from '@element-plus/icons-vue'
 import { getProductRules, preCheck, getCreditLimit, entrustPayment, getMerchants, applyMerchant, getMyMerchants,
@@ -498,15 +615,27 @@ import { getProductRules, preCheck, getCreditLimit, entrustPayment, getMerchants
   getObservationProgress, applyPromotion, getRepayGuard } from '@/api/loan'
 import PayCashier from '@/components/PayCashier.vue'
 
-const activeTab = ref('apply')
+const activeTab = ref('tabA')
 
-// 办理流程步骤条（与 3 个 tab 联动）
-const flowSteps = [
-  { key: 'apply', title: '① 申请办理', desc: 'B类免费预审 + 提交申请，获批才有钱可用' },
-  { key: 'credit', title: '② 我的额度', desc: 'A类随借随还；B类看定向额度' },
-  { key: 'entrust', title: '③ 受托支付', desc: '审批通过后：100%直付商户放款' }
-]
-const flowStep = computed(() => flowSteps.findIndex(s => s.key === activeTab.value))
+// A/B 分区内各自的流程进度（步骤条高亮）
+const aCredit = computed(() => creditList.value.find(x => x.creditType === 'A_TYPE') || null)
+const bCredit = computed(() => creditList.value.find(x => x.creditType === 'B_TYPE') || null)
+const aStep = computed(() => (aCredit.value && aCredit.value.usedLimit > 0) ? 1 : 0)
+const bStep = computed(() => {
+  const approved = (applications.value || []).some(a => a.applyStatus === 'APPROVED')
+  const b = bCredit.value
+  const paid = (entrustRecords.value || []).some(r => r.status === 'SUCCESS')
+  if (paid) return 3
+  if (b && b.usedLimit > 0) return 2
+  if (approved) return 1
+  return 0
+})
+
+// 切换分区时同步还款中心类型
+watch(activeTab, (v) => {
+  if (v === 'tabA') switchRepay('A_TYPE')
+  else switchRepay('B_TYPE')
+})
 
 // 商户类型映射（merchant_type → 中文）
 const merchantTypeName = (t) => ({ MATERIAL: '物料采购', STALL: '摊位租赁', PROMOTION: '推广服务', OTHER: '综合服务' }[t] || t || '-')
@@ -628,9 +757,8 @@ const switchRepay = async (type) => {
   } catch (e) {} finally { repayLoading.value = false }
 }
 const loadRepayPanel = async () => {
-  // 默认选中有负债的额度类型；都无负债则保持 A 类
-  const debt = (creditList.value || []).find(x => x.usedLimit > 0)
-  await switchRepay(debt ? debt.creditType : 'A_TYPE')
+  // 由所在分区决定还款中心类型
+  await switchRepay(activeTab.value === 'tabA' ? 'A_TYPE' : 'B_TYPE')
 }
 const setFullRepay = () => {
   // 全部结清：金额 = 待还本息合计（本金 + 按笔利息），一次付清
@@ -707,9 +835,9 @@ const onRepayPaid = () => {
 const openTxns = async (c) => {
   currentLimit.value = c
   creditDialogType.value = 'txns'
-  creditDialogTitle.value = '循环贷流水'
+  creditDialogTitle.value = c.creditType === 'A_TYPE' ? 'A类循环贷流水' : 'B类定向贷流水'
   creditDialog.value = true
-  try { txnList.value = await getCreditTxns() } catch (e) { txnList.value = [] }
+  try { txnList.value = await getCreditTxns(c.creditType) } catch (e) { txnList.value = [] }
 }
 const submitCreditAction = async () => {
   creditSubmitting.value = true
@@ -853,6 +981,17 @@ onMounted(() => { loadRules(); loadCredit(); loadMerchants(); loadApplications()
 </script>
 
 <style scoped>
+.zone-card { margin-bottom: 4px; }
+.zone-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+.zone-head-a { border-left: 4px solid #409eff; padding-left: 10px; }
+.zone-head-b { border-left: 4px solid #e6a23c; padding-left: 10px; }
+.zone-title { font-size: 16px; font-weight: 700; color: #303133; }
+.zone-desc { font-size: 13px; color: #909399; }
+.zone-steps { margin: 14px 0 20px; }
+.zone-row { margin-bottom: 20px; }
+.credit-card { border: 1px solid #ebeef5; border-radius: 8px; padding: 18px 20px; box-shadow: 0 2px 8px rgba(0,0,0,.04); }
+.card-a { border-top: 3px solid #409eff; }
+.card-b { border-top: 3px solid #e6a23c; }
 .module-header :deep(.el-card__body) { padding: 0; }
 .header-content { display: flex; align-items: center; gap: 20px; padding: 24px; position: relative; }
 .module-icon { width: 72px; height: 72px; border-radius: 16px; display: flex; align-items: center; justify-content: center; }

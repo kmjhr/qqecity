@@ -79,9 +79,9 @@ export function entrustRepay(data) {
   return request.post('/v1/loan/entrust-repay', data)
 }
 
-/** 查询循环贷流水（提款/还款明细） */
-export function getCreditTxns() {
-  return request.get('/v1/loan/credit-txns')
+/** 查询额度流水（提款/还款明细，可传 creditType=A_TYPE|B_TYPE 按类型过滤） */
+export function getCreditTxns(creditType) {
+  return request.get('/v1/loan/credit-txns', { params: { creditType } })
 }
 
 /** 观察期·经营数据回流进度（模块3/4联动看板） */

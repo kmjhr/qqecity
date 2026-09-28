@@ -16,6 +16,8 @@ public class CreditTxnVO {
     private Long creditLimitId;
     private String txnType;
     private String txnTypeName;
+    private String creditTypeName;
+    private String txnDesc;
     private BigDecimal principalAmount;
     private BigDecimal interestAmount;
     private Integer borrowDays;

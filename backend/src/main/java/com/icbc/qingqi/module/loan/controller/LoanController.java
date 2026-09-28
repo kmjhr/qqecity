@@ -162,11 +162,12 @@ public class LoanController {
         return Result.success(loanService.entrustRepay(userId, dto));
     }
 
-    @Operation(summary = "查询循环贷流水", description = "提款/还款流水列表")
+    @Operation(summary = "查询循环贷流水", description = "提款/还款流水列表；creditType 可选 A_TYPE/B_TYPE 过滤")
     @GetMapping("/credit-txns")
-    public Result<List<CreditTxnVO>> creditTxns() {
+    public Result<List<CreditTxnVO>> creditTxns(
+            @RequestParam(required = false) String creditType) {
         Long userId = UserContext.getUserId();
-        return Result.success(loanService.listCreditTxns(userId));
+        return Result.success(loanService.listCreditTxns(userId, creditType));
     }
 
     // ============================================================
