@@ -83,3 +83,18 @@ export function entrustRepay(data) {
 export function getCreditTxns() {
   return request.get('/v1/loan/credit-txns')
 }
+
+/** 观察期·经营数据回流进度（模块3/4联动看板） */
+export function getObservationProgress() {
+  return request.get('/v1/loan/observation-progress')
+}
+
+/** 数据回流达标一键申请转A */
+export function applyPromotion() {
+  return request.post('/v1/loan/observation/apply-promotion')
+}
+
+/** 还款保障金概览（模块4×贷款联动） */
+export function getRepayGuard() {
+  return request.get('/v1/budget/repay-guard')
+}

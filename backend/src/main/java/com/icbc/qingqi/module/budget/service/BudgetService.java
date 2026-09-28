@@ -9,6 +9,8 @@ import com.icbc.qingqi.module.budget.dto.TransactionDTO;
 import com.icbc.qingqi.module.budget.dto.TransferSavingDTO;
 import com.icbc.qingqi.module.budget.entity.*;
 import com.icbc.qingqi.module.budget.mapper.*;
+import com.icbc.qingqi.module.loan.entity.BizCreditLimit;
+import com.icbc.qingqi.module.loan.mapper.BizCreditLimitMapper;
 import com.icbc.qingqi.module.message.entity.SysMessage;
 import com.icbc.qingqi.module.message.mapper.SysMessageMapper;
 import com.icbc.qingqi.module.risk.entity.BizRiskWarning;
@@ -43,6 +45,7 @@ public class BudgetService {
     private final BizSavingGoalMapper savingGoalMapper;
     private final SysMessageMapper messageMapper;
     private final BizRiskWarningMapper riskWarningMapper;
+    private final BizCreditLimitMapper creditLimitMapper;
 
     // MCC → 分类编码 映射
     private static final Map<String, String> MCC_TO_CATEGORY = Map.ofEntries(
@@ -69,13 +72,15 @@ public class BudgetService {
                          BizTransactionMapper transactionMapper,
                          BizSavingGoalMapper savingGoalMapper,
                          SysMessageMapper messageMapper,
-                         BizRiskWarningMapper riskWarningMapper) {
+                         BizRiskWarningMapper riskWarningMapper,
+                         BizCreditLimitMapper creditLimitMapper) {
         this.categoryMapper = categoryMapper;
         this.settingMapper = settingMapper;
         this.transactionMapper = transactionMapper;
         this.savingGoalMapper = savingGoalMapper;
         this.messageMapper = messageMapper;
         this.riskWarningMapper = riskWarningMapper;
+        this.creditLimitMapper = creditLimitMapper;
     }
 
     // ============================================================
@@ -321,6 +326,110 @@ public class BudgetService {
                 new LambdaQueryWrapper<BizSavingGoal>()
                         .eq(BizSavingGoal::getUserId, userId)
                         .orderByDesc(BizSavingGoal::getCreateTime));
+    }
+
+    /**
+     * 还款保障金概览（M4-2，模块4×贷款联动）
+     * 保障金 = goal_type=REPAY_GUARD 的储蓄目标；覆盖率 = 保障金余额 / 当月待还（A+B 在贷本金）
+     */
+    public Map<String, Object> getRepayGuard(Long userId) {
+        BizSavingGoal guard = savingGoalMapper.selectOne(
+                new LambdaQueryWrapper<BizSavingGoal>()
+                        .eq(BizSavingGoal::getUserId, userId)
+                        .eq(BizSavingGoal::getGoalType, "REPAY_GUARD")
+                        .eq(BizSavingGoal::getStatus, "ACTIVE")
+                        .last("LIMIT 1"));
+        BigDecimal balance = guard != null && guard.getCurrentAmount() != null ? guard.getCurrentAmount() : BigDecimal.ZERO;
+        BigDecimal target = guard != null && guard.getTargetAmount() != null ? guard.getTargetAmount() : new BigDecimal("5000.00");
+
+        // 当月待还（A+B 在贷本金）
+        BigDecimal due = BigDecimal.ZERO;
+        List<BizCreditLimit> limits = creditLimitMapper.selectList(
+                new LambdaQueryWrapper<BizCreditLimit>()
+                        .eq(BizCreditLimit::getUserId, userId)
+                        .eq(BizCreditLimit::getStatus, "ACTIVE"));
+        for (BizCreditLimit l : limits) {
+            if (l.getUsedLimit() != null) {
+                due = due.add(l.getUsedLimit());
+            }
+        }
+        BigDecimal coverage = due.compareTo(BigDecimal.ZERO) > 0
+                ? balance.multiply(new BigDecimal("100")).divide(due, 0, RoundingMode.HALF_UP)
+                : new BigDecimal("100");
+        boolean worryFree = due.compareTo(BigDecimal.ZERO) > 0 && coverage.compareTo(new BigDecimal("100")) >= 0;
+
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("guardId", guard != null ? guard.getId() : null);
+        map.put("balance", balance);
+        map.put("targetAmount", target);
+        map.put("progressPercent", guard != null ? guard.getProgressPercent() : BigDecimal.ZERO);
+        map.put("dueAmount", due);
+        map.put("coverage", coverage);
+        map.put("worryFree", worryFree);
+        map.put("message", worryFree
+                ? "还款保障金已覆盖全部待还（" + coverage + "%），还款无忧"
+                : "保障金覆盖" + coverage + "% 待还，继续将预算结余转入可提升还款保障");
+        return map;
+    }
+
+    /**
+     * 预算结余 → 还款保障金（M4-2）：本月各分类剩余结余一键转入 REPAY_GUARD 目标
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> transferRepayGuard(Long userId) {
+        String period = currentPeriod();
+        List<BizBudgetSetting> settings = settingMapper.selectList(
+                new LambdaQueryWrapper<BizBudgetSetting>()
+                        .eq(BizBudgetSetting::getUserId, userId)
+                        .eq(BizBudgetSetting::getBudgetPeriod, period));
+        BigDecimal totalSurplus = settings.stream()
+                .map(s -> s.getRemainingAmount() != null ? s.getRemainingAmount() : BigDecimal.ZERO)
+                .filter(v -> v.compareTo(BigDecimal.ZERO) > 0)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (totalSurplus.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "本月无预算结余可转入还款保障金");
+        }
+
+        BizSavingGoal guard = savingGoalMapper.selectOne(
+                new LambdaQueryWrapper<BizSavingGoal>()
+                        .eq(BizSavingGoal::getUserId, userId)
+                        .eq(BizSavingGoal::getGoalType, "REPAY_GUARD")
+                        .eq(BizSavingGoal::getStatus, "ACTIVE")
+                        .last("LIMIT 1"));
+        if (guard == null) {
+            guard = new BizSavingGoal();
+            guard.setUserId(userId);
+            guard.setGoalName("还款保障金");
+            guard.setGoalType("REPAY_GUARD");
+            guard.setTargetAmount(new BigDecimal("5000.00"));
+            guard.setCurrentAmount(BigDecimal.ZERO);
+            guard.setProgressPercent(BigDecimal.ZERO);
+            guard.setStatus("ACTIVE");
+            savingGoalMapper.insert(guard);
+        }
+        BigDecimal newCurrent = guard.getCurrentAmount().add(totalSurplus);
+        guard.setCurrentAmount(newCurrent);
+        guard.setProgressPercent(newCurrent.multiply(new BigDecimal("100"))
+                .divide(guard.getTargetAmount(), 2, RoundingMode.HALF_UP));
+        savingGoalMapper.updateById(guard);
+
+        // 结余清零（模拟转存后预算已用尽）
+        for (BizBudgetSetting s : settings) {
+            if (s.getRemainingAmount() != null && s.getRemainingAmount().compareTo(BigDecimal.ZERO) > 0) {
+                s.setUsedAmount(s.getBudgetAmount());
+                s.setRemainingAmount(BigDecimal.ZERO);
+                s.setUsagePercent(new BigDecimal("100.00"));
+                settingMapper.updateById(s);
+            }
+        }
+        log.info("[转还款保障金] 用户={}, 转入={}, 保障金余额={}", userId, totalSurplus, newCurrent);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("guardId", guard.getId());
+        result.put("transferAmount", totalSurplus);
+        result.put("balance", newCurrent);
+        result.put("message", "预算结余" + totalSurplus + "元已转入还款保障金（模拟），可用于一键还本付息");
+        return result;
     }
 
     public Map<String, Object> getOverview(Long userId) {

@@ -40,3 +40,13 @@ export function getSavings() {
 export function getBudgetOverview() {
   return request.get('/v1/budget/overview')
 }
+
+/** M4-2 还款保障金概览（模块4×贷款联动：余额/待还/覆盖率） */
+export function getRepayGuard() {
+  return request.get('/v1/budget/repay-guard')
+}
+
+/** M4-2 预算结余一键转入还款保障金 */
+export function transferRepayGuard() {
+  return request.post('/v1/budget/transfer-repay-guard')
+}

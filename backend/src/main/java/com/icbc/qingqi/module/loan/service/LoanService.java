@@ -6,7 +6,11 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.icbc.qingqi.common.BizException;
 import com.icbc.qingqi.common.ErrorCode;
 import com.icbc.qingqi.module.bookkeeping.entity.BizBookkeepingRecord;
+import com.icbc.qingqi.module.bookkeeping.entity.BizCashflowReport;
 import com.icbc.qingqi.module.bookkeeping.mapper.BizBookkeepingRecordMapper;
+import com.icbc.qingqi.module.bookkeeping.mapper.BizCashflowReportMapper;
+import com.icbc.qingqi.module.budget.entity.BizSavingGoal;
+import com.icbc.qingqi.module.budget.mapper.BizSavingGoalMapper;
 import com.icbc.qingqi.module.loan.dto.*;
 import com.icbc.qingqi.module.loan.entity.*;
 import com.icbc.qingqi.module.loan.mapper.*;
@@ -16,6 +20,7 @@ import com.icbc.qingqi.module.pay.dto.PayOrderVO;
 import com.icbc.qingqi.module.pay.service.PayService;
 import com.icbc.qingqi.module.pay.service.PaySuccessEvent;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,7 +54,10 @@ public class LoanService {
     private final com.icbc.qingqi.module.loan.mapper.BizEntrustReviewMapper entrustReviewMapper;
     private final BizCreditTxnMapper creditTxnMapper;
     private final BizBookkeepingRecordMapper bookkeepingMapper;
+    private final BizCashflowReportMapper cashflowReportMapper;
+    private final BizSavingGoalMapper savingGoalMapper;
     private final SysMessageMapper messageMapper;
+    private final ApplicationEventPublisher eventPublisher;
     private final PayService payService;
 
     // 贷款类型
@@ -92,7 +100,10 @@ public class LoanService {
                        com.icbc.qingqi.module.loan.mapper.BizEntrustReviewMapper entrustReviewMapper,
                        BizCreditTxnMapper creditTxnMapper,
                        BizBookkeepingRecordMapper bookkeepingMapper,
+                       BizCashflowReportMapper cashflowReportMapper,
+                       BizSavingGoalMapper savingGoalMapper,
                        SysMessageMapper messageMapper,
+                       ApplicationEventPublisher eventPublisher,
                        PayService payService) {
         this.merchantMapper = merchantMapper;
         this.applicationMapper = applicationMapper;
@@ -101,7 +112,10 @@ public class LoanService {
         this.entrustReviewMapper = entrustReviewMapper;
         this.creditTxnMapper = creditTxnMapper;
         this.bookkeepingMapper = bookkeepingMapper;
+        this.cashflowReportMapper = cashflowReportMapper;
+        this.savingGoalMapper = savingGoalMapper;
         this.messageMapper = messageMapper;
+        this.eventPublisher = eventPublisher;
         this.payService = payService;
     }
 
@@ -841,7 +855,51 @@ public class LoanService {
         }
         log.info("[创建还款订单] 用户={}, 类型={}, 金额={}, 借款={}, 口径={}", userId, creditType, orderAmount, remark,
                 totalMode ? "TOTAL" : "PRINCIPAL");
+        // 还款保障金一键还款（模块4联动）：校验保障金余额 → 扣减 → 模拟自动支付 → 触发还本付息
+        if (dto.getSource() != null && "REPAY_GUARD".equalsIgnoreCase(dto.getSource())) {
+            return createRepayOrderWithGuard(userId, limit.getId(), subject, orderAmount, remark);
+        }
         return payService.createBizOrder(userId, "LOAN_REPAY", limit.getId(), subject, orderAmount, null, remark);
+    }
+
+    /**
+     * 还款保障金一键还款（模拟）：从 REPAY_GUARD 目标扣款，自动发布支付成功事件触发还本付息
+     */
+    @Transactional(rollbackFor = Exception.class)
+    private PayOrderVO createRepayOrderWithGuard(Long userId, Long limitId, String subject,
+                                                 BigDecimal orderAmount, String remark) {
+        BizSavingGoal guard = savingGoalMapper.selectOne(
+                new LambdaQueryWrapper<BizSavingGoal>()
+                        .eq(BizSavingGoal::getUserId, userId)
+                        .eq(BizSavingGoal::getGoalType, "REPAY_GUARD")
+                        .eq(BizSavingGoal::getStatus, "ACTIVE")
+                        .last("LIMIT 1"));
+        if (guard == null || guard.getCurrentAmount() == null
+                || guard.getCurrentAmount().compareTo(orderAmount) < 0) {
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET,
+                    "还款保障金不足（可用：¥" + (guard == null ? "0.00" : guard.getCurrentAmount())
+                            + "），请先在「预算消费-还款保障金」通过预算结余转入");
+        }
+        // 扣减保障金
+        guard.setCurrentAmount(guard.getCurrentAmount().subtract(orderAmount));
+        if (guard.getTargetAmount() != null && guard.getTargetAmount().compareTo(BigDecimal.ZERO) > 0) {
+            guard.setProgressPercent(guard.getCurrentAmount().multiply(new BigDecimal("100"))
+                    .divide(guard.getTargetAmount(), 2, RoundingMode.HALF_UP));
+        }
+        savingGoalMapper.updateById(guard);
+
+        String fullRemark = "REPAY_GUARD#" + (remark == null ? "" : remark);
+        PayOrderVO vo = payService.createBizOrder(userId, "LOAN_REPAY", limitId, subject, orderAmount, null, fullRemark);
+        // 保障金自动支付（模拟）：直接发布支付成功事件，触发 onLoanRepayPaid 还本付息
+        eventPublisher.publishEvent(new PaySuccessEvent(vo.getOrderNo(), "LOAN_REPAY", limitId, userId,
+                orderAmount, "REPAY_GUARD", null, fullRemark));
+        vo.setPayMethod("REPAY_GUARD");
+        vo.setPayMethodName("还款保障金");
+        vo.setStatus("PAID");
+        vo.setPayTime(LocalDateTime.now());
+        log.info("[还款保障金还款] 用户={}, 订单={}, 金额={}, 保障金余额={}", userId, vo.getOrderNo(), orderAmount,
+                guard.getCurrentAmount());
+        return vo;
     }
 
     /**
@@ -897,6 +955,9 @@ public class LoanService {
         int maxDays = 0;
         String detail;
         String remark = event.getRemark();
+        if (remark != null && remark.startsWith("REPAY_GUARD#")) {
+            remark = remark.substring("REPAY_GUARD#".length());
+        }
         List<LoanItemVO> loans = buildLoanItems(event.getUserId(), limit.getCreditType(), rate, limit);
 
         if (remark != null && remark.startsWith("TOTAL#LOAN#")) {
@@ -1184,6 +1245,135 @@ public class LoanService {
     // ============================================================
 
     /**
+     * 观察期·数据回流进度（模块3/4 联动看板）
+     * <p>
+     * 三指标：经营流水回流额（受托支付成功金额，阈值¥10000）/ AI记账笔数（阈值12笔）/ 现金流健康度（最新月报）
+     * 综合进度 = 40/30/30 加权，≥60 视为达标，可一键申请转A（applyPromotion）
+     */
+    public Map<String, Object> observationProgress(Long userId) {
+        // 经营流水回流额
+        List<BizEntrustPayment> payments = paymentMapper.selectList(
+                new LambdaQueryWrapper<BizEntrustPayment>()
+                        .eq(BizEntrustPayment::getUserId, userId)
+                        .eq(BizEntrustPayment::getPaymentStatus, PAY_SUCCESS));
+        BigDecimal flowAmount = payments.stream()
+                .map(BizEntrustPayment::getAmount)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal flowThreshold = new BigDecimal("10000.00");
+        int flowPct = flowAmount.multiply(new BigDecimal("100")).divide(flowThreshold, 0, RoundingMode.HALF_UP)
+                .min(new BigDecimal("100")).intValue();
+
+        // AI记账笔数（经营账本）
+        long bookCount = bookkeepingMapper.selectCount(
+                new LambdaQueryWrapper<BizBookkeepingRecord>()
+                        .eq(BizBookkeepingRecord::getUserId, userId));
+        int bookPct = (int) Math.min(bookCount * 100L / 12L, 100);
+
+        // 现金流健康度（最新月报）
+        int cashScore = 0;
+        BizCashflowReport report = cashflowReportMapper.selectOne(
+                new LambdaQueryWrapper<BizCashflowReport>()
+                        .eq(BizCashflowReport::getUserId, userId)
+                        .orderByDesc(BizCashflowReport::getGenerateTime)
+                        .last("LIMIT 1"));
+        if (report != null && report.getWarningLevel() != null) {
+            cashScore = switch (report.getWarningLevel()) {
+                case "NORMAL" -> 100;
+                case "WARNING" -> 55;
+                case "DANGER" -> 20;
+                default -> 0;
+            };
+        }
+
+        int totalPercent = (int) Math.min((flowPct * 40 + bookPct * 30 + cashScore * 30) / 100L, 100);
+        boolean eligible = totalPercent >= 60;
+
+        // 观察期状态
+        BizCreditLimit bLimit = creditLimitMapper.selectOne(
+                new LambdaQueryWrapper<BizCreditLimit>()
+                        .eq(BizCreditLimit::getUserId, userId)
+                        .eq(BizCreditLimit::getCreditType, TYPE_B));
+
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("hasBCredit", bLimit != null);
+        map.put("observationStatus", bLimit != null && bLimit.getObservationStatus() != null
+                ? bLimit.getObservationStatus() : "NONE");
+        map.put("observationStatusName", observationStatusName(
+                bLimit != null ? bLimit.getObservationStatus() : null));
+        map.put("flowAmount", flowAmount.setScale(2, RoundingMode.HALF_UP));
+        map.put("flowThreshold", flowThreshold);
+        map.put("flowPercent", flowPct);
+        map.put("bookCount", bookCount);
+        map.put("bookThreshold", 12L);
+        map.put("bookPercent", bookPct);
+        map.put("cashScore", cashScore);
+        map.put("cashLevelName", report != null && report.getWarningLevel() != null
+                ? switch (report.getWarningLevel()) {
+                    case "NORMAL" -> "健康";
+                    case "WARNING" -> "需关注";
+                    case "DANGER" -> "危险";
+                    default -> "未知";
+                } : "暂无月报");
+        map.put("totalPercent", totalPercent);
+        map.put("eligible", eligible);
+        map.put("message", eligible
+                ? "数据回流达标（综合进度" + totalPercent + "%），可一键申请转A类循环贷并提额【模拟】"
+                : "继续经营：受托支付回流、AI记账、现金流健康度达标后即可申请转A（当前" + totalPercent + "%，≥60%达标）");
+        return map;
+    }
+
+    /**
+     * 观察期达标申请转A（模块3/4 联动）：数据回流综合进度≥60% 时一键转A+提额，无需等待6个月
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public ObservationVO applyPromotion(Long userId) {
+        BizCreditLimit bLimit = creditLimitMapper.selectOne(
+                new LambdaQueryWrapper<BizCreditLimit>()
+                        .eq(BizCreditLimit::getUserId, userId)
+                        .eq(BizCreditLimit::getCreditType, TYPE_B));
+        if (bLimit == null) {
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "暂无B类授信，需先完成B类预审");
+        }
+        if (!"OBSERVING".equals(bLimit.getObservationStatus())) {
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET,
+                    "当前观察期状态为" + observationStatusName(bLimit.getObservationStatus()) + "，不可申请转A");
+        }
+        Map<String, Object> progress = observationProgress(userId);
+        if (!Boolean.TRUE.equals(progress.get("eligible"))) {
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET,
+                    "数据回流未达标（综合进度 " + progress.get("totalPercent") + "%），需≥60% 才可申请转A");
+        }
+        promoteToA(userId, bLimit);
+        sendInternalMessage(userId, "转A申请通过 - 已升级A类循环贷",
+                "恭喜！经营数据回流达标（综合进度" + progress.get("totalPercent") + "%），已升级为A类5万循环额度（年化3.85%），支持随借随还。【模拟】",
+                "LOAN", bLimit.getId());
+        ObservationVO vo = getObservationStatus(userId);
+        vo.setCurrentMonthDetail("经营数据回流达标（综合进度" + progress.get("totalPercent") + "%），一键申请转A通过，已提额至5万。");
+        return vo;
+    }
+
+    /**
+     * 转A：观察期置 PROMOTED + 创建/升级 A 类循环额度（提额至 5 万）
+     */
+    private void promoteToA(Long userId, BizCreditLimit bLimit) {
+        bLimit.setObservationStatus("PROMOTED");
+        BizCreditLimit aLimit = creditLimitMapper.selectOne(
+                new LambdaQueryWrapper<BizCreditLimit>()
+                        .eq(BizCreditLimit::getUserId, userId)
+                        .eq(BizCreditLimit::getCreditType, TYPE_A));
+        if (aLimit == null) {
+            aLimit = createCreditLimit(userId, TYPE_A, A_TYPE_TOTAL, A_TYPE_RATE);
+        } else {
+            aLimit.setTotalLimit(A_TYPE_TOTAL);
+            aLimit.setAvailableLimit(A_TYPE_TOTAL.subtract(aLimit.getUsedLimit()));
+            aLimit.setStatus("ACTIVE");
+            creditLimitMapper.updateById(aLimit);
+        }
+        creditLimitMapper.updateById(bLimit);
+    }
+
+    /**
      * 查询观察期状态
      */
     public ObservationVO getObservationStatus(Long userId) {
@@ -1255,22 +1445,8 @@ public class LoanService {
             // 观察期结束，评估
             if (totalScore >= 60) {
                 // 达标 → 转A类+提额
-                bLimit.setObservationStatus("PROMOTED");
+                promoteToA(userId, bLimit);
                 detail += "观察期结束，累计评分达标，已转A类循环贷并提额至5万。";
-
-                // 创建/升级 A 类额度
-                BizCreditLimit aLimit = creditLimitMapper.selectOne(
-                        new LambdaQueryWrapper<BizCreditLimit>()
-                                .eq(BizCreditLimit::getUserId, userId)
-                                .eq(BizCreditLimit::getCreditType, TYPE_A));
-                if (aLimit == null) {
-                    aLimit = createCreditLimit(userId, TYPE_A, A_TYPE_TOTAL, A_TYPE_RATE);
-                } else {
-                    aLimit.setTotalLimit(A_TYPE_TOTAL);
-                    aLimit.setAvailableLimit(A_TYPE_TOTAL.subtract(aLimit.getUsedLimit()));
-                    aLimit.setStatus("ACTIVE");
-                    creditLimitMapper.updateById(aLimit);
-                }
 
                 sendInternalMessage(userId, "观察期达标 - 已转A类循环贷",
                         "恭喜！6个月观察期累计评分" + totalScore + "分（≥60），已升级为A类5万循环额度（年化3.85%），支持随借随还。【模拟】",

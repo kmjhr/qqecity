@@ -77,4 +77,18 @@ public class BudgetController {
     public Result<Map<String, Object>> overview() {
         return Result.success(budgetService.getOverview(UserContext.getUserId()));
     }
+
+    @Operation(summary = "M4-2 还款保障金概览（模块4×贷款联动）",
+            description = "保障金余额、当月待还（A+B在贷本金）、覆盖率；覆盖率≥100% 显示还款无忧。")
+    @GetMapping("/repay-guard")
+    public Result<Map<String, Object>> repayGuard() {
+        return Result.success(budgetService.getRepayGuard(UserContext.getUserId()));
+    }
+
+    @Operation(summary = "M4-2 预算结余一键转入还款保障金",
+            description = "本月各分类剩余结余转入 REPAY_GUARD 目标（模拟），可用于贷款还款。")
+    @PostMapping("/transfer-repay-guard")
+    public Result<Map<String, Object>> transferRepayGuard() {
+        return Result.success(budgetService.transferRepayGuard(UserContext.getUserId()));
+    }
 }

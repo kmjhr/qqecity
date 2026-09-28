@@ -121,6 +121,9 @@ public class SafetyService {
             if (text.contains(kw)) hitSuspicious.add(kw);
         }
 
+        // 复合模式识别：冒充运营商/威胁恐吓 + 索要敏感信息 → 高危（命中即 DANGEROUS）
+        hitDangerous.addAll(detectSocialPatterns(text));
+
         // 短链接/钓鱼链接特征：http(s) 链接，或 短域名+路径（n5a.cn/KaEOyO、abcd.top/xxx 等）
         boolean hasUrl = containsSuspiciousUrl(text);
 
@@ -194,7 +197,45 @@ public class SafetyService {
         if (hits.contains("安全账户") || hits.contains("资金核查") || hits.contains("涉嫌洗钱")) {
             return "高度疑似「冒充公检法」诈骗！公检法机关绝无\"安全账户\"概念，也不会要求转账核查。请立即挂断并拨打110。【模拟识别】";
         }
+        if (hits.contains("冒充运营商+威胁+索要个人信息") || hits.contains("威胁话术+索要身份证号码")) {
+            return "高度疑似「冒充运营商/官方机构」诈骗！正规运营商不会通过短信索要您的身份证号码、姓名等个人信息，也不会以暂停服务相要挟。请勿回复，通过官方客服电话核实，必要时拨打96110/110报警。【模拟识别】";
+        }
+        if (hits.contains("索要身份证号码") || hits.contains("索要银行卡号") || hits.contains("索要支付/验证信息")) {
+            return "高度警惕！该短信疑似诱导您提供身份证号码/银行卡号等敏感信息，正规机构不会通过短信索取。切勿回复，更不要提供个人信息或点击任何链接。【模拟识别】";
+        }
         return "高度疑似诈骗话术！命中关键词：" + String.join("、", hits) + "，请切勿相信，更不要转账或提供个人信息。【模拟识别】";
+    }
+
+    /**
+     * 复合模式识别：冒充运营商/威胁恐吓 + 索要敏感信息 → 高危
+     * 单关键词太脆（正常短信也会出现"身份证""暂停"），组合命中才判高危
+     */
+    private List<String> detectSocialPatterns(String text) {
+        List<String> hits = new ArrayList<>();
+        boolean operator = text.contains("中国电信") || text.contains("中国移动") || text.contains("中国联通")
+                || text.contains("10086") || text.contains("10000") || text.contains("10010")
+                || text.contains("电信") || text.contains("移动") || text.contains("联通");
+        boolean threat = text.contains("暂停") || text.contains("停用") || text.contains("封停")
+                || text.contains("停机") || text.contains("冻结") || text.contains("注销")
+                || text.contains("涉嫌") || text.contains("违法") || text.contains("报案");
+        boolean askId = text.contains("身份证号码") || text.contains("身份证号");
+        boolean askSensitive = askId || text.contains("银行卡号") || text.contains("支付密码")
+                || text.contains("验证码");
+        boolean replyAct = text.contains("回复") || text.contains("发送") || text.contains("提供")
+                || text.contains("申请复核");
+
+        if (operator && threat && askSensitive) {
+            hits.add("冒充运营商+威胁+索要个人信息");
+        } else if (threat && askId && replyAct) {
+            hits.add("威胁话术+索要身份证号码");
+        } else if (askId && replyAct) {
+            hits.add("索要身份证号码");
+        } else if (text.contains("银行卡号") && replyAct) {
+            hits.add("索要银行卡号");
+        } else if (text.contains("支付密码") || (text.contains("验证码") && replyAct)) {
+            hits.add("索要支付/验证信息");
+        }
+        return hits;
     }
 
     /** 短链接/钓鱼链接特征：http(s) 链接，或 短域名+路径（n5a.cn/KaEOyO、abcd.top/xxx 等） */

@@ -609,6 +609,8 @@ CREATE TABLE `biz_saving_goal` (
   `progress_percent` DECIMAL(5,2)   NOT NULL DEFAULT 0 COMMENT '进度百分比',
   `deadline`         DATE           NULL COMMENT '目标截止日期',
   `description`      VARCHAR(500)   NULL COMMENT '描述',
+  `goal_type`        VARCHAR(20)    NOT NULL DEFAULT 'WISH' COMMENT '目标类型：WISH心愿储蓄/REPAY_GUARD还款保障金',
+  `linked_credit_limit_id` BIGINT   NULL COMMENT '关联授信额度ID（还款保障金绑定贷款额度）',
   `status`           VARCHAR(20)    NOT NULL DEFAULT 'ACTIVE' COMMENT '状态：ACTIVE/COMPLETED/CANCELLED',
   `deleted`          TINYINT        NOT NULL DEFAULT 0 COMMENT '逻辑删除：0存在 1删除',
   `create_time`      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',

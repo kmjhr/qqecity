@@ -18,6 +18,67 @@
       </div>
     </el-card>
 
+    <!-- 经营数据回流看板（模块3×贷款联动） -->
+    <el-card shadow="never" class="linkage-card" v-loading="linkageLoading">
+      <template #header>
+        <div class="card-header">
+          <span>经营数据回流看板 <el-tag size="small" type="success" style="margin-left:8px">B转A 观察期联动</el-tag></span>
+          <el-button size="small" @click="loadLinkage">
+            <el-icon><Refresh /></el-icon>刷新
+          </el-button>
+        </div>
+      </template>
+      <div v-if="progress" class="linkage-body">
+        <el-row :gutter="16">
+          <el-col :span="8">
+            <div class="linkage-metric">
+              <div class="lm-label">经营流水回流 <el-tooltip content="B类受托支付成功金额累计（阈值 ¥10,000）" placement="top"><el-icon style="vertical-align:-2px"><InfoFilled /></el-icon></el-tooltip></div>
+              <div class="lm-value">¥{{ progress.flowAmount }}<span class="lm-threshold"> / ¥{{ progress.flowThreshold }}</span></div>
+              <el-progress :percentage="progress.flowPercent" :stroke-width="10" :color="progress.flowPercent >= 100 ? '#67c23a' : '#409eff'" />
+              <div class="lm-sub">完成 {{ progress.flowPercent }}%</div>
+            </div>
+          </el-col>
+          <el-col :span="8">
+            <div class="linkage-metric">
+              <div class="lm-label">AI记账笔数 <el-tooltip content="经营账本累计记账笔数（阈值 12 笔）" placement="top"><el-icon style="vertical-align:-2px"><InfoFilled /></el-icon></el-tooltip></div>
+              <div class="lm-value">{{ progress.bookCount }}<span class="lm-threshold"> / {{ progress.bookThreshold }} 笔</span></div>
+              <el-progress :percentage="progress.bookPercent" :stroke-width="10" :color="progress.bookPercent >= 100 ? '#67c23a' : '#409eff'" />
+              <div class="lm-sub">完成 {{ progress.bookPercent }}%</div>
+            </div>
+          </el-col>
+          <el-col :span="8">
+            <div class="linkage-metric">
+              <div class="lm-label">现金流健康度 <el-tooltip content="最新现金流月报等级：NORMAL=100 / WARNING=55 / DANGER=20" placement="top"><el-icon style="vertical-align:-2px"><InfoFilled /></el-icon></el-tooltip></div>
+              <div class="lm-value">{{ progress.cashScore }}<span class="lm-threshold"> 分（{{ progress.cashLevelName }}）</span></div>
+              <el-progress :percentage="progress.cashScore" :stroke-width="10" :color="progress.cashScore >= 80 ? '#67c23a' : progress.cashScore >= 50 ? '#e6a23c' : '#f56c6c'" />
+              <div class="lm-sub">按最新月报评级折算</div>
+            </div>
+          </el-col>
+        </el-row>
+        <el-alert :type="progress.eligible ? 'success' : 'info'" :closable="false" class="linkage-alert">
+          <div class="linkage-msg">
+            <div>
+              <b>综合回流进度 {{ progress.totalPercent }}%</b>
+              <span style="color:#909399;margin-left:8px">＝ 流水 40% + 记账 30% + 现金流 30%，≥60% 达标可转A</span>
+            </div>
+            <div style="margin-top:4px;font-size:13px">{{ progress.message }}</div>
+            <el-button v-if="progress.eligible && progress.observationStatus === 'OBSERVING'" type="success" size="small" style="margin-top:8px"
+              :loading="promoting" @click="doApplyPromotion">
+              一键申请转A（提额至5万）
+            </el-button>
+          </div>
+        </el-alert>
+      </div>
+
+      <!-- 联动预警 -->
+      <div v-if="linkage && linkage.warningCount > 0" class="linkage-warnings">
+        <div class="lw-title"><el-icon color="#e6a23c"><Warning /></el-icon> 联动风险预警（{{ linkage.warningCount }} 条未处理，在贷 ¥{{ linkage.outstandingAmount }}）</div>
+        <el-alert v-for="w in linkage.warnings.slice(0, 3)" :key="w.id" :type="w.warningLevel === 'HIGH' ? 'error' : w.warningLevel === 'MEDIUM' ? 'warning' : 'info'"
+          :closable="false" style="margin-top:6px" :title="w.warningTitle" :description="w.warningContent" />
+        <div class="lw-impact">{{ linkage.impact }}</div>
+      </div>
+    </el-card>
+
     <el-row :gutter="16" style="margin-top:16px">
       <el-col :span="12">
         <el-card shadow="never" class="report-card">
@@ -131,15 +192,46 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import { Notebook, Plus, Refresh } from '@element-plus/icons-vue'
-import { getBookkeepingList, addBookkeepingRecord, getCashFlowReport } from '@/api/bookkeeping'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Notebook, Plus, Refresh, InfoFilled, Warning } from '@element-plus/icons-vue'
+import { getBookkeepingList, addBookkeepingRecord, getCashFlowReport, getLoanLinkedWarnings, getObservationProgress, applyPromotion } from '@/api/bookkeeping'
 
 const listLoading = ref(false)
 const records = ref([])
 const report = ref(null)
 const reportPeriod = ref(new Date().toISOString().slice(0, 7))
 const filterType = ref('')
+
+const linkageLoading = ref(false)
+const progress = ref(null)
+const linkage = ref(null)
+const promoting = ref(false)
+
+const loadLinkage = async () => {
+  linkageLoading.value = true
+  try {
+    const [p, lk] = await Promise.all([
+      getObservationProgress().catch(() => null),
+      getLoanLinkedWarnings().catch(() => null)
+    ])
+    progress.value = p
+    linkage.value = lk
+  } catch (e) {} finally { linkageLoading.value = false }
+}
+
+const doApplyPromotion = async () => {
+  try {
+    await ElMessageBox.confirm('确认一键申请转A？将通过数据回流达标路径升级为A类循环贷并提额至5万（模拟）。', '转A申请', { type: 'success', confirmButtonText: '确认申请', cancelButtonText: '取消' })
+  } catch (e) { return }
+  promoting.value = true
+  try {
+    const vo = await applyPromotion()
+    ElMessage.success('转A申请通过：已升级A类循环贷并提额至5万（模拟）')
+    loadLinkage()
+    loadRecords()
+    loadReport()
+  } catch (e) { ElMessage.error(e?.message || '转A申请失败') } finally { promoting.value = false }
+}
 
 const addDialogVisible = ref(false)
 const adding = ref(false)
@@ -186,7 +278,7 @@ const submitAdd = async () => {
   } catch (e) {} finally { adding.value = false }
 }
 
-onMounted(() => { loadRecords(); loadReport() })
+onMounted(() => { loadRecords(); loadReport(); loadLinkage() })
 </script>
 
 <style scoped>
@@ -212,4 +304,16 @@ onMounted(() => { loadRecords(); loadReport() })
 .report-meta .meta { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #f5f7fa; border-radius: 6px; }
 .pos { color: #67c23a; }
 .neg { color: #f56c6c; }
+.linkage-card { margin-top: 16px; }
+.linkage-body { padding: 4px 0; }
+.linkage-metric { background: #f7f8fa; border-radius: 8px; padding: 14px 16px; height: 100%; box-sizing: border-box; }
+.lm-label { font-size: 13px; color: #606266; margin-bottom: 8px; }
+.lm-value { font-size: 24px; font-weight: 700; color: #303133; margin-bottom: 8px; }
+.lm-threshold { font-size: 13px; color: #909399; font-weight: 400; }
+.lm-sub { font-size: 12px; color: #909399; margin-top: 6px; }
+.linkage-alert { margin-top: 16px; }
+.linkage-msg { font-size: 13px; }
+.linkage-warnings { margin-top: 16px; border: 1px solid #fbe6e2; background: #fef7f5; border-radius: 8px; padding: 12px 14px; }
+.lw-title { font-size: 14px; font-weight: 600; color: #b86b58; margin-bottom: 4px; }
+.lw-impact { font-size: 12px; color: #909399; margin-top: 8px; line-height: 1.6; }
 </style>

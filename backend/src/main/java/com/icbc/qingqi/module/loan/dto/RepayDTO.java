@@ -21,4 +21,7 @@ public class RepayDTO {
 
     @io.swagger.v3.oas.annotations.media.Schema(description = "金额口径：PRINCIPAL=本金（默认，利息按笔自动结算）/ TOTAL=本息合计（输入含息金额，自动拆分本金+利息）")
     private String amountType;
+
+    @io.swagger.v3.oas.annotations.media.Schema(description = "还款来源：PAYMENT=扫码支付（默认）/ REPAY_GUARD=还款保障金一键还款")
+    private String source;
 }

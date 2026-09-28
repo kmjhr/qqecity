@@ -266,10 +266,10 @@ sys_user  ───1:N───────────────────�
    - `transaction.budget_id` → `biz_budget_setting.id`（关联对应月份的预算）
    - 来源：SIMULATED（模拟数据）、BANK_IMPORT（银行导入）
 
-4. **biz_saving_goal（心愿储蓄）**：
+4. **biz_saving_goal（心愿储蓄 / 还款保障金）**：
    - `goal.user_id` → `sys_user.id`
-   - 预算结余可一键转入心愿储蓄
-   - 字段：target_amount / current_amount / progress_percent
+   - 预算结余可一键转入心愿储蓄（goal_type=WISH）；模块3/4×贷款联动新增 **还款保障金**（goal_type=REPAY_GUARD，用于贷款一键还本付息）
+   - 字段：target_amount / current_amount / progress_percent / **goal_type**（WISH/REPAY_GUARD，默认 WISH）/ **linked_credit_limit_id**（预留：保障金绑定的授信额度，当前按用户聚合演示，未实际写入）
 
 ### 2.7 金融安全模块
 

@@ -20,3 +20,19 @@ export function addBookkeepingRecord(data) {
 export function getCashFlowReport(params) {
   return request.get('/v1/bookkeeping/cashflow-report', { params })
 }
+
+/** 模块3/4×贷款联动预警聚合（现金流/预算/高频借贷等未处理预警 + 在贷余额 + 影响提示） */
+export function getLoanLinkedWarnings() {
+  return request.get('/v1/operation/loan-linked/warnings')
+}
+
+/** 观察期·经营数据回流进度（三指标加权看板） */
+export function getObservationProgress() {
+  return request.get('/v1/loan/observation-progress')
+}
+
+/** 数据回流达标一键申请转A */
+export function applyPromotion() {
+  return request.post('/v1/loan/observation/apply-promotion')
+}
+

@@ -118,6 +118,36 @@
           <el-empty v-else description="暂无心愿储蓄，可将预算结余一键转入" />
         </el-card>
       </el-tab-pane>
+
+      <!-- 还款保障金（模块4×贷款联动） -->
+      <el-tab-pane label="还款保障金" name="repayGuard">
+        <el-card shadow="never" v-loading="guardLoading">
+          <template #header>
+            <div class="card-header">
+              <span>还款保障金 <el-tag size="small" type="success" style="margin-left:8px">贷款还款联动</el-tag></span>
+              <el-button size="small" type="success" :loading="guardTransferring" @click="doTransferRepayGuard">
+                <el-icon><Coin /></el-icon>预算结余一键转入
+              </el-button>
+            </div>
+          </template>
+          <div v-if="repayGuard" class="guard-body">
+            <el-row :gutter="16">
+              <el-col :span="6"><div class="guard-item"><div class="g-label">保障金余额</div><div class="g-value ok">¥{{ repayGuard.balance }}</div></div></el-col>
+              <el-col :span="6"><div class="guard-item"><div class="g-label">目标金额</div><div class="g-value">¥{{ repayGuard.targetAmount }}</div></div></el-col>
+              <el-col :span="6"><div class="guard-item"><div class="g-label">当月待还（A+B在贷）</div><div class="g-value warn">¥{{ repayGuard.dueAmount }}</div></div></el-col>
+              <el-col :span="6"><div class="guard-item"><div class="g-label">覆盖率</div><div class="g-value" :class="repayGuard.worryFree ? 'ok' : 'warn'">{{ repayGuard.coverage }}%</div></div></el-col>
+            </el-row>
+            <el-progress :percentage="Number(repayGuard.coverage)" :stroke-width="12"
+              :color="repayGuard.worryFree ? '#67c23a' : '#e6a23c'" style="margin:16px 0 4px" />
+            <el-alert :type="repayGuard.worryFree ? 'success' : 'warning'" :closable="false"
+              :title="repayGuard.message" style="margin-top:8px" />
+            <el-alert type="info" :closable="false" style="margin-top:8px" show-icon>
+              <div style="font-size:13px">将预算结余转入保障金后，可在「青创e贷 → 我的额度 → 还款中心」选择<b>「还款保障金一键还款」</b>还本付息（模拟，不涉及真实资金）。</div>
+            </el-alert>
+          </div>
+          <el-empty v-else description="暂无还款保障金，点击右上角将预算结余转入" />
+        </el-card>
+      </el-tab-pane>
     </el-tabs>
 
     <!-- 设置预算弹窗 -->
@@ -166,7 +196,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { PieChart, Plus, Coin } from '@element-plus/icons-vue'
-import { getCategories, saveBudgetSetting, getBudgetList, addTransaction, transferToSaving, getSavings, getBudgetOverview } from '@/api/budget'
+import { getCategories, saveBudgetSetting, getBudgetList, addTransaction, transferToSaving, getSavings, getBudgetOverview, getRepayGuard, transferRepayGuard } from '@/api/budget'
 
 const activeTab = ref('list')
 const loading = ref(false)
@@ -174,6 +204,29 @@ const budgetList = ref([])
 const categories = ref([])
 const overview = ref(null)
 const savings = ref([])
+
+const repayGuard = ref(null)
+const guardLoading = ref(false)
+const guardTransferring = ref(false)
+
+const loadRepayGuard = async () => {
+  guardLoading.value = true
+  try {
+    repayGuard.value = await getRepayGuard().catch(() => null)
+  } catch (e) {} finally { guardLoading.value = false }
+}
+
+const doTransferRepayGuard = async () => {
+  guardTransferring.value = true
+  try {
+    const data = await transferRepayGuard()
+    ElMessage.success(`已转入 ¥${data.transferAmount} 到还款保障金（模拟），现余额 ¥${data.balance}`)
+    loadRepayGuard()
+    loadAll()
+  } catch (e) {
+    ElMessage.error(e?.message || '转入失败')
+  } finally { guardTransferring.value = false }
+}
 
 const mccOptions = [
   { code: '5812', name: '餐饮-就餐场所' },
@@ -255,7 +308,7 @@ const submitTransfer = async () => {
   } catch (e) {} finally { transferLoading.value = false }
 }
 
-onMounted(loadAll)
+onMounted(() => { loadAll(); loadRepayGuard() })
 </script>
 
 <style scoped>
@@ -277,4 +330,10 @@ onMounted(loadAll)
 .saving-name { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
 .saving-amount { font-size: 20px; color: #67c23a; margin-bottom: 8px; }
 .saving-total { font-size: 13px; color: #909399; }
+.guard-body { padding: 4px 0; }
+.guard-item { background: #f7f8fa; border-radius: 8px; padding: 14px 16px; text-align: center; }
+.g-label { font-size: 13px; color: #909399; margin-bottom: 6px; }
+.g-value { font-size: 22px; font-weight: 700; color: #303133; }
+.g-value.ok { color: #67c23a; }
+.g-value.warn { color: #e6a23c; }
 </style>

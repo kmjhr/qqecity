@@ -189,6 +189,22 @@ public class LoanController {
         return Result.success(loanService.advanceObservation(userId));
     }
 
+    @Operation(summary = "观察期·数据回流进度（模块3/4联动看板）",
+            description = "经营流水回流额（受托支付成功金额）/ AI记账笔数 / 现金流健康度 三指标加权，综合进度≥60%达标，可一键申请转A。")
+    @GetMapping("/observation-progress")
+    public Result<java.util.Map<String, Object>> observationProgress() {
+        Long userId = UserContext.getUserId();
+        return Result.success(loanService.observationProgress(userId));
+    }
+
+    @Operation(summary = "数据回流达标申请转A（一键）",
+            description = "综合进度≥60%时调用：观察期转PROMOTED + 创建/升级A类循环额度（提额至5万），无需等待6个月。")
+    @PostMapping("/observation/apply-promotion")
+    public Result<ObservationVO> applyPromotion() {
+        Long userId = UserContext.getUserId();
+        return Result.success(loanService.applyPromotion(userId));
+    }
+
     // ============================================================
     //  L-补3 商户白名单管理（缺口 #6）
     // ============================================================

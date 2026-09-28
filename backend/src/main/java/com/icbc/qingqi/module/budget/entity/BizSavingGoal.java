@@ -33,6 +33,12 @@ public class BizSavingGoal {
 
     private String description;
 
+    /** 目标类型：WISH心愿储蓄 / REPAY_GUARD还款保障金 */
+    private String goalType;
+
+    /** 关联授信额度ID（还款保障金绑定） */
+    private Long linkedCreditLimitId;
+
     /** 状态：ACTIVE/COMPLETED/CANCELLED */
     private String status;
 

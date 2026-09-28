@@ -152,6 +152,28 @@
       <el-tab-pane label="我的额度" name="credit">
         <el-alert type="success" :closable="false" style="margin-bottom:16px"
           title="A类 = 5万循环额度可直接提款/还款（随借随还，按日计息）；B类 = 定向小额额度，须走「受托支付」放款" />
+        <!-- 观察期·数据回流联动看板（模块3/4） -->
+        <el-card v-if="obsProgress && obsProgress.hasBCredit" shadow="never" class="obs-banner" v-loading="obsLoading">
+          <div class="obs-head">
+            <div class="obs-title">B转A 观察期 · 经营数据回流进度
+              <el-tag size="small" :type="obsProgress.observationStatus === 'PROMOTED' ? 'success' : 'warning'" style="margin-left:8px">
+                {{ obsProgress.observationStatusName }}
+              </el-tag>
+            </div>
+            <div class="obs-total">综合进度 <b :style="{ color: obsProgress.eligible ? '#67c23a' : '#e6a23c' }">{{ obsProgress.totalPercent }}%</b>
+              <span class="obs-sub">（流水40% + 记账30% + 现金流30%，≥60%达标）</span>
+            </div>
+          </div>
+          <el-row :gutter="12" style="margin-top:10px">
+            <el-col :span="8"><div class="obs-item"><span>受托支付回流</span><b>¥{{ obsProgress.flowAmount }}/¥{{ obsProgress.flowThreshold }}</b></div></el-col>
+            <el-col :span="8"><div class="obs-item"><span>AI记账笔数</span><b>{{ obsProgress.bookCount }}/{{ obsProgress.bookThreshold }}笔</b></div></el-col>
+            <el-col :span="8"><div class="obs-item"><span>现金流健康度</span><b>{{ obsProgress.cashScore }}分（{{ obsProgress.cashLevelName }}）</b></div></el-col>
+          </el-row>
+          <el-button v-if="obsProgress.observationStatus === 'OBSERVING' && obsProgress.eligible" type="success" size="small"
+            :loading="obsPromoting" style="margin-top:10px" @click="doApplyPromotion">一键申请转A（提额至5万）</el-button>
+          <div v-if="obsProgress.observationStatus !== 'OBSERVING'" class="obs-tip" style="margin-top:10px">{{ obsProgress.message }}</div>
+          <el-alert v-if="obsProgress.observationStatus === 'OBSERVING' && !obsProgress.eligible" type="info" :closable="false" style="margin-top:10px" :title="obsProgress.message" />
+        </el-card>
         <el-row :gutter="16">
           <el-col :span="15">
             <div class="credit-grid" v-loading="creditLoading">
@@ -250,8 +272,12 @@
                   <el-button size="small" type="primary" plain style="margin-top:8px;width:100%"
                     @click="setFullRepay">全部结清（本息合计 ¥{{ repayPreview.totalDue }}）</el-button>
                 </div>
-                <el-button type="primary" size="large" class="repay-submit" :loading="repaySubmitting" @click="submitRepay">
+                <el-button type="primary" size="large" class="repay-submit" :loading="repaySubmitting" @click="submitRepay('')">
                   扫码支付还款（本息一并支付）
+                </el-button>
+                <el-button type="success" size="large" class="repay-submit" :loading="repaySubmitting"
+                  :disabled="!repayGuard || Number(repayGuard.balance) <= 0" @click="submitRepay('REPAY_GUARD')">
+                  还款保障金一键还款<template v-if="repayGuard">（可用 ¥{{ repayGuard.balance }}，覆盖 {{ repayGuard.coverage }}% 待还）</template>
                 </el-button>
                 <div class="repay-remark">{{ repayPreview.remark }}</div>
               </template>
@@ -468,7 +494,8 @@ import { ElMessage } from 'element-plus'
 import { Money, Refresh } from '@element-plus/icons-vue'
 import { getProductRules, preCheck, getCreditLimit, entrustPayment, getMerchants, applyMerchant, getMyMerchants,
   getEntrustRecords, getLoanApplications,
-  withdrawCredit, repayCredit, getCreditTxns, getRepayPreview, entrustRepay, createRepayOrder } from '@/api/loan'
+  withdrawCredit, repayCredit, getCreditTxns, getRepayPreview, entrustRepay, createRepayOrder,
+  getObservationProgress, applyPromotion, getRepayGuard } from '@/api/loan'
 import PayCashier from '@/components/PayCashier.vue'
 
 const activeTab = ref('apply')
@@ -620,21 +647,52 @@ const setFullRepay = () => {
 const repayCashierVisible = ref(false)
 const repayCashierOrderNo = ref('')
 const repayLoanNo = ref('')
+const repayGuard = ref(null)
+const obsProgress = ref(null)
+const obsLoading = ref(false)
+const obsPromoting = ref(false)
+
+const loadRepayGuard = async () => {
+  try { repayGuard.value = await getRepayGuard().catch(() => null) } catch (e) {}
+}
+const loadObsProgress = async () => {
+  obsLoading.value = true
+  try { obsProgress.value = await getObservationProgress().catch(() => null) } catch (e) {} finally { obsLoading.value = false }
+}
+const doApplyPromotion = async () => {
+  obsPromoting.value = true
+  try {
+    const vo = await applyPromotion()
+    ElMessage.success('转A申请通过：已升级A类循环贷并提额至5万（模拟）')
+    loadCredit()
+    loadObsProgress()
+    loadRepayGuard()
+  } catch (e) { ElMessage.error(e?.message || '转A申请失败') } finally { obsPromoting.value = false }
+}
 const settleLoan = (loan) => {
   // 结清指定借款：本息合计一次付清（本金 + 该笔按天利息）
   repayLoanNo.value = loan.loanNo
   repayAmount.value = Number(loan.totalDue)
   ElMessage.info(`将结清借款 ${loan.loanNo}：本息合计 ¥${loan.totalDue}（本金 ¥${loan.remainingPrincipal} ＋ 利息 ¥${loan.interestPreview}，${loan.borrowDays} 天）`)
 }
-const submitRepay = async () => {
+const submitRepay = async (source) => {
   if (!repayAmount.value || repayAmount.value <= 0) { ElMessage.warning('请输入还款金额'); return }
   repaySubmitting.value = true
   try {
-    // 两步式还款：创建还款支付订单 → 收银台扫码支付（微信/银行）
+    // 两步式还款：创建还款支付订单 → 收银台扫码支付（微信/银行）或 还款保障金一键支付（模拟）
     // 金额口径=TOTAL（本息合计）：后端按先进先出拆本金+利息，订单金额=实际本息
     const payload = { amount: repayAmount.value, amountType: 'TOTAL' }
+    if (source === 'REPAY_GUARD') payload.source = 'REPAY_GUARD'
     if (repayLoanNo.value) payload.loanNo = repayLoanNo.value
     const order = await createRepayOrder(repayType.value, payload)
+    if (source === 'REPAY_GUARD') {
+      // 保障金一键支付：订单直接 PAID，额度已恢复
+      ElMessage.success(`还款成功（还款保障金 ¥${order.amount || repayAmount.value}，额度已恢复）`)
+      loadCredit()
+      loadRepayPanel()
+      loadRepayGuard()
+      return
+    }
     repayCashierOrderNo.value = order.orderNo
     repayCashierVisible.value = true
   } catch (e) {
@@ -791,7 +849,7 @@ const submitEntrust = async () => {
   } finally { paying.value = false }
 }
 
-onMounted(() => { loadRules(); loadCredit(); loadMerchants(); loadApplications(); loadMyMerchants(); loadEntrustRecords() })
+onMounted(() => { loadRules(); loadCredit(); loadMerchants(); loadApplications(); loadMyMerchants(); loadEntrustRecords(); loadObsProgress(); loadRepayGuard() })
 </script>
 
 <style scoped>
@@ -828,6 +886,13 @@ onMounted(() => { loadRules(); loadCredit(); loadMerchants(); loadApplications()
 .repay-form { margin-top: 4px; }
 .repay-form-label { font-size: 13px; color: #909399; margin-bottom: 6px; }
 .repay-submit { width: 100%; margin-top: 14px; }
+.obs-banner { margin-bottom: 16px; border-top: 3px solid #67c23a; }
+.obs-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.obs-title { font-size: 15px; font-weight: 600; color: #303133; }
+.obs-total { font-size: 13px; color: #606266; }
+.obs-sub { font-size: 12px; color: #909399; }
+.obs-item { background: #f7f8fa; border-radius: 6px; padding: 8px 12px; font-size: 13px; color: #606266; display: flex; justify-content: space-between; }
+.obs-tip { font-size: 13px; color: #67c23a; }
 .repay-remark { margin-top: 12px; padding-top: 10px; border-top: 1px dashed #ebeef5; font-size: 12px; color: #909399; line-height: 1.7; }
 .repay-rules { margin: 8px 0; padding: 8px 12px; background: #f5f7fa; border-radius: 8px; }
 .repay-rules-title { font-size: 13px; font-weight: 600; color: #303133; margin-bottom: 6px; }
