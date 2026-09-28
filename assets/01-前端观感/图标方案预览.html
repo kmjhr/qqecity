@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>青启e城 图标方案预览</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: #f5f7fa; color: #303133; padding: 40px 24px; }
+    h1 { text-align: center; font-size: 28px; margin-bottom: 8px; }
+    .subtitle { text-align: center; color: #909399; margin-bottom: 40px; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .set { background: #fff; border-radius: 16px; padding: 28px; margin-bottom: 28px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+    .set-title { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+    .set-desc { font-size: 13px; color: #909399; margin-bottom: 24px; }
+    .icons { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 20px; }
+    .icon-card { text-align: center; padding: 20px; border-radius: 12px; background: #fafbfc; transition: transform 0.2s; }
+    .icon-card:hover { transform: translateY(-4px); background: #f5f7fa; }
+    .icon-card img { width: 64px; height: 64px; margin-bottom: 12px; }
+    .icon-card .name { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .icon-card .desc { font-size: 12px; color: #909399; line-height: 1.4; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-top: 8px; }
+    .tag-a { background: #f3effa; color: #764ba2; }
+    .tag-b { background: #fff0f3; color: #f5576c; }
+    .tag-c { background: #e8faf1; color: #11998e; }
+    .tag-d { background: #e6f7ff; color: #00c6fb; }
+    .tag-e { background: #fff8e6; color: #f39c12; }
+  </style>
+</head>
+<body>
+  <h1>青启e城 · 业务模块图标方案</h1>
+  <p class="subtitle">基于项目五大核心功能提取，提供三套风格供选择</p>
+
+  <div class="container">
+    <!-- 功能说明 -->
+    <div class="set">
+      <div class="set-title">项目功能提取</div>
+      <div class="set-desc">从 user-web 页面与后端模块文档整理出的五个一级业务入口</div>
+      <div class="icons">
+        <div class="icon-card">
+          <div class="name">安居保函</div>
+          <div class="desc">租房履约保函、AI 合同复审、房东确认、缴费开函</div>
+        </div>
+        <div class="icon-card">
+          <div class="name">青创 e 贷</div>
+          <div class="desc">B 类预审、A/B 双轨授信、受托支付、随借随还</div>
+        </div>
+        <div class="icon-card">
+          <div class="name">经营赋能</div>
+          <div class="desc">AI 简易记账、现金流报表、风险预警</div>
+        </div>
+        <div class="icon-card">
+          <div class="name">预算消费</div>
+          <div class="desc">分类预算、交易归类、分级提醒、结余转储蓄</div>
+        </div>
+        <div class="icon-card">
+          <div class="name">金融安全</div>
+          <div class="desc">反诈财商教学、骗局甄别、征信解读</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 方案 A -->
+    <div class="set">
+      <div class="set-title">方案 A · 渐变填充风格</div>
+      <div class="set-desc">圆角渐变背景 + 白色图标，与你现有首页卡片风格一致，视觉冲击强</div>
+      <div class="icons">
+        <div class="icon-card">
+          <img src="../../user-web/src/assets/icons/set-a-gradient/guarantee.svg" alt="安居保函">
+          <div class="name">安居保函</div>
+          <span class="tag tag-a">房屋 + 护盾</span>
+        </div>
+        <div class="icon-card">
+          <img src="../../user-web/src/assets/icons/set-a-gradient/loan.svg" alt="青创e贷">
+          <div class="name">青创 e 贷</div>
+          <span class="tag tag-b">萌芽 + 金币</span>
+        </div>
+        <div class="icon-card">
+          <img src="../../user-web/src/assets/icons/set-a-gradient/business.svg" alt="经营赋能">
+          <div class="name">经营赋能</div>
+          <span class="tag tag-c">记账本 + 折线</span>
+        </div>
+        <div class="icon-card">
+          <img src="../../user-web/src/assets/icons/set-a-gradient/budget.svg" alt="预算消费">
+          <div class="name">预算消费</div>
+          <span class="tag tag-d">钱包 + 微笑曲线</span>
+        </div>
+        <div class="icon-card">
+          <img src="../../user-web/src/assets/icons/set-a-gradient/safety.svg" alt="金融安全">
+          <div class="name">金融安全</div>
+          <span class="tag tag-e">护盾 + 对勾</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 方案 B -->
+    <div class="set">
+      <div class="set-title">方案 B · 线性描边风格</div>
+      <div class="set-desc">白底彩色描边，更现代、更克制，适合轻量化的 B 端或年轻向 C 端</div>
+      <div class="icons">
+        <div class="icon-card">
+          <img src="../../user-web/src/assets/icons/set-b-outline/guarantee.svg" alt="安居保函">
+          <div class="name">安居保函</div>
+          <span class="tag tag-a">房屋护盾</span>
+        </div>
+        <div class="icon-card">
+          <img src="../../user-web/src/assets/icons/set-b-outline/loan.svg" alt="青创e贷">
+          <div class="name">青创 e 贷</div>
+          <span class="tag tag-b">萌芽增长</span>
+        </div>
+        <div class="icon-card">
+          <img src="../../user-web/src/assets/icons/set-b-outline/business.svg" alt="经营赋能">
+          <div class="name">经营赋能</div>
+          <span class="tag tag-c">报表折线</span>
+        </div>
+        <div class="icon-card">
+          <img src="../../user-web/src/assets/icons/set-b-outline/budget.svg" alt="预算消费">
+          <div class="name">预算消费</div>
+          <span class="tag tag-d">钱包管理</span>
+        </div>
+        <div class="icon-card">
+          <img src="../../user-web/src/assets/icons/set-b-outline/safety.svg" alt="金融安全">
+          <div class="name">金融安全</div>
+          <span class="tag tag-e">安全认证</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 方案 C -->
+    <div class="set">
+      <div class="set-title">方案 C · 扁平轻色块风格</div>
+      <div class="set-desc">浅色底 + 彩色面性图标，对比柔和，适合大面积卡片列表，长时间看不疲劳</div>
+      <div class="icons">
+        <div class="icon-card">
+          <img src="../../user-web/src/assets/icons/set-c-flat/guarantee.svg" alt="安居保函">
+          <div class="name">安居保函</div>
+          <span class="tag tag-a">紫色面性</span>
+        </div>
+        <div class="icon-card">
+          <img src="../../user-web/src/assets/icons/set-c-flat/loan.svg" alt="青创e贷">
+          <div class="name">青创 e 贷</div>
+          <span class="tag tag-b">珊瑚面性</span>
+        </div>
+        <div class="icon-card">
+          <img src="../../user-web/src/assets/icons/set-c-flat/business.svg" alt="经营赋能">
+          <div class="name">经营赋能</div>
+          <span class="tag tag-c">绿色面性</span>
+        </div>
+        <div class="icon-card">
+          <img src="../../user-web/src/assets/icons/set-c-flat/budget.svg" alt="预算消费">
+          <div class="name">预算消费</div>
+          <span class="tag tag-d">蓝色面性</span>
+        </div>
+        <div class="icon-card">
+          <img src="../../user-web/src/assets/icons/set-c-flat/safety.svg" alt="金融安全">
+          <div class="name">金融安全</div>
+          <span class="tag tag-e">橙色面性</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

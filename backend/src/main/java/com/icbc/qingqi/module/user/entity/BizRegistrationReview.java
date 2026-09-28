@@ -47,7 +47,7 @@ public class BizRegistrationReview {
     /** 毕业日期 */
     private LocalDate graduationDate;
 
-    /** 核验方式：XUE_XIN_WANG/STUDENT_CARD */
+    /** 核验方式：XUE_XIN_WANG学信网/STUDENT_CARD学生证·仅在校生/GRAD_CERT毕业证·仅毕业2年内 */
     private String verifyType;
 
     /** 学信档案验证码/学号（模拟） */

@@ -48,8 +48,8 @@ public class RegistrationReviewService {
     /** 合法学历层次 */
     private static final Set<String> EDUCATION_LEVELS = Set.of("UNDERGRADUATE", "MASTER", "DOCTOR");
 
-    /** 合法核验方式 */
-    private static final Set<String> VERIFY_TYPES = Set.of("XUE_XIN_WANG", "STUDENT_CARD");
+    /** 合法核验方式：学信网在线核验 / 学生证照片识别（仅在校生）/ 毕业证照片识别（仅毕业2年内） */
+    private static final Set<String> VERIFY_TYPES = Set.of("XUE_XIN_WANG", "STUDENT_CARD", "GRAD_CERT");
 
     /** 毕业 2 年内（730 天） */
     private static final long GRADUATE_WITHIN_DAYS = 730L;
@@ -191,7 +191,7 @@ public class RegistrationReviewService {
     }
 
     /**
-     * 学生证照片 AI 识别（模拟）
+     * 学生证/毕业证照片 AI 识别（模拟）
      * <p>
      * 演示：未接真实 OCR，根据请求中的演示字段或默认值返回模拟识别结果，标注"模拟"
      */
@@ -205,7 +205,7 @@ public class RegistrationReviewService {
                 : "XH" + RandomUtil.randomNumbers(8));
         vo.setConfidence(98);
         vo.setSimulated(Boolean.TRUE);
-        vo.setMessage("已模拟识别学生证照片（演示），识别结果可直接回填注册表单");
+        vo.setMessage("已模拟识别证件照片（演示），识别结果可直接回填注册表单");
         return vo;
     }
 
@@ -301,16 +301,26 @@ public class RegistrationReviewService {
             }
         }
 
-        // 4. 核验方式有效（学信网在线核验 / 学生证照片识别，均为模拟）
+        // 4. 核验方式有效（学信网在线核验 / 学生证照片识别·仅在校生 / 毕业证照片识别·仅毕业2年内，均为模拟）
         String verifyType = dto.getVerifyType();
         String studentNo = dto.getStudentNo();
         if (verifyType == null || !VERIFY_TYPES.contains(verifyType) || studentNo == null || studentNo.isBlank()) {
             detail.append("缺少核验方式或学信档案验证码/学号；");
             pass = false;
+        } else if ("STUDENT_CARD".equals(verifyType) && "GRADUATE".equals(dto.getUserType())) {
+            detail.append("核验方式「学生证照片识别」不适用于毕业人群，毕业须通过「学信网在线核验」或「毕业证照片识别」；");
+            pass = false;
+        } else if ("GRAD_CERT".equals(verifyType) && !"GRADUATE".equals(dto.getUserType())) {
+            detail.append("核验方式「毕业证照片识别」仅限毕业2年内人群，在校生请使用「学信网在线核验」或「学生证照片识别」；");
+            pass = false;
         } else {
-            detail.append("核验方式")
-                    .append("XUE_XIN_WANG".equals(verifyType) ? "「学信网在线核验（模拟）」" : "「学生证照片识别（模拟）」")
-                    .append("核验通过；");
+            String verifyName = switch (verifyType) {
+                case "XUE_XIN_WANG" -> "学信网在线核验（模拟）";
+                case "STUDENT_CARD" -> "学生证照片识别（模拟）";
+                case "GRAD_CERT" -> "毕业证照片识别（模拟）";
+                default -> verifyType;
+            };
+            detail.append("核验方式「").append(verifyName).append("」核验通过；");
         }
 
         items.add(item("EDUCATION", "学历核验", pass, detail.toString()));
