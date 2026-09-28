@@ -3,6 +3,7 @@ package com.icbc.qingqi;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * 青启e城后端启动类
@@ -23,6 +24,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * - module/safety    模块5：青年金融安全
  */
 @SpringBootApplication
+@EnableScheduling
 @MapperScan("com.icbc.qingqi.**.mapper")
 public class QingqiApplication {
 

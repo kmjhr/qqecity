@@ -28,26 +28,29 @@ public class PolicyController {
         this.policyService = policyService;
     }
 
-    @Operation(summary = "按人群资质匹配政策",
-            description = "根据当前用户 userType（STUDENT/GRADUATE/ENTREPRENEUR/OTHER）匹配 biz_policy.target_crowd，返回全部政策并标注 matched 字段。")
+    @Operation(summary = "智能匹配政策（有效期过滤 + 关键词匹配 + 自动推送）",
+            description = "只返回有效期内政策；按用户人群资质+创业行为提取关键词，与政策 keyword_tags 命中即匹配；匹配结果自动写入消息中心（去重）。")
     @GetMapping("/match")
-    public Result<List<PolicyVO>> match() {
+    public Result<List<PolicyVO>> match(
+            @Parameter(description = "地区筛选，如 浙江/广东/全国") @RequestParam(required = false) String region) {
         Long userId = UserContext.getUserId();
-        return Result.success(policyService.matchPolicies(userId));
+        return Result.success(policyService.matchPolicies(userId, region));
     }
 
     @Operation(summary = "仅返回匹配当前用户的政策")
     @GetMapping("/matched")
-    public Result<List<PolicyVO>> matched() {
+    public Result<List<PolicyVO>> matched(
+            @Parameter(description = "地区筛选，如 浙江/广东/全国") @RequestParam(required = false) String region) {
         Long userId = UserContext.getUserId();
-        return Result.success(policyService.matchedPolicies(userId));
+        return Result.success(policyService.matchedPolicies(userId, region));
     }
 
     @Operation(summary = "按类型筛选政策", description = "policyType: HOUSING-安居 / ENTREPRENEUR-创业贴息，不传则返回全部")
     @GetMapping
     public Result<List<PolicyVO>> list(
-            @Parameter(description = "政策类型") @RequestParam(required = false) String policyType) {
-        return Result.success(policyService.listByType(policyType));
+            @Parameter(description = "政策类型") @RequestParam(required = false) String policyType,
+            @Parameter(description = "地区筛选，如 浙江/广东/全国") @RequestParam(required = false) String region) {
+        return Result.success(policyService.listByType(policyType, region));
     }
 
     @Operation(summary = "政策详情")
@@ -57,7 +60,7 @@ public class PolicyController {
     }
 
     @Operation(summary = "智能推送匹配政策（站内信）",
-            description = "将当前用户匹配的政策以站内信推送，返回匹配的政策列表。")
+            description = "手动推送匹配政策到消息中心（先清理旧推送再生成最新，自动推送已在匹配接口触发）。")
     @PostMapping("/push")
     public Result<List<PolicyVO>> push() {
         Long userId = UserContext.getUserId();

@@ -35,6 +35,17 @@ public class LoanController {
     }
 
     // ============================================================
+    //  L-0 产品介绍：A/B 双轨产品规则与风险揭示
+    // ============================================================
+
+    @Operation(summary = "青创e贷 A/B 双轨产品规则",
+            description = "返回A类（创业信用画像循环贷）与B类（小额定向两步式受托支付贷）完整产品要素、准入规则、资金流向与风险提示，供前端产品介绍页展示。")
+    @GetMapping("/product-rules")
+    public Result<LoanProductRulesVO> productRules() {
+        return Result.success(loanService.getProductRules());
+    }
+
+    // ============================================================
     //  L-1 B 类免费预审（不查征信）
     // ============================================================
 
@@ -117,6 +128,23 @@ public class LoanController {
     public Result<CreditTxnVO> repay(@Valid @RequestBody RepayDTO dto) {
         Long userId = UserContext.getUserId();
         return Result.success(loanService.repay(userId, dto));
+    }
+
+    @Operation(summary = "还款试算预览（A/B双轨）",
+            description = "返回待还本金、计息起始日、已计息天数、预估利息与应还合计，供还款弹窗展示。creditType=A_TYPE|B_TYPE")
+    @GetMapping("/repay-preview")
+    public Result<RepayPreviewVO> repayPreview(
+            @Parameter(description = "额度类型 A_TYPE/B_TYPE") @RequestParam(defaultValue = "A_TYPE") String creditType) {
+        Long userId = UserContext.getUserId();
+        return Result.success(loanService.repayPreview(userId, creditType));
+    }
+
+    @Operation(summary = "B类受托支付还款",
+            description = "归还B类定向贷款本金+利息（年化4.35%模拟，自最早受托支付日起按日计息），额度自动恢复。")
+    @PostMapping("/entrust-repay")
+    public Result<CreditTxnVO> entrustRepay(@Valid @RequestBody RepayDTO dto) {
+        Long userId = UserContext.getUserId();
+        return Result.success(loanService.entrustRepay(userId, dto));
     }
 
     @Operation(summary = "查询循环贷流水", description = "提款/还款流水列表")

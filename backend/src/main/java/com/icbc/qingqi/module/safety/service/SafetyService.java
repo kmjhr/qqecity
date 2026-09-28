@@ -34,7 +34,16 @@ public class SafetyService {
             "刷单", "刷信誉", "刷销量",
             "裸条", "裸贷",
             "内部渠道", "内部人脉", "特殊关系",
-            "洗白"
+            "洗白",
+            // 冒充运营商/开通诱导
+            "免费开通", "业务开通提醒", "人工转", "二线客服",
+            "退订请拨打", "下载客户端", "下载APP", "客服转接",
+            "停机", "已停用", "注销",
+            // 快递包裹/礼品诱导（伪基站群发，回复R标记活跃用户）
+            "包裹派送", "派送中", "取件码", "拒收请回复",
+            // 积分清零/紧迫威胁（诱导点击钓鱼链接）
+            "积分清零", "积分过期", "即将失效", "即将清零", "过期清零",
+            "逾期作废", "今日内", "最后期限", "作废"
     );
 
     // 可疑话术关键词 → SUSPICIOUS
@@ -43,7 +52,17 @@ public class SafetyService {
             "保证金", "解冻费", "押金入职", "先交押金",
             "中奖", "缴纳税费", "领取奖品",
             "翻倍", "稳赚不赔", "高额回报",
-            "零门槛", "秒到账", "黑户可贷"
+            "零门槛", "秒到账", "黑户可贷",
+            // 快递/礼品诱导弱特征
+            "领取", "已发", "到付", "抽奖", "赠品", "秘籍", "年终盛典", "扫码进群",
+            // 积分/营销类（配合链接）
+            "兑换", "兑换礼品", "回馈",
+            // 出行/退款类
+            "改签", "退票", "理赔", "退款", "全额退",
+            // 贷款授信类
+            "授信额度", "额度已批", "放款", "下款",
+            // 冒充客服/联系方式
+            "加微信", "添加微信", "点击链接", "回复TD"
     );
 
     public SafetyService(BizAntiFraudContentMapper contentMapper,
@@ -97,6 +116,9 @@ public class SafetyService {
             if (text.contains(kw)) hitSuspicious.add(kw);
         }
 
+        // 短链接/钓鱼链接特征：http(s) 链接，或 短域名+路径（n5a.cn/KaEOyO、abcd.top/xxx 等）
+        boolean hasUrl = containsSuspiciousUrl(text);
+
         String result;
         int riskLevel;
         String warning;
@@ -107,13 +129,15 @@ public class SafetyService {
             riskLevel = 5;
             allHits.addAll(hitDangerous);
             allHits.addAll(hitSuspicious);
+            if (hasUrl) allHits.add("含外链");
             warning = buildDangerousWarning(hitDangerous, text);
-        } else if (!hitSuspicious.isEmpty()) {
+        } else if (!hitSuspicious.isEmpty() || hasUrl) {
             result = "SUSPICIOUS";
             riskLevel = 3;
             allHits.addAll(hitSuspicious);
-            warning = "可疑话术！检测到关键词：" + String.join("、", hitSuspicious)
-                    + "。此类话术常被用于诈骗，请提高警惕，切勿提供个人信息或转账。【模拟识别】";
+            if (hasUrl) allHits.add("含外链");
+            warning = "可疑话术！检测到关键词：" + String.join("、", allHits)
+                    + "。此类话术常被用于诈骗，请提高警惕，切勿点击陌生链接、提供个人信息或转账。【模拟识别】";
         } else {
             result = "SAFE";
             riskLevel = 1;
@@ -140,9 +164,42 @@ public class SafetyService {
         if (hits.stream().anyMatch(h -> h.contains("刷单"))) {
             return "高度疑似「刷单诈骗」！所有要求先交钱的刷单兼职都是诈骗，刷单本身也是违法行为，切勿参与。【模拟识别】";
         }
+        if (hits.stream().anyMatch(h -> h.contains("开通") || h.contains("人工转")
+                || h.contains("二线客服") || h.contains("退订") || h.contains("下载") || h.contains("客服转接"))) {
+            return "高度疑似「冒充运营商」诈骗！运营商不会主动免费开通业务并诱导下载客户端/转人工客服。凡要求下载不明APP、拨打客服退订的，请先通过官方渠道（10086/10010/10000）核实，切勿点击陌生链接。【模拟识别】";
+        }
+        if (hits.stream().anyMatch(h -> h.contains("包裹") || h.contains("派送") || h.contains("取件")
+                || h.contains("拒收") || h.contains("领取"))) {
+            return "高度疑似「快递包裹/礼品诱导」诈骗！伪基站冒充快递群发，短链接多为钓鱼引流，回复R会标记活跃号再接连环诈骗。请勿点击链接或回复，直接删除。【模拟识别】";
+        }
+        if (hits.stream().anyMatch(h -> h.contains("积分") || h.contains("清零") || h.contains("过期")
+                || h.contains("失效") || h.contains("作废"))) {
+            return "高度疑似「积分清零/兑换」诈骗！运营商积分不会无故清零，凡要求点击链接兑换、补差价的就是钓鱼。请通过官方APP核实，勿点短信链接。【模拟识别】";
+        }
+        if (hits.stream().anyMatch(h -> h.contains("ETC") || h.contains("医保") || h.contains("社保")
+                || h.contains("停用") || h.contains("锁定") || h.contains("注销"))) {
+            return "高度疑似「冒充ETC/医保」诈骗！ETC/医保卡不会因过期停用要求点击链接认证。请通过官方小程序/服务号核实，切勿点击短信链接填写信息。【模拟识别】";
+        }
+        if (hits.stream().anyMatch(h -> h.contains("航班") || h.contains("改签") || h.contains("退票"))) {
+            return "高度疑似「机票退改签」诈骗！航空公司不会以短信要求拨打400电话改签理赔。请通过官方APP/客服核实航班状态，勿拨打短信内电话。【模拟识别】";
+        }
+        if (hits.stream().anyMatch(h -> h.contains("授信") || h.contains("额度") || h.contains("放款") || h.contains("下款"))) {
+            return "高度疑似「虚假贷款」诈骗！正规贷款不会通过短信链接发放，凡要求先交保证金/解冻费的一律是诈骗。请通过银行官方渠道申请。【模拟识别】";
+        }
         if (hits.contains("安全账户") || hits.contains("资金核查") || hits.contains("涉嫌洗钱")) {
             return "高度疑似「冒充公检法」诈骗！公检法机关绝无\"安全账户\"概念，也不会要求转账核查。请立即挂断并拨打110。【模拟识别】";
         }
         return "高度疑似诈骗话术！命中关键词：" + String.join("、", hits) + "，请切勿相信，更不要转账或提供个人信息。【模拟识别】";
+    }
+
+    /** 短链接/钓鱼链接特征：http(s) 链接，或 短域名+路径（n5a.cn/KaEOyO、abcd.top/xxx 等） */
+    private boolean containsSuspiciousUrl(String text) {
+        if (text == null || text.isBlank()) return false;
+        String lower = text.toLowerCase();
+        if (lower.contains("http://") || lower.contains("https://")) return true;
+        return java.util.regex.Pattern
+                .compile("[a-z0-9][a-z0-9-]{1,10}\\.(cn|com|top|xyz|cc|vip|net|io|icu|site)/[a-z0-9]{4,}")
+                .matcher(lower)
+                .find();
     }
 }

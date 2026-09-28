@@ -194,6 +194,22 @@ public class LoanService {
         List<BizCreditLimit> limits = creditLimitMapper.selectList(
                 new LambdaQueryWrapper<BizCreditLimit>().eq(BizCreditLimit::getUserId, userId));
 
+        // 到期自动失效（对齐《工行杯9.26》P76：预审额度在有效期后自动失效、零负债）
+        LocalDate today = LocalDate.now();
+        boolean changed = false;
+        for (BizCreditLimit l : limits) {
+            if ("ACTIVE".equals(l.getStatus()) && l.getExpireDate() != null
+                    && l.getExpireDate().isBefore(today) && l.getUsedLimit().signum() == 0) {
+                l.setStatus("CLOSED");
+                creditLimitMapper.updateById(l);
+                changed = true;
+            }
+        }
+        if (changed) {
+            limits = creditLimitMapper.selectList(
+                    new LambdaQueryWrapper<BizCreditLimit>().eq(BizCreditLimit::getUserId, userId));
+        }
+
         // 若没有 A 类额度，生成演示 A 类 5 万循环额度
         boolean hasA = limits.stream().anyMatch(l -> TYPE_A.equals(l.getCreditType()));
         if (!hasA) {
@@ -217,6 +233,79 @@ public class LoanService {
         }
 
         return limits.stream().map(this::toCreditLimitVO).toList();
+    }
+
+    /**
+     * 青创e贷 A/B 双轨产品规则（模块2 产品介绍）
+     * <p>
+     * A类：创业信用画像循环贷（5万循环、年化3.85%、随借随还）
+     * B类：小额定向两步式授信（免费预审 + 100%受托支付白名单商户）
+     * 通用风险揭示与银行信贷产品一致；全部为演示模拟口径。
+     */
+    public LoanProductRulesVO getProductRules() {
+        LoanProductRulesVO vo = new LoanProductRulesVO();
+
+        // ---------------- A 类 ----------------
+        LoanProductRulesVO.ProductRule a = new LoanProductRulesVO.ProductRule();
+        a.setName("A类 · 创业信用画像循环贷");
+        a.setSlogan("有画像即可贷：把真实经营流水变成信用证明，随借随还");
+        a.setTarget("已有真实经营画像的青年创业者（经营流水/受托支付/记账数据回流≥3个月、画像经营力达标；在校生、毕业2年内等扶持人群优先）");
+        a.setLimitDesc("循环授信额度最高 ¥50,000（按画像评分授信；安居稳定+经营良好可联动提额，最高上浮20%）");
+        a.setRateDesc("年化利率 3.85%（单利），随借随还按实际用款天数计息");
+        a.setTermDesc("额度有效期 1 年，有效期内循环使用，可申请续贷评估");
+        a.setInterestDesc("利息 = 提款本金 × 3.85% ÷ 365 × 实际用款天数（用几天算几天，还款当日不计息）");
+        a.setRepayDesc("随借随还：可随时全额/部分还款；还款后额度即时恢复，可再次提款，无提前还款违约金");
+        a.setAccessDesc("准入规则：① 人群白名单（在校大学生/毕业2年内/退役军人等扶持人群）② 创业信用画像评分达标 ③ 无重大逾期记录 ④ 通过AI初审+人工复核");
+        a.setFundFlowDesc("提款资金进入借款人本人工行账户，仅限合法经营用途（原料采购/摊位租赁/设备购置/线上推广），严禁流入股市、楼市或转借他人");
+        a.setRules(List.of(
+                "单笔提款最低 ¥1,000，可分次提款，累计不超过循环额度",
+                "额度有效期 1 年，到期后未提用部分自动失效，已提用部分继续按日计息",
+                "每笔提款/还款均生成流水记录，可在「我的申请-循环贷流水」查询",
+                "画像联动：安居稳定 + 经营流水良好可申请提额并享利率优惠（联动演示）",
+                "额度为动态管理：经营画像恶化或逾期将触发降额/冻结（模拟）"));
+        a.setRisks(List.of(
+                "本产品为参赛演示系统，放款、计息、征信影响均为模拟，不发生真实资金往来",
+                "逾期将按日收取罚息（年化利率上浮50%），并可能冻结额度、影响后续授信（模拟）",
+                "借款资金仅限合法经营用途，挪用将被风控实时监测并冻结额度",
+                "循环贷额度不等于固定承诺：以画像评分与风控复核为准，额度可动态调整"));
+
+        // ---------------- B 类 ----------------
+        LoanProductRulesVO.ProductRule b = new LoanProductRulesVO.ProductRule();
+        b.setName("B类 · 小额定向授信（两步式 + 受托支付）");
+        b.setSlogan("零历史也能贷：免费预审 + 100%受托支付，小额定向、专款专用");
+        b.setTarget("无历史经营数据的初创青年（城市市集、文创创作、校园服务、本地生活等新业态）");
+        b.setLimitDesc("预审额度区间 ¥5,000 ~ ¥20,000（扶持人群上限2万、普通上限1万；创业计划命中经营关键词确定额度下限）");
+        b.setRateDesc("年化利率 4.35%（单利），按受托支付金额与实际用款天数计息");
+        b.setTermDesc("额度有效期 1 年；未发生真实交易的预审额度到期自动失效，零成本、零负债");
+        b.setInterestDesc("利息 = 受托支付金额 × 4.35% ÷ 365 × 实际用款天数");
+        b.setRepayDesc("按合同约定期限还款，支持提前还款；资金由银行直接支付商户账户，不经过借款人个人账户");
+        b.setAccessDesc("准入规则：① 人群白名单 ② 创业计划通过经营关键词校验 ③ 指定收款商户须为白名单（VERIFIED）商户 ④ 通过AI初审+人工复核");
+        b.setFundFlowDesc("100%受托支付：贷款资金由银行直接支付给指定白名单收款商户账户，资金不经过借款人个人账户，从源头保障专款专用");
+        b.setRules(List.of(
+                "第一步·免费预审：提交创业计划+人群资质 → 准入判断并给出额度区间；不查询征信、不产生硬查询记录、不收费",
+                "第二步·正式提款：确认真实交易（物料采购/摊位租赁/设备购置）→ 指定白名单收款商户 → 100%受托支付直付商户账户",
+                "预审额度不构成实际放款：未提用无成本、无负债，有效期后自动失效",
+                "提款后进入 6 个月观察期：受托支付/收款码/AI记账数据回流 → 经营稳定达标转A类循环贷并提额；数据不足维持小额或退出",
+                "提款后经营失败：进入逾期催收流程，先由保险/担保代偿再依法追偿，可申请展期/续贷（模拟）",
+                "资金仅限合法经营用途，严禁信用卡资金流入经营领域"));
+        b.setRisks(List.of(
+                "本产品为参赛演示系统，放款、受托支付、代偿均为模拟，不发生真实资金往来",
+                "B类预审不查征信；正式提款申请将依法查询征信（模拟），逾期记录将报送征信系统",
+                "受托支付商户须真实经营，虚构交易将被风控识别并追责（模拟）",
+                "提款后经营失败可能面临逾期罚息、催收与依法追偿，请合理规划还款来源"));
+
+        // ---------------- 通用风险揭示 ----------------
+        vo.setGeneralRisks(List.of(
+                "利率与费用：平台展示年化利率均为单利口径，实际利息按实际用款天数计算；除利息外无其他手续费（模拟）",
+                "征信提示：B类免费预审不查询征信、不产生硬查询；正式提款申请依法查询征信；逾期记录将报送征信系统，影响后续信贷（模拟）",
+                "逾期后果：逾期按合同收取罚息（年化利率上浮50%），并可能面临催收、依法追偿；请按时还款、量入为出",
+                "用途限制：贷款资金仅限合法经营用途，严禁流入股市、楼市、虚拟货币或转借他人；违反用途将触发风控冻结",
+                "个人信息保护：依据《个人信息保护法》《数据安全法》，您的信息仅用于授信评估，传输加密、脱敏建模、操作留痕，可随时查询与删除授权",
+                "模拟声明：本系统为参赛演示系统，全部银行能力为模拟桩，不发生真实资金往来、不产生真实征信影响，请以真实银行产品为准"));
+
+        vo.setProductA(a);
+        vo.setProductB(b);
+        return vo;
     }
 
     private BizCreditLimit createCreditLimit(Long userId, String type, BigDecimal total, BigDecimal rate) {
@@ -293,6 +382,12 @@ public class LoanService {
             String statusName = "PENDING".equals(merchant.getVerifyStatus()) ? "灰名单审核中" : "未认证";
             throw new BizException(ErrorCode.BIZ_RULE_NOT_MET,
                     "商户「" + merchant.getMerchantName() + "」当前为" + statusName + "，非白名单商户不可受托支付");
+        }
+
+        // 支付金额不得超过申请批准额度（用户看到"申请到能用的钱"）
+        if (app.getApproveAmount() != null && dto.getAmount().compareTo(app.getApproveAmount()) > 0) {
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET,
+                    "支付金额超过申请批准额度（批准额度：¥" + app.getApproveAmount() + "）");
         }
 
         // 扣减额度（按申请类型对应的授信额度）
@@ -415,8 +510,7 @@ public class LoanService {
                 .multiply(new BigDecimal(borrowDays))
                 .divide(new BigDecimal("365"), 2, RoundingMode.HALF_UP);
 
-        // 恢复额度（本金+利息都归还）
-        BigDecimal totalRepay = repayPrincipal.add(interest);
+        // 恢复额度：按本金归还恢复；利息计入应还（全额结清 = 本金+利息）
         limit.setUsedLimit(limit.getUsedLimit().subtract(repayPrincipal));
         limit.setAvailableLimit(limit.getAvailableLimit().add(repayPrincipal));
         creditLimitMapper.updateById(limit);
@@ -439,6 +533,127 @@ public class LoanService {
                 userId, repayPrincipal, interest, borrowDays, limit.getAvailableLimit());
         return toTxnVO(txn);
     }
+
+    /**
+     * 还款试算预览（A/B 双轨）：待还本金、计息天数、预估利息、应还合计
+     */
+    public RepayPreviewVO repayPreview(Long userId, String creditType) {
+        BigDecimal rate = TYPE_A.equals(creditType) ? A_TYPE_RATE : B_TYPE_RATE;
+        BizCreditLimit limit = TYPE_A.equals(creditType) ? getActiveACreditLimit(userId) : getActiveBCreditLimit(userId);
+        LocalDate earliest = null;
+        if (TYPE_A.equals(creditType)) {
+            BizCreditTxn w = creditTxnMapper.selectOne(
+                    new LambdaQueryWrapper<BizCreditTxn>()
+                            .eq(BizCreditTxn::getUserId, userId)
+                            .eq(BizCreditTxn::getTxnType, "WITHDRAW")
+                            .orderByAsc(BizCreditTxn::getTxnTime)
+                            .last("LIMIT 1"));
+            if (w != null && w.getTxnTime() != null) {
+                earliest = w.getTxnTime().toLocalDate();
+            }
+        } else {
+            BizEntrustPayment p = paymentMapper.selectOne(
+                    new LambdaQueryWrapper<BizEntrustPayment>()
+                            .eq(BizEntrustPayment::getUserId, userId)
+                            .eq(BizEntrustPayment::getPaymentStatus, PAY_SUCCESS)
+                            .orderByAsc(BizEntrustPayment::getPaymentTime)
+                            .last("LIMIT 1"));
+            if (p != null && p.getPaymentTime() != null) {
+                earliest = p.getPaymentTime().toLocalDate();
+            }
+        }
+        int borrowDays = 1;
+        if (earliest != null) {
+            borrowDays = (int) ChronoUnit.DAYS.between(earliest, LocalDate.now());
+            if (borrowDays < 1) borrowDays = 1;
+        }
+        BigDecimal used = limit.getUsedLimit() == null ? BigDecimal.ZERO : limit.getUsedLimit();
+        BigDecimal interest = used.multiply(rate).multiply(new BigDecimal(borrowDays))
+                .divide(new BigDecimal("365"), 2, RoundingMode.HALF_UP);
+        RepayPreviewVO vo = new RepayPreviewVO();
+        vo.setCreditType(creditType);
+        vo.setCreditTypeName(TYPE_A.equals(creditType) ? "A类循环额度" : "B类定向额度");
+        vo.setUsedLimit(used);
+        vo.setRate(rate);
+        vo.setRateText(rate.multiply(new BigDecimal("100")).setScale(2, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString() + "%");
+        vo.setEarliestDate(earliest);
+        vo.setBorrowDays(borrowDays);
+        vo.setInterestPreview(interest);
+        vo.setTotalDue(used.add(interest));
+        vo.setRemark(TYPE_A.equals(creditType)
+                ? "还款需还本付息：全额结清 = 本金 + 按日累计利息（本息合计）。利息 = 待还本金 × 3.85% ÷ 365 × 实际用款天数（随借随还、无违约金，模拟）"
+                : "还款需还本付息：全额结清 = 本金 + 按日累计利息（本息合计）。利息 = 待还本金 × 4.35% ÷ 365 × 自受托支付日起算天数（B类定向贷款，模拟）");
+        return vo;
+    }
+
+    /**
+     * B类定向额度还款：归还受托支付本金 + 按日计息（年化4.35%模拟）
+     */
+    public CreditTxnVO entrustRepay(Long userId, RepayDTO dto) {
+        BizCreditLimit limit = getActiveBCreditLimit(userId);
+        if (limit.getUsedLimit().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "当前无 B类待还本金");
+        }
+        // 最早一笔成功受托支付日起算计息天数
+        BizEntrustPayment earliest = paymentMapper.selectOne(
+                new LambdaQueryWrapper<BizEntrustPayment>()
+                        .eq(BizEntrustPayment::getUserId, userId)
+                        .eq(BizEntrustPayment::getPaymentStatus, PAY_SUCCESS)
+                        .orderByAsc(BizEntrustPayment::getPaymentTime)
+                        .last("LIMIT 1"));
+        int borrowDays = 1;
+        if (earliest != null && earliest.getPaymentTime() != null) {
+            borrowDays = (int) ChronoUnit.DAYS.between(earliest.getPaymentTime().toLocalDate(), LocalDate.now());
+            if (borrowDays < 1) borrowDays = 1;
+        }
+        BigDecimal repayPrincipal = dto.getAmount().min(limit.getUsedLimit());
+        BigDecimal interest = repayPrincipal.multiply(B_TYPE_RATE).multiply(new BigDecimal(borrowDays))
+                .divide(new BigDecimal("365"), 2, RoundingMode.HALF_UP);
+        limit.setUsedLimit(limit.getUsedLimit().subtract(repayPrincipal));
+        limit.setAvailableLimit(limit.getAvailableLimit().add(repayPrincipal));
+        creditLimitMapper.updateById(limit);
+
+        BizCreditTxn txn = new BizCreditTxn();
+        txn.setTxnNo(generateNo("CR"));
+        txn.setUserId(userId);
+        txn.setCreditLimitId(limit.getId());
+        txn.setTxnType("REPAY");
+        txn.setPrincipalAmount(repayPrincipal);
+        txn.setInterestAmount(interest);
+        txn.setBorrowDays(borrowDays);
+        txn.setBalanceAfter(limit.getAvailableLimit());
+        txn.setRemark("B类受托支付还款，利息¥" + interest + "（" + borrowDays + "天，年化4.35%模拟）");
+        txn.setTxnTime(LocalDateTime.now());
+        creditTxnMapper.insert(txn);
+
+        log.info("[B类还款] 用户={}, 本金={}, 利息={}, 天数={}, 剩余待还={}",
+                userId, repayPrincipal, interest, borrowDays, limit.getUsedLimit());
+        return toTxnVO(txn);
+    }
+
+    private BizCreditLimit getActiveBCreditLimit(Long userId) {
+        BizCreditLimit limit = creditLimitMapper.selectOne(
+                new LambdaQueryWrapper<BizCreditLimit>()
+                        .eq(BizCreditLimit::getUserId, userId)
+                        .eq(BizCreditLimit::getCreditType, TYPE_B));
+        if (limit == null) {
+            BizLoanApplication last = applicationMapper.selectOne(
+                    new LambdaQueryWrapper<BizLoanApplication>()
+                            .eq(BizLoanApplication::getUserId, userId)
+                            .eq(BizLoanApplication::getLoanType, TYPE_B)
+                            .eq(BizLoanApplication::getPreCheckResult, PRE_ELIGIBLE)
+                            .orderByDesc(BizLoanApplication::getCreateTime)
+                            .last("LIMIT 1"));
+            BigDecimal bTotal = (last != null && last.getPreCheckMaxAmount() != null)
+                    ? last.getPreCheckMaxAmount() : LIMIT_MAX_NORMAL;
+            limit = createCreditLimit(userId, TYPE_B, bTotal, B_TYPE_RATE);
+        }
+        if (!"ACTIVE".equals(limit.getStatus())) {
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "B类额度状态为" + limit.getStatus() + "，不可操作");
+        }
+        return limit;
+    }
+
 
     /**
      * 查询循环贷流水

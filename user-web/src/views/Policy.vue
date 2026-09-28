@@ -3,12 +3,21 @@
     <el-card shadow="never">
       <template #header>
         <div class="card-header">
-          <span>政策智能匹配 - 人才安居 + 创业贴息</span>
-          <el-button type="primary" size="small" @click="handlePush" :loading="pushLoading">
-            一键推送匹配政策到消息中心
-          </el-button>
+          <span>政策智能匹配 - 全国青年政策库</span>
+          <div class="header-right">
+            <el-select v-model="region" placeholder="按地区筛选" clearable style="width:160px" @change="loadData">
+              <el-option v-for="r in regions" :key="r" :label="r === '全部' ? '全部地区' : r" :value="r === '全部' ? '' : r" />
+            </el-select>
+            <span class="auto-tip">匹配政策已自动推送至消息中心（模拟）</span>
+            <el-button type="primary" size="small" @click="handlePush" :loading="pushLoading">
+              重新推送匹配政策
+            </el-button>
+          </div>
         </div>
       </template>
+
+      <el-alert type="info" :closable="false" style="margin-bottom:14px"
+        title="政策库已升级为全国版：覆盖国家层面及 15 省市真实政策（官方来源），仅展示有效期内的政策，无数量限制；系统提取您的人群资质与创业行为关键词自动匹配，符合即自动推送消息中心" />
 
       <el-tabs v-model="activeTab">
         <el-tab-pane label="匹配我的政策" name="matched" />
@@ -17,49 +26,68 @@
 
       <div v-loading="loading" class="policy-list">
         <el-row :gutter="16">
-          <el-col :span="12" v-for="p in policies" :key="p.id">
+          <el-col :span="8" v-for="p in policies" :key="p.id">
             <el-card class="policy-card" :class="{ matched: p.matched }" shadow="hover">
               <div class="policy-head">
-                <el-tag :type="p.policyType === 'HOUSING' ? 'success' : 'primary'" size="small">
-                  {{ p.policyType === 'HOUSING' ? '人才安居' : '创业贴息' }}
+                <el-tag :type="p.policyType === 'HOUSING' ? 'success' : 'warning'" size="small">
+                  {{ p.policyTypeName }}
                 </el-tag>
+                <el-tag type="info" size="small" effect="plain">{{ p.region }}</el-tag>
                 <el-tag v-if="p.matched" type="success" size="small" effect="dark">已匹配</el-tag>
               </div>
-              <h3 class="policy-title">{{ p.title }}</h3>
-              <p class="policy-desc">{{ p.summary || p.description }}</p>
-              <div v-if="p.crowdTags" class="crowd-tags">
-                <el-tag v-for="tag in parseCrowdTags(p.crowdTags)" :key="tag" size="small" type="info">
-                  {{ crowdTagName(tag) }}
+              <h3 class="policy-title">{{ p.policyName }}</h3>
+              <p class="policy-summary">{{ p.policySummary }}</p>
+              <div class="policy-benefit">
+                {{ p.subsidyRate }}
+                <template v-if="p.maxAmount > 0">｜最高 ¥{{ p.maxAmount }}</template>
+              </div>
+              <div v-if="p.hitKeywords && p.hitKeywords.length" class="crowd-tags">
+                <el-tag v-for="k in p.hitKeywords" :key="k" size="small" type="success" effect="light">
+                  命中：{{ k }}
                 </el-tag>
               </div>
               <div class="policy-footer">
-                <el-button type="primary" link size="small" @click="viewDetail(p)">
-                  查看详情
-                </el-button>
-                <span v-if="p.matched" class="matched-tip">✓ 您符合申报条件</span>
+                <el-button type="primary" link size="small" @click="viewDetail(p)">详情 / 去申报</el-button>
+                <span v-if="p.matched" class="matched-tip">✓ 您符合</span>
               </div>
             </el-card>
           </el-col>
         </el-row>
-        <el-empty v-if="!loading && policies.length === 0" description="暂无匹配政策" />
+        <el-empty v-if="!loading && policies.length === 0" description="暂无政策" />
       </div>
     </el-card>
 
     <!-- 详情弹窗 -->
-    <el-dialog v-model="detailVisible" :title="current?.title" width="640px">
+    <el-dialog v-model="detailVisible" :title="current?.policyName" width="680px">
       <div v-if="current">
-        <p style="color: #606266; margin-bottom: 12px">{{ current.summary || current.description }}</p>
-        <el-divider />
+        <el-descriptions :column="2" border size="small" style="margin-bottom:14px">
+          <el-descriptions-item label="政策类型">{{ current.policyTypeName }}</el-descriptions-item>
+          <el-descriptions-item label="适用地区">{{ current.region || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="有效期">
+            {{ current.validFrom || '-' }} ~ {{ current.validTo || '长期有效' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="补贴标准">{{ current.subsidyRate || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="政策来源" :span="2">{{ current.policySource || '-' }}</el-descriptions-item>
+        </el-descriptions>
+        <h4>政策概要</h4>
+        <p class="cond-text">{{ current.policySummary }}</p>
         <h4>申报条件</h4>
-        <p style="white-space: pre-line">{{ current.conditions }}</p>
+        <p class="cond-text">{{ current.conditions }}</p>
         <h4>政策内容</h4>
-        <p style="white-space: pre-line">{{ current.content }}</p>
-        <h4>申报入口</h4>
+        <p class="cond-text">
+          适用人群：{{ current.targetCrowdList?.join('、') || '-' }}
+          <template v-if="current.hitKeywords && current.hitKeywords.length">
+            ｜系统命中：{{ current.hitKeywords.join('、') }} → {{ current.matchReason }}
+          </template>
+        </p>
+        <h4>申报入口（官方真实入口，点击跳转）</h4>
         <p>
-          <el-link type="primary" :underline="false">
-            {{ current.applyUrl || '演示入口（模拟）' }}
+          <el-link type="primary" :href="current.applyUrl" target="_blank" :underline="false">
+            {{ current.applyUrl || '官方申报页面' }}
           </el-link>
         </p>
+        <el-alert type="success" :closable="false" style="margin-top:10px"
+          title="演示说明：平台仅做政策匹配与跳转演示，实际申报请以官方页面为准（模拟）" />
       </div>
     </el-dialog>
   </div>
@@ -79,6 +107,9 @@ const loading = ref(false)
 const pushLoading = ref(false)
 const policies = ref([])
 const activeTab = ref('matched')
+const region = ref('')
+const regions = ['全部', '全国', '浙江', '广东', '江苏', '上海', '北京', '四川', '湖北',
+  '福建', '山东', '湖南', '河南', '安徽', '重庆', '广西', '陕西']
 const detailVisible = ref(false)
 const current = ref(null)
 
@@ -86,10 +117,14 @@ async function loadData() {
   loading.value = true
   try {
     if (activeTab.value === 'matched') {
-      policies.value = await matchedPolicies()
+      policies.value = await matchedPolicies(region.value || undefined)
     } else {
-      policies.value = await matchPolicies()
+      policies.value = await matchPolicies(region.value || undefined)
     }
+    if (activeTab.value === 'matched' && policies.value.length) {
+      ElMessage.success(`已自动匹配 ${policies.value.length} 条政策并推送至消息中心【模拟】`)
+    }
+  } catch (e) {
   } finally {
     loading.value = false
   }
@@ -111,33 +146,11 @@ async function viewDetail(p) {
 async function handlePush() {
   pushLoading.value = true
   try {
-    const matched = await pushPolicies()
-    ElMessage.success(`已推送 ${matched?.length || 0} 条匹配政策至消息中心【模拟】`)
+    const matched = await pushPolicies(region.value || undefined)
+    ElMessage.success(`已重新推送 ${matched?.length || 0} 条匹配政策至消息中心【模拟】`)
   } finally {
     pushLoading.value = false
   }
-}
-
-function parseCrowdTags(tags) {
-  if (!tags) return []
-  if (Array.isArray(tags)) return tags
-  try {
-    return JSON.parse(tags)
-  } catch (e) {
-    return String(tags).split(/[，,、]/).filter(Boolean)
-  }
-}
-function crowdTagName(tag) {
-  const m = {
-    STUDENT: '在校生',
-    GRADUATE: '应届毕业生',
-    ENTREPRENEUR: '创业者',
-    VETERAN: '退伍军人',
-    DISABLED: '残疾人',
-    FARMER: '农民',
-    OTHER: '其他'
-  }
-  return m[tag] || tag
 }
 
 onMounted(loadData)
@@ -145,7 +158,7 @@ onMounted(loadData)
 
 <style scoped>
 .policy-page {
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
@@ -153,6 +166,17 @@ onMounted(loadData)
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.auto-tip {
+  font-size: 12px;
+  color: #909399;
 }
 
 .policy-list {
@@ -163,6 +187,8 @@ onMounted(loadData)
   margin-bottom: 16px;
   border-radius: 8px;
   border-left: 4px solid #dcdfe6;
+  height: 100%;
+  box-sizing: border-box;
 }
 .policy-card.matched {
   border-left-color: #67c23a;
@@ -171,35 +197,59 @@ onMounted(loadData)
 
 .policy-head {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   margin-bottom: 8px;
+  flex-wrap: wrap;
 }
 
 .policy-title {
-  margin: 8px 0;
-  font-size: 16px;
+  margin: 6px 0;
+  font-size: 15px;
   color: #303133;
+  line-height: 1.4;
+  min-height: 42px;
 }
 
-.policy-desc {
+.policy-summary {
   color: #606266;
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.6;
+  margin-bottom: 6px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.policy-benefit {
+  color: #e6a23c;
+  font-size: 12px;
   margin-bottom: 8px;
 }
 
 .crowd-tags {
   margin-bottom: 8px;
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
 }
 
 .policy-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
 }
 
 .matched-tip {
   color: #67c23a;
   font-size: 12px;
+  font-weight: 600;
+}
+.cond-text {
+  white-space: pre-line;
+  color: #606266;
+  line-height: 1.8;
+  margin-bottom: 12px;
 }
 </style>

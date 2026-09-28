@@ -71,6 +71,20 @@ springdoc:
     enabled: true
     path: /swagger-ui.html
 
+# 政策定时同步（方案B：定时抓取官方栏目源）
+# enabled=false 可关闭；sources 可配置多个官方栏目页；抓取失败自动跳过不影响现有数据
+policy:
+  sync:
+    enabled: ${POLICY_SYNC_ENABLED:true}
+    cron: ${POLICY_SYNC_CRON:0 0 2 * * ?}
+    sources:
+      - name: gdhrss
+        region: 广东
+        url: https://hrss.gd.gov.cn/zdlyxx/zxzy/
+      - name: hzhrss
+        region: 浙江
+        url: https://hrss.hangzhou.gov.cn/col/col1587936/index.html
+
 # 对话引擎（步骤 7·智能中台）
 # engine=local 仅本地规则引擎（离线可用）；engine=agent 启用 LLM 增强（需 API Key，Key 由项目根 .env 注入）
 # API Key 安全红线：代码仅读 ${CHAT_LLM_API_KEY:} 环境变量占位符；Key 为空时 agent 自动降级 local 并提示"AI 增强未开启"

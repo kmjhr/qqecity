@@ -92,13 +92,13 @@
       </el-button>
       <div v-if="detectResult" class="detect-result">
         <el-alert :type="detectResult.isFraud ? 'error' : 'success'" :closable="false" :title="detectResult.isFraud ? `疑似诈骗（匹配 ${detectResult.matchCount} 个特征）` : '未检测到明显诈骗特征'">
-          <div v-if="detectResult.matchKeywords.length" style="margin-top:6px">
+          <div v-if="(detectResult.matchKeywords || []).length" style="margin-top:6px">
             命中特征：
             <el-tag v-for="k in detectResult.matchKeywords" :key="k" type="warning" style="margin-right:6px">{{ k }}</el-tag>
           </div>
         </el-alert>
-        <div class="suggest-box" v-if="detectResult.suggestion">
-          <b>建议：</b>{{ detectResult.suggestion }}
+        <div class="suggest-box" v-if="detectResult.warning">
+          <b>提示：</b>{{ detectResult.warning }}
         </div>
       </div>
     </el-drawer>
@@ -140,8 +140,25 @@ const doDetect = async () => {
   detecting.value = true
   detectResult.value = null
   try {
-    detectResult.value = await detectFraud({ text: detectText.value })
-  } catch (e) {} finally { detecting.value = false }
+    const res = await detectFraud({ inputText: detectText.value })
+    // 后端返回 BizFraudDetectionLog：detectResult / riskLevel / matchedRules / warningContent
+    const rules = parseMatchedRules(res.matchedRules || '')
+    detectResult.value = {
+      isFraud: res.detectResult !== 'SAFE',
+      matchCount: rules.length,
+      matchKeywords: rules,
+      warning: res.warningContent || ''
+    }
+  } catch (e) {
+    ElMessage.error(e?.message || '甄别失败，请稍后重试')
+  } finally { detecting.value = false }
+}
+
+/** 后端 matchedRules 形如 "[刷单, 垫付]"，解析为数组 */
+function parseMatchedRules(s) {
+  const t = s.trim()
+  if (t === '[]' || t === '') return []
+  return t.replace(/^\[|\]$/g, '').split(',').map(x => x.trim()).filter(Boolean)
 }
 
 onMounted(loadList)

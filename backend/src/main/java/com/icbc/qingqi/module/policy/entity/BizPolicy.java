@@ -43,8 +43,23 @@ public class BizPolicy {
     /** 申报条件速览 */
     private String conditions;
 
-    /** 申报入口URL（模拟） */
+    /** 申报入口URL（真实官方申报链接） */
     private String applyUrl;
+
+    /** 政策生效日期 */
+    private java.time.LocalDate validFrom;
+
+    /** 政策失效日期（NULL=长期有效） */
+    private java.time.LocalDate validTo;
+
+    /** 匹配关键词（逗号分隔） */
+    private String keywordTags;
+
+    /** 地区（全国/省/直辖市） */
+    private String region;
+
+    /** 政策概要（卡片速览） */
+    private String policySummary;
 
     /** 政策来源 */
     private String policySource;

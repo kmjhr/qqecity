@@ -237,8 +237,39 @@ public class ProfileService {
         dataPoints.add(buildDataPoint("记账收入笔数", String.valueOf(incomeRecords)));
         dataPoints.add(buildDataPoint("记账收入总额", incomeAmount.toPlainString()));
 
+        // === 经营力四子维度（对齐《工行杯9.26》P68：经营稳定性/收入连续性/客单与复购/履约记录） ===
+        // 1) 收入连续性：近6个月有经营收入月份数
+        long incomeMonths = records.stream()
+                .filter(r -> "INCOME".equals(r.getRecordType()) && r.getHappenDate() != null)
+                .map(r -> r.getHappenDate().withDayOfMonth(1))
+                .distinct()
+                .count();
+        dataPoints.add(buildDataPoint("收入连续性", incomeMonths + "/6个月有经营收入"));
+        // 2) 客单与复购：平均单笔金额 + 复购（同一往来方≥2笔）
+        BigDecimal avgTicket = incomeRecords > 0
+                ? incomeAmount.divide(new BigDecimal(incomeRecords), 2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
+        long incomePartyCount = records.stream()
+                .filter(r -> "INCOME".equals(r.getRecordType()) && r.getRelatedParty() != null
+                        && !r.getRelatedParty().isBlank())
+                .map(BizBookkeepingRecord::getRelatedParty)
+                .distinct()
+                .count();
+        boolean hasRepurchase = incomeRecords > 1 && incomePartyCount < incomeRecords;
+        dataPoints.add(buildDataPoint("平均单笔收入", "¥" + avgTicket.toPlainString()));
+        dataPoints.add(buildDataPoint("复购情况", hasRepurchase ? "存在回头客/复购往来" : "暂未形成复购"));
+        // 3) 履约记录：受托支付成功率
+        long totalPay = payments.size();
+        String perfRate = totalPay > 0 ? (successPay * 100 / totalPay) + "%" : "暂无受托支付";
+        dataPoints.add(buildDataPoint("受托支付履约率", perfRate));
+        // 4) 经营规模：受托支付 + 记账收入总额
+        BigDecimal totalIncome = payAmount.add(incomeAmount);
+        dataPoints.add(buildDataPoint("经营规模(受托支付+记账收入)", "¥" + totalIncome.toPlainString()));
+
         if (successPay >= 2) evidences.add("受托支付活跃，" + successPay + " 笔成功支付");
         if (incomeRecords >= 3) evidences.add("记账收入 " + incomeRecords + " 笔，经营记录规范");
+        if (incomeMonths >= 3) evidences.add("近6月有 " + incomeMonths + " 个月经营收入，收入连续性良好");
+        if (hasRepurchase) evidences.add("存在复购往来，客单稳定");
+        if (totalPay > 0 && successPay == totalPay) evidences.add("受托支付履约率100%，履约记录良好");
 
         int score = 30;
         if (successPay >= 2) score += 25;
