@@ -246,6 +246,34 @@ public class OverdueRiskService {
         return vo;
     }
 
+    /**
+     * 还款后自动复检（模拟）：还本付息完成后触发一次逾期预判；
+     * 若复检无风险，则将当前用户未处理的 OVERDUE_RISK 预警自动置为已处理（动态闭环演示）。
+     *
+     * @return 复检结果（predict 返回）
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public OverdueRiskVO refreshAfterRepay(Long userId) {
+        OverdueRiskVO vo = predict(userId, DEFAULT_AHEAD_DAYS);
+        boolean triggered = vo.getWarningTriggered() != null && vo.getWarningTriggered();
+        if (!triggered) {
+            LocalDateTime now = LocalDateTime.now();
+            List<BizRiskWarning> unhandled = riskWarningMapper.selectList(
+                    new LambdaQueryWrapper<BizRiskWarning>()
+                            .eq(BizRiskWarning::getUserId, userId)
+                            .eq(BizRiskWarning::getWarningType, "OVERDUE_RISK")
+                            .eq(BizRiskWarning::getIsHandled, 0));
+            for (BizRiskWarning w : unhandled) {
+                w.setIsHandled(1);
+                w.setHandleNote("还款后自动复检通过，风险解除（模拟）");
+                w.setHandleTime(now);
+                riskWarningMapper.updateById(w);
+            }
+            log.info("[逾期复检] 用户={} 还款后复检无风险，自动处理 {} 条 OVERDUE_RISK 预警", userId, unhandled.size());
+        }
+        return vo;
+    }
+
     public List<BizRiskWarning> listWarnings(Long userId) {
         return riskWarningMapper.selectList(
                 new LambdaQueryWrapper<BizRiskWarning>()

@@ -6,6 +6,11 @@ import request from './request'
 // 聚合：逾期风险 + 高频借贷 + 征信异常 + 预算超支 + 现金流预警
 // ============================================================
 
+/** 风险预警总览（一次返回 5 类 + 未处理数，直查共享表 biz_risk_warning） */
+export function getRiskOverview() {
+  return request.get('/v1/risk/overview')
+}
+
 /** 历史逾期风险预警 */
 export function getOverdueRiskWarnings() {
   return request.get('/v1/safety/overdue-risk/warnings')

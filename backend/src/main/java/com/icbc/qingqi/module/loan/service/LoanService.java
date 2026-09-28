@@ -19,6 +19,7 @@ import com.icbc.qingqi.module.message.mapper.SysMessageMapper;
 import com.icbc.qingqi.module.pay.dto.PayOrderVO;
 import com.icbc.qingqi.module.pay.service.PayService;
 import com.icbc.qingqi.module.pay.service.PaySuccessEvent;
+import com.icbc.qingqi.module.safety.service.OverdueRiskService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
@@ -59,6 +60,7 @@ public class LoanService {
     private final SysMessageMapper messageMapper;
     private final ApplicationEventPublisher eventPublisher;
     private final PayService payService;
+    private final OverdueRiskService overdueRiskService;
 
     // 贷款类型
     private static final String TYPE_A = "A_TYPE";
@@ -104,7 +106,8 @@ public class LoanService {
                        BizSavingGoalMapper savingGoalMapper,
                        SysMessageMapper messageMapper,
                        ApplicationEventPublisher eventPublisher,
-                       PayService payService) {
+                       PayService payService,
+                       OverdueRiskService overdueRiskService) {
         this.merchantMapper = merchantMapper;
         this.applicationMapper = applicationMapper;
         this.creditLimitMapper = creditLimitMapper;
@@ -117,6 +120,7 @@ public class LoanService {
         this.messageMapper = messageMapper;
         this.eventPublisher = eventPublisher;
         this.payService = payService;
+        this.overdueRiskService = overdueRiskService;
     }
 
     // ============================================================
@@ -779,6 +783,8 @@ public class LoanService {
 
         log.info("[A类还款] 用户={}, 本金={}, 利息={}, 天数={}, 可用余额={}",
                 userId, repayPrincipal, interest, borrowDays, limit.getAvailableLimit());
+        // C：还款后自动复检逾期风险（模拟）：风险解除自动置已处理
+        overdueRiskService.refreshAfterRepay(userId);
         return toTxnVO(txn);
     }
 
@@ -1037,6 +1043,8 @@ public class LoanService {
 
         log.info("[扫码还款成功] 订单={}, 用户={}, 类型={}, 本金={}, 利息={}",
                 event.getOrderNo(), event.getUserId(), limit.getCreditType(), repayPrincipal, interest);
+        // C：还款后自动复检逾期风险（模拟）：风险解除自动置已处理
+        overdueRiskService.refreshAfterRepay(event.getUserId());
     }
 
     /**

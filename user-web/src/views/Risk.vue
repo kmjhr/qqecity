@@ -3,7 +3,15 @@
     <el-card shadow="never">
       <template #header>
         <div class="card-header">
-          <span>风险预警总览（个人聚合）</span>
+          <span>
+            风险预警总览（个人聚合）
+            <el-badge
+              v-if="unhandledCount > 0"
+              :value="`${unhandledCount} 条未处理`"
+              type="danger"
+              class="unhandled-badge"
+            />
+          </span>
           <div class="header-actions">
             <el-button type="primary" size="small" :loading="detectLoading" @click="handleDetect">
               立即检测当前风险
@@ -14,7 +22,7 @@
       </template>
 
       <el-alert
-        title="本页聚合 5 类风险预警：逾期风险 / 高频借贷 / 征信异常 / 预算超支 / 现金流预警，均为模拟口径"
+        title="本页聚合 5 类风险预警：逾期风险 / 高频借贷 / 征信异常 / 预算超支 / 现金流预警，均为模拟口径；点击预警行可跳转对应业务模块"
         type="info"
         :closable="false"
         show-icon
@@ -31,7 +39,7 @@
       </el-tabs>
 
       <div v-loading="activeLoading" class="risk-list">
-        <el-table :data="activeData" stripe>
+        <el-table :data="activeData" stripe highlight-current-row @row-click="handleRowClick" class="risk-table">
           <el-table-column prop="warningType" label="类型" width="160">
             <template #default="{ row }">
               <el-tag :type="typeTagType(row.warningType)" size="small">
@@ -62,6 +70,11 @@
           <el-table-column label="预警时间" width="160">
             <template #default="{ row }">{{ formatTime(row.warningTime) }}</template>
           </el-table-column>
+          <el-table-column label="操作" width="100">
+            <template #default>
+              <el-link type="primary" :underline="false">查看详情 ›</el-link>
+            </template>
+          </el-table-column>
         </el-table>
         <el-empty v-if="!activeLoading && !activeData.length" description="暂无此类风险预警" />
       </div>
@@ -71,16 +84,25 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
-  getOverdueRiskWarnings,
-  getHighFreqBorrowWarnings,
-  getCreditAbnormalWarnings,
-  getCashflowWarnings,
+  getRiskOverview,
   predictOverdueRisk,
   detectHighFreqBorrow,
   detectCashflowWarning
 } from '@/api/risk'
+
+const router = useRouter()
+
+// 预警类型 → 业务模块路由（行点击跳转，模拟联动）
+const moduleRouteMap = {
+  OVERDUE_RISK: '/loan',          // 逾期风险 → 青创e贷（还款中心）
+  HIGH_FREQ_BORROW: '/loan',       // 高频借贷 → 青创e贷（额度管理）
+  CREDIT_ABNORMAL: '/credit-profile', // 征信异常 → 青年信用画像
+  BUDGET_OVER: '/budget',          // 预算超支 → 预算消费
+  CASHFLOW_WARNING: '/bookkeeping' // 现金流预警 → 经营赋能
+}
 
 const tabs = ref([
   { key: 'OVERDUE_RISK', name: '逾期风险', data: [] },
@@ -92,6 +114,7 @@ const tabs = ref([
 const activeTab = ref('OVERDUE_RISK')
 const activeLoading = ref(false)
 const detectLoading = ref(false)
+const unhandledCount = ref(0)
 
 const activeData = computed(() => {
   const t = tabs.value.find(x => x.key === activeTab.value)
@@ -132,18 +155,15 @@ function formatTime(t) {
 async function loadAll() {
   activeLoading.value = true
   try {
-    const [overdue, highFreq, creditAb, budgetList, cashflow] = await Promise.all([
-      getOverdueRiskWarnings().catch(() => []),
-      getHighFreqBorrowWarnings().catch(() => []),
-      getCreditAbnormalWarnings().catch(() => []),
-      Promise.resolve([]), // 预算超支历史需走 /v1/budget/*，暂用空数组占位
-      getCashflowWarnings().catch(() => [])
-    ])
-    tabs.value[0].data = overdue || []
-    tabs.value[1].data = highFreq || []
-    tabs.value[2].data = creditAb || []
-    tabs.value[3].data = budgetList || []
-    tabs.value[4].data = cashflow || []
+    const data = await getRiskOverview()
+    tabs.value[0].data = data.overdue || []
+    tabs.value[1].data = data.highFreqBorrow || []
+    tabs.value[2].data = data.creditAbnormal || []
+    tabs.value[3].data = data.budgetOver || []
+    tabs.value[4].data = data.cashflow || []
+    unhandledCount.value = data.unhandledCount || 0
+  } catch (e) {
+    // 请求失败保持空列表，不阻塞页面
   } finally {
     activeLoading.value = false
   }
@@ -151,6 +171,12 @@ async function loadAll() {
 
 async function loadActive() {
   // 已在 loadAll 中加载，切换 Tab 时无需重复请求
+}
+
+/** 行点击跳转对应业务模块（模拟联动） */
+function handleRowClick(row) {
+  const path = moduleRouteMap[row.warningType]
+  if (path) router.push(path)
 }
 
 async function handleDetect() {
@@ -188,6 +214,13 @@ onMounted(loadAll)
 .header-actions {
   display: flex;
   gap: 8px;
+}
+.unhandled-badge {
+  margin-left: 8px;
+  vertical-align: 1px;
+}
+.risk-table {
+  cursor: pointer;
 }
 .risk-list {
   min-height: 240px;
