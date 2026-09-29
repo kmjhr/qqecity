@@ -10,6 +10,7 @@
 ```
 scripts/
 ├── README.md                    # 本文档
+├── _legacy/                     # 🗄️  历史一次性开发/迁移脚本（不参与部署，仅供留档）
 ├── windows/                     # Windows 脚本（.bat）
 │   ├── config.bat               # ⚙️ 统一配置文件（数据库/Redis/端口等）
 │   ├── 00-check-env.bat         # 🔍 环境检查（Java/Maven/Node/MySQL/Redis/Git）
@@ -84,7 +85,7 @@ scripts\windows\01-init-db.bat
 scripts/linux/01-init-db.sh
 ```
 
-完成后会显示 41 张表和 5 个演示账号。
+完成后会显示 43 张表和 5 个演示账号。
 
 ### 第 5 步：初始化项目（编译+安装依赖）
 

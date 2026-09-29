@@ -109,7 +109,7 @@ EXIT;
 # 1. 创建数据库
 mysql -u root -p123456 -e "CREATE DATABASE IF NOT EXISTS qingqi DEFAULT CHARSET utf8mb4 DEFAULT COLLATE utf8mb4_general_ci;"
 
-# 2. 导入表结构（41 张表）
+# 2. 导入表结构（43 张表）
 mysql -u root -p123456 qingqi < backend/sql/schema.sql
 
 # 3. 导入演示数据

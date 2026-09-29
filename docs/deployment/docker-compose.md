@@ -110,7 +110,7 @@ docker compose restart backend
 
 MySQL 首次启动时会自动执行 `backend/sql/` 目录下的 SQL：
 
-1. `schema.sql` — 建表（41 张表）
+1. `schema.sql` — 建表（43 张表）
 2. `data.sql` — 演示数据（含演示账号）
 
 演示账号（用户名登录，统一密码 `123456`）：`admin`、`testuser`、`entrepreneur`、`landlord01`、`banker01`

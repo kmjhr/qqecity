@@ -18,7 +18,7 @@
 **选择理由**：
 - 与银行现有系统（Java 系）技术栈同族；生态成熟、资料多；模块化包结构预留微服务拆分
 - MyBatis-Plus CRUD 开箱即用、国内主流，降低骨架开发量，复杂查询与银行 SQL 风格贴合
-- MySQL 关系型、事务成熟，41 张表直接落地
+- MySQL 关系型、事务成熟，43 张表直接落地
 - JWT 无状态、前后端分离友好
 - springdoc-openapi 演示与答辩时可直接查看接口
 
@@ -75,7 +75,7 @@ backend/src/main/java/com/icbc/qingqi/
 | 应用服务层 | `module/*` 下的 Controller/Service |
 | 智能引擎层 | 骨架阶段以服务内规则模拟（AI 合同复审、预审规则、骗局甄别规则） |
 | 业务中台层 | 模拟桩：银行能力由服务层直接模拟，预留适配点 |
-| 数据层 | MySQL（schema.sql 41 张表）+ Redis（JWT 黑名单 + 缓存） |
+| 数据层 | MySQL（schema.sql 43 张表）+ Redis（JWT 黑名单 + 缓存） |
 
 ## 五、关键设计取舍
 

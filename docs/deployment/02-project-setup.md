@@ -149,7 +149,7 @@ mysql -u root -p123456 qingqi < data.sql
 ```sql
 USE qingqi;
 
--- 查看表数量（应返回 41）
+-- 查看表数量（应返回 43）
 SELECT COUNT(*) AS table_count FROM information_schema.tables WHERE table_schema = 'qingqi';
 
 -- 查看演示用户（应返回 5 条）

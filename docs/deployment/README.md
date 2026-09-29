@@ -25,7 +25,7 @@
 | [mysql-deployment.md](./mysql-deployment.md) | MySQL 8.0 部署（Windows / Linux 双平台 + 远程访问 + 数据导入） |
 | [redis-deployment.md](./redis-deployment.md) | Redis 7.x 部署（Windows / Linux 双平台 + 远程访问 + 安全加固） |
 | [docker-compose.md](./docker-compose.md) | Docker Compose 一键部署（MySQL + Redis + 后端 + 双前端） |
-| [database-design.md](./database-design.md) | 数据库设计与 ER 图（41 张表结构说明） |
+| [database-design.md](./database-design.md) | 数据库设计与 ER 图（43 张表结构说明） |
 
 ---
 
@@ -151,7 +151,7 @@ scripts/linux/99-start-all.sh
 - [ ] JDK 17+ 已安装，`java -version` 正常
 - [ ] Node.js 18+ 已安装，`node -v` 正常
 - [ ] MySQL 8.0 已启动，数据库 `qingqi` 已创建
-- [ ] schema.sql 已导入，表数量 = 41
+- [ ] schema.sql 已导入，表数量 = 43
 - [ ] data.sql 已导入，5 个演示账号可登录
 - [ ] Redis 已启动（推荐安装；未安装时后端自动降级，仅黑名单功能失效）
 - [ ] 后端 application.yml 数据库 / Redis 配置正确

@@ -47,6 +47,10 @@ public class AntiFraudAlertSourceService {
     /** 保留条数上限，超出清理最旧（防止定时生成无限膨胀） */
     private static final int KEEP_MAX = 30;
 
+    /** 自动生成记录的来源标记：仅清理这些来源，人工维护的预警（青启e城·模拟反诈预警 等）永不删除 */
+    private static final List<String> AUTO_SOURCES = List.of(
+            "平台实时轮换（模拟）", "公开反诈源爬取");
+
     private final AtomicInteger templateCursor = new AtomicInteger(0);
 
     /** 模拟实时模板池（与平台五大业务场景强关联：保函/征信/创业贷/理财/平台客服） */
@@ -161,19 +165,26 @@ public class AntiFraudAlertSourceService {
         }
     }
 
-    /** 仅保留最新 KEEP_MAX 条（按发布时间），清理最旧记录 */
+    /**
+     * 仅保留自动生成记录（mock/real）的最新 KEEP_MAX 条，清理最旧自动记录。
+     * 人工维护的预警（source 不在 AUTO_SOURCES 内，如种子数据"青启e城·模拟反诈预警"）永不参与清理，
+     * 避免定时任务把人工展示数据当垃圾挤出（曾出现种子数据被误删）。
+     */
     private void trimToMax() {
-        Long total = alertMapper.selectCount(null);
-        if (total == null || total <= KEEP_MAX) return;
+        Long auto = alertMapper.selectCount(new LambdaQueryWrapper<BizAntiFraudAlert>()
+                .in(BizAntiFraudAlert::getSource, AUTO_SOURCES));
+        if (auto == null || auto <= KEEP_MAX) return;
         List<BizAntiFraudAlert> keep = alertMapper.selectList(
                 new LambdaQueryWrapper<BizAntiFraudAlert>()
+                        .in(BizAntiFraudAlert::getSource, AUTO_SOURCES)
                         .orderByDesc(BizAntiFraudAlert::getPublishTime)
                         .last("LIMIT " + KEEP_MAX));
         if (!keep.isEmpty()) {
             LocalDateTime oldestKeep = keep.get(keep.size() - 1).getPublishTime();
             alertMapper.delete(new LambdaQueryWrapper<BizAntiFraudAlert>()
+                    .in(BizAntiFraudAlert::getSource, AUTO_SOURCES)
                     .lt(BizAntiFraudAlert::getPublishTime, oldestKeep));
-            log.info("[反诈预警] 数据已超上限，清理至最新 {} 条", KEEP_MAX);
+            log.info("[反诈预警] 自动数据已超上限，清理至最新 {} 条（人工预警不受影响）", KEEP_MAX);
         }
     }
 }

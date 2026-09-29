@@ -12,7 +12,7 @@
 - 👥 **多角色体系**：青年用户（在校生/毕业生/创业者）、房东、银行运营岗、系统管理员
 - 📱 **三端复用**：用户网页 + 管理后台 + 微信小程序（共用后端 API）
 - 🔐 **JWT 鉴权**：Token 双令牌 + Redis 黑名单 + 角色权限控制
-- 🗄️ **41 张数据表**：完整覆盖业务全链路，ER 关系清晰
+- 🗄️ **43 张数据表**：完整覆盖业务全链路，ER 关系清晰
 - 🐳 **Docker 一键启动**：MySQL + Redis + 后端 + 双前端全部容器化
 - 🧪 **内置演示数据**：5 个演示账号 + 各模块样例数据，开箱即用
 - 📖 **完整文档体系**：需求文档 + 模块设计 + 部署指南 + 问题排查
@@ -54,7 +54,7 @@ qingqi-ecity/
 │   ├── pom.xml
 │   ├── Dockerfile
 │   ├── sql/                        # SQL 脚本
-│   │   ├── schema.sql              # 建表 SQL（41 张表）
+│   │   ├── schema.sql              # 建表 SQL（43 张表）
 │   │   └── data.sql                # 演示数据（幂等可重复导入）
 │   └── src/main/
 │       ├── java/com/icbc/qingqi/
@@ -314,7 +314,7 @@ npm run dev
 | --- | --- |
 | [后端架构说明](docs/backend/architecture.md) | 分层架构、模块划分、代码规范 |
 | [接口规范](docs/backend/api-spec.md) | 统一返回格式、错误码、鉴权规则 |
-| [数据库设计与 ER 图](docs/deployment/database-design.md) | 41 张表的字段、关系、ER 说明 |
+| [数据库设计与 ER 图](docs/deployment/database-design.md) | 43 张表的字段、关系、ER 说明 |
 | [用户前端页面结构](docs/user-web/page-structure.md) | 路由、菜单、页面布局 |
 | [管理前端页面结构](docs/admin-web/page-structure.md) | 管理端页面与权限说明 |
 
@@ -345,7 +345,7 @@ npm run dev
 
 - [ ] 后端启动无报错，端口 8080 正常监听
 - [ ] 访问 `http://localhost:8080/api/...` 接口返回正常 JSON
-- [ ] MySQL 中有 41 张表，数据库字符集为 utf8mb4
+- [ ] MySQL 中有 43 张表，数据库字符集为 utf8mb4
 - [ ] 用户前端可以正常打开（http://localhost:5173）
 - [ ] 用户端登录成功（testuser / 123456）
 - [ ] 管理前端可以正常打开（http://localhost:5174）

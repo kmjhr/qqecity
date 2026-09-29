@@ -269,7 +269,7 @@ SELECT DATABASE();
 USE qingqi;
 SHOW TABLES;
 
--- 3. 检查表数量（应为 41 张）
+-- 3. 检查表数量（应为 43 张）
 SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'qingqi';
 ```
 
