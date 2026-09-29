@@ -54,8 +54,9 @@
                   </div>
                   <div class="credit-remark">{{ aCredit.remark }}</div>
                   <div class="credit-actions" v-if="aCredit.status === 'ACTIVE'">
-                    <el-button size="small" type="primary" @click="openWithdraw(aCredit)">提款</el-button>
                     <el-button size="small" @click="openTxns(aCredit)">流水</el-button>
+                    <el-button type="primary" :disabled="!promoted" @click="openWithdraw(aCredit)">提款</el-button>
+                    <div v-if="!promoted" style="margin-top:8px; font-size:12px; color:#f56c6c">B 转 A 通过后方可使用 A 类循环贷提款</div>
                   </div>
                 </div>
                 <el-empty v-else-if="!creditLoading" description="暂无A类额度（B类观察期数据回流达标后可一键转A）" />
@@ -388,7 +389,7 @@
                 </el-card>
               </el-col>
               <el-col :xs="24" :md="12">
-                <el-card shadow="never" style="margin-bottom:16px">
+                <el-card shadow="never" class="merchant-list-card" style="margin-bottom:16px">
                   <template #header>
                     <div class="app-card-head">
                       <span>定向打款商户</span>
@@ -532,7 +533,7 @@
     </el-tabs>
 
     <!-- 添加自定义商户弹窗（管理端 banker 审核，仅本人可用，每单复核） -->
-    <el-dialog v-model="merchantDialog" title="添加自定义商户（需管理端审核）" width="560px">
+    <el-dialog v-model="merchantDialog" class="merchant-dialog" title="添加自定义商户（需管理端审核）" width="560px">
       <el-alert type="info" :closable="false" style="margin-bottom:12px"
         title="提交后进入灰名单，由管理端 banker 审核；通过后仅你本人可用于受托支付，且每次打款前仍会复核【模拟】" />
       <el-form label-width="96px">
@@ -1244,6 +1245,9 @@ onMounted(() => { loadRules(); loadCredit(); loadMerchants(); loadApplications()
 .app-amount-tip { font-size: 13px; color: #67c23a; background: #f0f9eb; border-radius: 6px; padding: 8px 12px; margin: -8px 0 14px 110px; }
 .app-amount-tip .tip-sub { color: #909399; font-size: 12px; }
 .merchant-tip { margin-top: 10px; font-size: 12px; color: #e6a23c; }
+
+/* 定向打款商户：仅按钮文字固定白色（卡片背景等保持原样） */
+.merchant-list-card :deep(.el-button--primary) { color: #fff !important; background: linear-gradient(135deg, #0ea5e9, #10b981) !important; border: none !important; }
 .intro-row { margin-top: 16px; }
 .product-card { border-top: 3px solid #409eff; }
 .product-card.card-a { border-top-color: #409eff; }
@@ -1306,4 +1310,9 @@ onMounted(() => { loadRules(); loadCredit(); loadMerchants(); loadApplications()
 .ai-guard-list .reject-item { color: #c45656; background: #fef0f0; }
 .ai-guard-list .dot { font-weight: 700; margin-right: 6px; }
 .ai-guard-no { color: #909399; font-size: 12px; }
+</style>
+
+<!-- 添加自定义商户弹窗：仅"选择文件"按钮文字固定白色（其余保持原样） -->
+<style>
+.merchant-dialog .el-upload button { color: #fff !important; background: linear-gradient(135deg, #0ea5e9, #10b981) !important; border: none !important; }
 </style>

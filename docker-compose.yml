@@ -60,6 +60,10 @@ services:
       CHAT_LLM_MODEL: ${CHAT_LLM_MODEL:-doubao-pro-32k}
       # 对话引擎 System Prompt 覆盖（可选）：SPRING_APPLICATION_JSON 优先级高于 application.yml，改 prompt 无需重建镜像
       SPRING_APPLICATION_JSON: ${SPRING_APPLICATION_JSON:-}
+      # 反诈预警数据源（可选）：mock=模拟实时轮换（默认，演示稳定）/ real=真实爬取公开反诈源（失败自动回退模拟，不空页）
+      ANTI_FRAUD_SOURCE: ${ANTI_FRAUD_SOURCE:-mock}
+      ANTI_FRAUD_POLL_MINUTES: ${ANTI_FRAUD_POLL_MINUTES:-30}
+      ANTI_FRAUD_SOURCE_URL: ${ANTI_FRAUD_SOURCE_URL:-https://www.cpd.com.cn/n15729503/}
     ports:
       - "8080:8080"
 

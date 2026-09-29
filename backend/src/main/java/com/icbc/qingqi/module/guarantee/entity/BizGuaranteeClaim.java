@@ -67,6 +67,9 @@ public class BizGuaranteeClaim {
     /** 申辩内容（租客提交） */
     private String defenseContent;
 
+    /** 申辩佐证材料（JSON 数组，租客提交） */
+    private String defenseFiles;
+
     /** 实际赔付金额 */
     private BigDecimal payoutAmount;
 

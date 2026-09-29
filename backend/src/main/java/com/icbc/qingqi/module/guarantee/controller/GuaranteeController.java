@@ -1,11 +1,13 @@
 package com.icbc.qingqi.module.guarantee.controller;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.icbc.qingqi.common.Result;
 import com.icbc.qingqi.module.guarantee.dto.GuaranteeApplyDTO;
 import com.icbc.qingqi.module.guarantee.dto.GuaranteeApplicationVO;
 import com.icbc.qingqi.module.guarantee.dto.GuaranteeVO;
 import com.icbc.qingqi.module.guarantee.dto.LandlordSignDTO;
+import com.icbc.qingqi.module.guarantee.dto.MoveoutRecordDTO;
 import com.icbc.qingqi.module.guarantee.service.GuaranteeService;
 import com.icbc.qingqi.module.pay.dto.PayOrderVO;
 import com.icbc.qingqi.security.UserContext;
@@ -129,6 +131,59 @@ public class GuaranteeController {
     // ============================================================
     //  辅助：状态流转说明
     // ============================================================
+
+    @Operation(summary = "G-5 租客名下已开立保函列表",
+            description = "当前租客名下已开立的电子保函（退租留档选函用）。")
+    @GetMapping("/mine")
+    public Result<List<GuaranteeVO>> tenantGuarantees() {
+        Long userId = UserContext.getUserId();
+        return Result.success(guaranteeService.listTenantGuarantees(userId));
+    }
+
+    @Operation(summary = "G-5 退租留档提交",
+            description = "租客结束租房时上传房屋照片留档，系统做照片合格审核（模拟）：照片>=3张且清晰→合格留档，否则需补拍或人工复核。")
+    @PostMapping("/moveout/record")
+    public Result<Map<String, Object>> submitMoveoutRecord(@Valid @RequestBody MoveoutRecordDTO dto) {
+        Long userId = UserContext.getUserId();
+        return Result.success(guaranteeService.submitMoveoutRecord(userId, dto));
+    }
+
+    @Operation(summary = "G-5 我的退租留档记录",
+            description = "当前租客的退租留档记录（分页）。")
+    @GetMapping("/moveout/records")
+    public Result<IPage<Map<String, Object>>> pageMoveoutRecords(
+            @RequestParam(defaultValue = "1") int pageNum,
+            @RequestParam(defaultValue = "10") int pageSize) {
+        Long userId = UserContext.getUserId();
+        return Result.success(guaranteeService.pageMoveoutRecords(userId, pageNum, pageSize));
+    }
+
+    @Operation(summary = "G-5 管理端：待房东确认的退租留档列表",
+            description = "照片合格留档但房东（管理端代）未确认无需索赔的记录，供运营人员代房东确认（完美结束）。")
+    @GetMapping("/moveout/pending-confirm")
+    public Result<IPage<Map<String, Object>>> pagePendingLandlordConfirm(
+            @RequestParam(defaultValue = "1") int pageNum,
+            @RequestParam(defaultValue = "10") int pageSize) {
+        return Result.success(guaranteeService.pagePendingLandlordConfirm(pageNum, pageSize));
+    }
+
+    @Operation(summary = "G-5 管理端：代房东确认无需索赔（完美结束）",
+            description = "留档仅系统防纠纷；房东确认不索赔后，保函房屋状态更新为：租后·确认无需索赔。")
+    @PostMapping("/moveout/{id}/landlord-confirm")
+    public Result<Map<String, Object>> landlordConfirmMoveout(
+            @Parameter(description = "留档记录 ID") @PathVariable Long id,
+            @RequestBody(required = false) Map<String, Object> body) {
+        String remark = body != null && body.get("remark") != null ? body.get("remark").toString() : "代房东确认无需索赔（模拟）";
+        return Result.success(guaranteeService.landlordConfirmMoveout(id, remark));
+    }
+
+    @Operation(summary = "G-6 房东名下保函列表",
+            description = "当前用户作为房东名下的全部保函（含已开立 ACTIVE，供发起索赔选择）。租客视角无此接口。")
+    @GetMapping("/landlord/guarantees")
+    public Result<List<GuaranteeVO>> landlordGuarantees() {
+        Long userId = UserContext.getUserId();
+        return Result.success(guaranteeService.listLandlordGuarantees(userId));
+    }
 
     @Operation(summary = "保函状态流转说明",
             description = "返回 5 态流转：申请中→待确认→待缴费→已开立→已失效，供前端展示。")

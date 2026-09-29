@@ -1,11 +1,14 @@
 package com.icbc.qingqi.module.guarantee.service;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.icbc.qingqi.common.BizException;
 import com.icbc.qingqi.common.ErrorCode;
 import com.icbc.qingqi.module.guarantee.dto.GuaranteeApplyDTO;
+import com.icbc.qingqi.module.guarantee.dto.MoveoutRecordDTO;
 import com.icbc.qingqi.module.guarantee.dto.GuaranteeApplicationVO;
 import com.icbc.qingqi.module.guarantee.dto.GuaranteeVO;
 import com.icbc.qingqi.module.guarantee.dto.LandlordSignDTO;
@@ -17,6 +20,7 @@ import com.icbc.qingqi.module.pay.dto.PayOrderVO;
 import com.icbc.qingqi.module.pay.service.PayService;
 import com.icbc.qingqi.module.pay.service.PaySuccessEvent;
 import com.icbc.qingqi.module.user.entity.SysUser;
+import com.icbc.qingqi.security.UserContext;
 import com.icbc.qingqi.module.user.mapper.SysUserMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
@@ -50,8 +54,10 @@ public class GuaranteeService {
     private final BizLandlordMapper landlordMapper;
     private final BizHouseMapper houseMapper;
     private final BizRentalContractMapper contractMapper;
+    private final BizMoveoutRecordMapper moveoutRecordMapper;
     private final BizGuaranteeApplicationMapper applicationMapper;
     private final BizGuaranteeMapper guaranteeMapper;
+    private final BizGuaranteeClaimMapper claimMapper;
     private final SysUserMapper userMapper;
     private final SysMessageMapper messageMapper;
     private final PayService payService;
@@ -74,6 +80,16 @@ public class GuaranteeService {
     private static final String GUARANTEE_ACTIVE = "ACTIVE";
     private static final String GUARANTEE_EXPIRED = "EXPIRED";
 
+    // 房屋租住情况（租期前/中/后 × 索赔 × 留档确认）
+    private static final String SIT_PRE_RENTAL = "PRE_RENTAL";
+    private static final String SIT_RENTING_CLAIMED = "RENTING_CLAIMED";
+    private static final String SIT_ENDED_CLAIMED = "ENDED_CLAIMED";
+    private static final String SIT_RENTING_NORMAL = "RENTING_NORMAL";
+    private static final String SIT_ENDED_NORMAL = "ENDED_NORMAL";
+    private static final String SIT_ENDED_CONFIRMED = "ENDED_CONFIRMED";
+    private static final String SIT_ENDED_PENDING_CONFIRM = "ENDED_PENDING_CONFIRM";
+    private static final String SIT_ENDED_EXPIRED = "ENDED_EXPIRED";
+
     // 缴费状态
     private static final String PAY_UNPAID = "UNPAID";
     private static final String PAY_PAID = "PAID";
@@ -84,16 +100,20 @@ public class GuaranteeService {
     public GuaranteeService(BizLandlordMapper landlordMapper,
                             BizHouseMapper houseMapper,
                             BizRentalContractMapper contractMapper,
+                            BizMoveoutRecordMapper moveoutRecordMapper,
                             BizGuaranteeApplicationMapper applicationMapper,
                             BizGuaranteeMapper guaranteeMapper,
+                            BizGuaranteeClaimMapper claimMapper,
                             SysUserMapper userMapper,
                             SysMessageMapper messageMapper,
                             PayService payService) {
         this.landlordMapper = landlordMapper;
         this.houseMapper = houseMapper;
         this.contractMapper = contractMapper;
+        this.moveoutRecordMapper = moveoutRecordMapper;
         this.applicationMapper = applicationMapper;
         this.guaranteeMapper = guaranteeMapper;
+        this.claimMapper = claimMapper;
         this.userMapper = userMapper;
         this.messageMapper = messageMapper;
         this.payService = payService;
@@ -642,9 +662,120 @@ public class GuaranteeService {
         return toGuaranteeVO(guarantee, app);
     }
 
+    /**
+     * 房东名下保函列表（G-6 索赔入口：房东选择已开立保函发起索赔）
+     * 仅返回当前用户作为房东名下的保函，租客视角无此接口
+     */
+    public List<GuaranteeVO> listLandlordGuarantees(Long currentUserId) {
+        BizLandlord landlord = landlordMapper.selectOne(
+                new LambdaQueryWrapper<BizLandlord>().eq(BizLandlord::getUserId, currentUserId));
+        if (landlord == null) {
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "当前用户不是房东，无名下保函");
+        }
+        List<BizGuarantee> guarantees = guaranteeMapper.selectList(
+                new LambdaQueryWrapper<BizGuarantee>()
+                        .eq(BizGuarantee::getLandlordId, landlord.getId())
+                        .orderByDesc(BizGuarantee::getCreateTime));
+        return guarantees.stream()
+                .map(g -> toGuaranteeVO(g, applicationMapper.selectById(g.getApplicationId())))
+                .toList();
+    }
+
+    /**
+     * 租客名下已开立保函列表（退租留档选函用）
+     */
+    public List<GuaranteeVO> listTenantGuarantees(Long tenantId) {
+        List<BizGuarantee> guarantees = guaranteeMapper.selectList(
+                new LambdaQueryWrapper<BizGuarantee>()
+                        .inSql(BizGuarantee::getApplicationId,
+                                "SELECT id FROM biz_guarantee_application WHERE tenant_id = " + tenantId)
+                        .orderByDesc(BizGuarantee::getCreateTime));
+        return guarantees.stream()
+                .map(g -> toGuaranteeVO(g, applicationMapper.selectById(g.getApplicationId())))
+                .toList();
+    }
+
+    /**
+     * 管理端：待房东确认的退租留档列表（照片合格但房东未确认无需索赔）
+     */
+    public IPage<Map<String, Object>> pagePendingLandlordConfirm(int pageNum, int pageSize) {
+        checkBackOffice();
+        Page<BizMoveoutRecord> page = moveoutRecordMapper.selectPage(new Page<>(pageNum, pageSize),
+                new LambdaQueryWrapper<BizMoveoutRecord>()
+                        .eq(BizMoveoutRecord::getCheckResult, "PASS")
+                        .ne(BizMoveoutRecord::getLandlordConfirm, "CONFIRMED")
+                        .orderByDesc(BizMoveoutRecord::getCreateTime));
+        return page.convert(this::toPendingConfirmVO);
+    }
+
+    /**
+     * 管理端：代房东确认无需索赔（留档仅系统防纠纷，房东确认不索赔才是完美结束）
+     */
+    @Transactional
+    public Map<String, Object> landlordConfirmMoveout(Long recordId, String remark) {
+        checkBackOffice();
+        BizMoveoutRecord record = moveoutRecordMapper.selectById(recordId);
+        if (record == null) {
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "留档记录不存在");
+        }
+        if (!"PASS".equals(record.getCheckResult())) {
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "仅照片审核合格的留档可确认无需索赔");
+        }
+        record.setLandlordConfirm("CONFIRMED");
+        record.setLandlordConfirmTime(LocalDateTime.now());
+        record.setLandlordConfirmRemark(remark);
+        moveoutRecordMapper.updateById(record);
+        Map<String, Object> m = new HashMap<>();
+        m.put("recordId", record.getId());
+        m.put("recordNo", record.getRecordNo());
+        m.put("guaranteeNo", record.getGuaranteeNo());
+        m.put("landlordConfirm", "CONFIRMED");
+        m.put("message", "已代房东确认无需索赔（模拟），该保函房屋状态更新为：已确认（完美结束）");
+        return m;
+    }
+
+    private Map<String, Object> toPendingConfirmVO(BizMoveoutRecord r) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("recordId", r.getId());
+        m.put("recordNo", r.getRecordNo());
+        m.put("guaranteeId", r.getGuaranteeId());
+        m.put("guaranteeNo", r.getGuaranteeNo());
+        m.put("photos", r.getPhotosJson());
+        m.put("checkResult", r.getCheckResult());
+        m.put("checkDetail", r.getCheckDetail());
+        m.put("landlordConfirm", r.getLandlordConfirm());
+        m.put("createTime", r.getCreateTime());
+        BizGuarantee g = guaranteeMapper.selectById(r.getGuaranteeId());
+        if (g != null) {
+            m.put("guaranteeAmount", g.getGuaranteeAmount());
+            BizGuaranteeApplication app = applicationMapper.selectById(g.getApplicationId());
+            if (app != null) {
+                m.put("tenantName", app.getApplicantName());
+                m.put("landlordName", app.getLandlordName());
+                BizRentalContract contract = contractMapper.selectById(app.getContractId());
+                if (contract != null) {
+                    m.put("rentStartDate", contract.getRentStartDate());
+                    m.put("rentEndDate", contract.getRentEndDate());
+                }
+            }
+            BizHouse house = houseMapper.selectById(g.getHouseId());
+            if (house != null) {
+                m.put("houseAddress", house.getAddress());
+            }
+        }
+        return m;
+    }
+
     // ============================================================
     //  工具方法
     // ============================================================
+
+    private void checkBackOffice() {
+        String role = UserContext.getRole();
+        if (!"ADMIN".equals(role) && !"BANK_OPERATOR".equals(role)) {
+            throw new BizException(ErrorCode.FORBIDDEN, "仅银行运营人员可操作");
+        }
+    }
 
     private BizGuaranteeApplication getApplication(Long id) {
         BizGuaranteeApplication app = applicationMapper.selectById(id);
@@ -700,6 +831,106 @@ public class GuaranteeService {
         };
     }
 
+    // ============================================================
+    //  退租留档：结束租房上传房屋照片，AI 合格审核（模拟）
+    // ============================================================
+
+    /**
+     * 退租留档提交
+     * <p>
+     * 租客结束租房时上传房屋照片，系统做照片合格审核（模拟）：
+     * 照片 &gt;= 3 张且画面清晰（文件名不含"模糊/遮挡/反光/不清晰"）→ PASS 合格留档；
+     * 否则 → REVIEW（需补拍后重新提交或转人工复核）。
+     */
+    @Transactional
+    public Map<String, Object> submitMoveoutRecord(Long currentUserId, MoveoutRecordDTO dto) {
+        BizGuarantee guarantee = guaranteeMapper.selectById(dto.getGuaranteeId());
+        if (guarantee == null) {
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "保函不存在");
+        }
+        // 越权校验：仅该保函对应的租客可提交退租留档
+        BizGuaranteeApplication app = applicationMapper.selectById(guarantee.getApplicationId());
+        if (app == null || !app.getTenantId().equals(currentUserId)) {
+            throw new BizException(ErrorCode.FORBIDDEN, "仅该保函对应的租客可提交退租留档");
+        }
+
+        // 解析照片列表（JSON 数组）
+        List<String> photos;
+        try {
+            photos = JSONUtil.toList(dto.getPhotos(), String.class);
+        } catch (Exception e) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "照片列表格式不正确");
+        }
+        if (photos == null || photos.isEmpty()) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "请上传房屋照片");
+        }
+
+        // AI 照片合格审核（模拟）
+        boolean blurHit = photos.stream().anyMatch(f -> f != null && (f.contains("模糊") || f.contains("遮挡")
+                || f.contains("反光") || f.contains("不清晰")));
+        String result;
+        String detail;
+        if (photos.size() >= 3 && !blurHit) {
+            result = "PASS";
+            detail = "共上传房屋照片" + photos.size() + "张，画面清晰、无遮挡，审核合格，已留档。【模拟】";
+        } else {
+            result = "REVIEW";
+            StringBuilder tip = new StringBuilder("共上传房屋照片" + photos.size() + "张；");
+            if (photos.size() < 3) {
+                tip.append("照片数量不足 3 张；");
+            }
+            if (blurHit) {
+                tip.append("存在画面模糊/遮挡照片；");
+            }
+            tip.append("未通过合格审核，需补拍后重新提交或转人工复核。【模拟】");
+            detail = tip.toString();
+        }
+
+        BizMoveoutRecord record = new BizMoveoutRecord();
+        record.setRecordNo(generateNo("TZ"));
+        record.setGuaranteeId(guarantee.getId());
+        record.setGuaranteeNo(guarantee.getGuaranteeNo());
+        record.setTenantId(currentUserId);
+        record.setLandlordId(guarantee.getLandlordId());
+        record.setHouseId(app.getHouseId());
+        record.setPhotosJson(dto.getPhotos());
+        record.setCheckResult(result);
+        record.setCheckDetail(detail);
+        record.setRemark(dto.getRemark());
+        moveoutRecordMapper.insert(record);
+
+        log.info("[退租留档] 编号={}, 保函={}, 照片={}张, 审核结果={}", record.getRecordNo(),
+                guarantee.getGuaranteeNo(), photos.size(), result);
+        return toMoveoutVO(record);
+    }
+
+    /**
+     * 我的退租留档记录（分页，租客本人）
+     */
+    public IPage<Map<String, Object>> pageMoveoutRecords(Long currentUserId, int pageNum, int pageSize) {
+        Page<BizMoveoutRecord> page = new Page<>(pageNum, pageSize);
+        LambdaQueryWrapper<BizMoveoutRecord> qw = new LambdaQueryWrapper<BizMoveoutRecord>()
+                .eq(BizMoveoutRecord::getTenantId, currentUserId)
+                .orderByDesc(BizMoveoutRecord::getCreateTime);
+        return moveoutRecordMapper.selectPage(page, qw).convert(this::toMoveoutVO);
+    }
+
+    private Map<String, Object> toMoveoutVO(BizMoveoutRecord r) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("id", r.getId());
+        m.put("recordNo", r.getRecordNo());
+        m.put("guaranteeId", r.getGuaranteeId());
+        m.put("guaranteeNo", r.getGuaranteeNo());
+        m.put("landlordId", r.getLandlordId());
+        m.put("houseId", r.getHouseId());
+        m.put("photos", r.getPhotosJson());
+        m.put("checkResult", r.getCheckResult());
+        m.put("checkDetail", r.getCheckDetail());
+        m.put("remark", r.getRemark());
+        m.put("createTime", r.getCreateTime());
+        return m;
+    }
+
     private String generateNo(String prefix) {
         return prefix + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
     }
@@ -747,7 +978,80 @@ public class GuaranteeService {
         if (house != null) {
             vo.setHouseAddress(house.getAddress());
         }
+        // 房屋租住情况：租期前/中/后 × 被索赔/正常 × 留档确认无需索赔
+        String[] sit = houseSituation(guarantee, app);
+        vo.setHouseSituation(sit[0]);
+        vo.setHouseSituationName(sit[1]);
+        // 租期（关联租赁合同）
+        if (app != null && app.getContractId() != null) {
+            BizRentalContract contract = contractMapper.selectById(app.getContractId());
+            if (contract != null) {
+                vo.setRentStartDate(contract.getRentStartDate());
+                vo.setRentEndDate(contract.getRentEndDate());
+            }
+        }
         return vo;
+    }
+
+    /**
+     * 派生房屋租住情况（状态名不携带阶段前缀，阶段由前端分区标题体现）：
+     * - 租期前（未入住）：待入住
+     * - 租期中：正常 / 被索赔
+     * - 租期后（仅提交留档并通过审核才归入）：待确认 / 已确认 / 已过期 / 被索赔
+     *   有索赔 → 被索赔；无合格留档（未提交或 REVIEW）→ 不归入分区（返回 null）；
+     *   保函过期（expireDate < 今日）→ 已过期；房东未确认 → 待确认；已确认 → 已确认。
+     * 租期取自关联租赁合同 rent_end_date（保函有效期长于租期，租期结束后保函仍有效属正常）。
+     */
+    private String[] houseSituation(BizGuarantee guarantee, BizGuaranteeApplication app) {
+        boolean hasClaim = claimMapper.selectCount(new LambdaQueryWrapper<BizGuaranteeClaim>()
+                .eq(BizGuaranteeClaim::getGuaranteeId, guarantee.getId())
+                .ne(BizGuaranteeClaim::getClaimStatus, "REJECTED")) > 0;
+        // 留档仅系统防纠纷；租后需房东（管理端代）确认不索赔才算完美结束
+        boolean hasPass = moveoutRecordMapper.selectCount(new LambdaQueryWrapper<BizMoveoutRecord>()
+                .eq(BizMoveoutRecord::getGuaranteeId, guarantee.getId())
+                .eq(BizMoveoutRecord::getCheckResult, "PASS")) > 0;
+        boolean hasConfirm = moveoutRecordMapper.selectCount(new LambdaQueryWrapper<BizMoveoutRecord>()
+                .eq(BizMoveoutRecord::getGuaranteeId, guarantee.getId())
+                .eq(BizMoveoutRecord::getCheckResult, "PASS")
+                .eq(BizMoveoutRecord::getLandlordConfirm, "CONFIRMED")) > 0;
+        LocalDate today = LocalDate.now();
+        LocalDate rentStart = null;
+        LocalDate rentEnd = null;
+        if (app != null && app.getContractId() != null) {
+            BizRentalContract contract = contractMapper.selectById(app.getContractId());
+            if (contract != null) {
+                rentStart = contract.getRentStartDate();
+                rentEnd = contract.getRentEndDate();
+            }
+        }
+        if (rentEnd == null) {
+            return new String[]{null, null};
+        }
+        // 租期前：租期未开始（保函已开立，待入住）
+        if (rentStart != null && rentStart.isAfter(today)) {
+            return new String[]{SIT_PRE_RENTAL, "待入住"};
+        }
+        boolean ended = rentEnd.isBefore(today);
+        if (hasClaim) {
+            return ended
+                    ? new String[]{SIT_ENDED_CLAIMED, "被索赔"}
+                    : new String[]{SIT_RENTING_CLAIMED, "被索赔"};
+        }
+        if (ended) {
+            // 只有提交留档并通过审核才归入租期后分区
+            if (!hasPass) {
+                return new String[]{null, null};
+            }
+            // 保函到期未发起索赔 → 已过期（不可再发起索赔）
+            if (guarantee.getExpireDate() != null && guarantee.getExpireDate().isBefore(today)) {
+                return new String[]{SIT_ENDED_EXPIRED, "已过期"};
+            }
+            // 留档合格后，需房东确认不索赔才算完美结束
+            return hasConfirm
+                    ? new String[]{SIT_ENDED_CONFIRMED, "已确认"}
+                    : new String[]{SIT_ENDED_PENDING_CONFIRM, "待确认"};
+        }
+        return new String[]{SIT_RENTING_NORMAL, "正常"};
     }
 
     /**

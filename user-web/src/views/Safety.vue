@@ -21,7 +21,7 @@
       <template #header>
         <div class="card-header">
           <span class="block-title"><i class="live-dot"></i>实时反诈预警</span>
-          <el-tag type="warning" size="small" effect="plain">人工维护 · 模拟实时</el-tag>
+          <el-tag type="warning" size="small" effect="plain">实时滚动 · 30秒自动刷新 · 模拟实时</el-tag>
         </div>
       </template>
       <el-row :gutter="16">
@@ -195,7 +195,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
@@ -317,6 +317,8 @@ function formatTime(t) {
   return String(t).replace('T', ' ').slice(5, 16)
 }
 
+let alertTimer = null
+
 async function loadAlerts() {
   alertLoading.value = true
   try { alerts.value = await getAlerts() || [] } catch (e) {} finally { alertLoading.value = false }
@@ -386,6 +388,12 @@ onMounted(() => {
   loadCases()
   loadTeaching()
   loadList()
+  // 实时反诈预警：每 30 秒自动轮询刷新，配合后端定时轮换/爬取，呈现"实时滚动"效果
+  alertTimer = setInterval(loadAlerts, 30000)
+})
+
+onUnmounted(() => {
+  if (alertTimer) clearInterval(alertTimer)
 })
 </script>
 

@@ -100,11 +100,15 @@ public class GuaranteeClaimService {
             throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "保函不存在");
         }
 
-        // 越权校验：仅本单房东可发起索赔
+        // 越权校验：仅本单房东可发起索赔；后台角色（ADMIN/banker）可代房东发起（管理端代理操作）
         BizLandlord landlord = landlordMapper.selectOne(
                 new LambdaQueryWrapper<BizLandlord>().eq(BizLandlord::getUserId, currentUserId));
         if (landlord == null || !landlord.getId().equals(guarantee.getLandlordId())) {
-            throw new BizException(ErrorCode.FORBIDDEN, "仅该保函对应的房东可发起索赔");
+            checkBackOffice();
+            landlord = landlordMapper.selectById(guarantee.getLandlordId());
+            if (landlord == null) {
+                throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "保函归属房东不存在");
+            }
         }
 
         // 保函状态校验
@@ -283,6 +287,9 @@ public class GuaranteeClaimService {
         }
 
         claim.setDefenseContent(dto.getDefenseContent());
+        if (dto.getDefenseFiles() != null) {
+            claim.setDefenseFiles(dto.getDefenseFiles());
+        }
         claim.setClaimStatus(CLAIM_MANUAL_REVIEW);
         claimMapper.updateById(claim);
 
@@ -425,6 +432,42 @@ public class GuaranteeClaimService {
         return voPage;
     }
 
+    /**
+     * 管理端可索赔保函列表（ADMIN/banker 代房东发起索赔用）
+     * 返回全部 ACTIVE 有效保函，含房东名/租客名/保函金额
+     */
+    public List<Map<String, Object>> listClaimableGuarantees() {
+        checkBackOffice();
+        // 返回全部保函（含已被索赔/已过期），由前端按可索赔性禁用并标注状态，
+        // 便于运营人员看到房东名下全部保函而不是只能看到 1 条可索赔的。
+        List<BizGuarantee> guarantees = guaranteeMapper.selectList(
+                new LambdaQueryWrapper<BizGuarantee>()
+                        .orderByDesc(BizGuarantee::getCreateTime));
+        java.time.LocalDate today = java.time.LocalDate.now();
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (BizGuarantee g : guarantees) {
+            boolean expired = g.getExpireDate() != null && g.getExpireDate().isBefore(today);
+            boolean claimable = "ACTIVE".equals(g.getGuaranteeStatus()) && !expired;
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", g.getId());
+            m.put("guaranteeNo", g.getGuaranteeNo());
+            m.put("guaranteeAmount", g.getGuaranteeAmount());
+            m.put("guaranteeStatus", g.getGuaranteeStatus());
+            m.put("landlordId", g.getLandlordId());
+            m.put("claimable", claimable);
+            m.put("claimableName", claimable ? "可索赔" : (expired ? "已过期" : "已被索赔"));
+            BizGuaranteeApplication app = applicationMapper.selectById(g.getApplicationId());
+            if (app != null) {
+                m.put("applyNo", app.getApplyNo());
+                m.put("tenantName", app.getApplicantName());
+            }
+            BizLandlord landlord = landlordMapper.selectById(g.getLandlordId());
+            m.put("landlordName", landlord != null ? landlord.getRealName() : "房东");
+            result.add(m);
+        }
+        return result;
+    }
+
     // ============================================================
     //  状态流转说明
     // ============================================================
@@ -535,6 +578,17 @@ public class GuaranteeClaimService {
         ClaimVO vo = new ClaimVO();
         BeanUtil.copyProperties(claim, vo);
         vo.setStatusName(claimStatusName(claim.getClaimStatus()));
+        // 补被索赔租客姓名（房东视角列表/详情展示）
+        try {
+            BizGuarantee g = guaranteeMapper.selectById(claim.getGuaranteeId());
+            if (g != null) {
+                BizGuaranteeApplication app = applicationMapper.selectById(g.getApplicationId());
+                if (app != null && app.getApplicantName() != null) {
+                    vo.setTenantName(app.getApplicantName());
+                }
+            }
+        } catch (Exception ignored) {
+        }
         return vo;
     }
 }

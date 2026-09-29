@@ -1287,3 +1287,30 @@ CREATE TABLE `biz_ai_review_log` (
   KEY `idx_user_id` (`user_id`),
   KEY `idx_create_time` (`create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='借款前AI审查日志（模拟AI）';
+
+-- -------------------------------------------------------------
+-- 43. biz_moveout_record 退租留档审核表
+-- -------------------------------------------------------------
+DROP TABLE IF EXISTS `biz_moveout_record`;
+CREATE TABLE `biz_moveout_record` (
+  `id`            BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `record_no`     VARCHAR(50)   NOT NULL COMMENT '留档编号',
+  `guarantee_id`  BIGINT        NOT NULL COMMENT '保函ID',
+  `guarantee_no`  VARCHAR(50)   NOT NULL COMMENT '保函编号（冗余）',
+  `tenant_id`     BIGINT        NOT NULL COMMENT '租客ID',
+  `landlord_id`   BIGINT        NOT NULL COMMENT '房东ID',
+  `house_id`      BIGINT        NULL COMMENT '房屋ID',
+  `photos_json`   TEXT          NULL COMMENT '房屋照片文件列表（JSON数组）',
+  `check_result`  VARCHAR(20)   NULL COMMENT '照片审核结果：PASS合格留档/REVIEW需补拍或人工复核',
+  `check_detail`  TEXT          NULL COMMENT '照片审核明细',
+  `landlord_confirm` VARCHAR(20) NULL DEFAULT 'PENDING' COMMENT '房东确认：PENDING待确认/CONFIRMED已确认无需索赔',
+  `landlord_confirm_time` DATETIME NULL COMMENT '房东确认时间',
+  `landlord_confirm_remark` VARCHAR(500) NULL COMMENT '房东确认备注',
+  `remark`        VARCHAR(500)  NULL COMMENT '备注',
+  `deleted`       TINYINT       NOT NULL DEFAULT 0 COMMENT '逻辑删除：0存在 1删除',
+  `create_time`   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time`   DATETIME      NULL COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_moveout_tenant` (`tenant_id`),
+  KEY `idx_moveout_guarantee` (`guarantee_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='退租留档审核表（房屋照片留档+AI审核）';

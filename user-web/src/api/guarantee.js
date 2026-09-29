@@ -40,3 +40,18 @@ export function getGuaranteeLetter(id) {
 export function getStatusFlow() {
   return request.get('/v1/guarantee/status-flow')
 }
+
+/** 租客名下已开立保函列表（退租留档选函用） */
+export function getMyGuarantees() {
+  return request.get('/v1/guarantee/mine')
+}
+
+/** 退租留档提交（上传房屋照片，AI 合格审核模拟） */
+export function submitMoveoutRecord(data) {
+  return request.post('/v1/guarantee/moveout/record', data)
+}
+
+/** 我的退租留档记录（分页） */
+export function getMoveoutRecords(params) {
+  return request.get('/v1/guarantee/moveout/records', { params })
+}

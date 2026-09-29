@@ -16,6 +16,7 @@
 | [04-frontend-config.md](./04-frontend-config.md) | 前端配置：Vite 代理、双前端项目配置说明 | 前端配置阶段 |
 | [05-troubleshooting.md](./05-troubleshooting.md) | 问题排查：环境 / 数据库 / Redis / 前后端 / 功能类 | 问题排查阶段 |
 | [06-ai-llm.md](./06-ai-llm.md) | AI/LLM 配置：Ollama / 云端 API / "AI 降级本地"排障 | AI 功能配置与排障 |
+| [07-anti-fraud-source.md](./07-anti-fraud-source.md) | 反诈预警实时源：mock 模拟实时 / real 真实爬取与回退 | 金融安全页数据源配置 |
 
 ### 专项部署文档
 

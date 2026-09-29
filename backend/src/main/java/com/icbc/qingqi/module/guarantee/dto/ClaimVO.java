@@ -32,6 +32,9 @@ public class ClaimVO {
     /** 被索赔租客 ID */
     private Long tenantId;
 
+    /** 被索赔租客姓名 */
+    private String tenantName;
+
     /** 索赔金额 */
     private BigDecimal claimAmount;
 
@@ -58,6 +61,9 @@ public class ClaimVO {
 
     /** 申辩内容 */
     private String defenseContent;
+
+    /** 申辩佐证材料（JSON 数组） */
+    private String defenseFiles;
 
     /** 实际赔付金额 */
     private BigDecimal payoutAmount;

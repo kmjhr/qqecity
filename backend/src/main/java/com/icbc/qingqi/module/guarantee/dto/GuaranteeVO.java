@@ -68,4 +68,16 @@ public class GuaranteeVO {
 
     /** 开函时间 */
     private LocalDateTime issueTime;
+
+    /** 房屋租住情况：PRE_RENTAL/RENTING_CLAIMED/ENDED_CLAIMED/RENTING_NORMAL/ENDED_NORMAL/ENDED_CONFIRMED */
+    private String houseSituation;
+
+    /** 房屋租住情况展示名：租期前·待入住/租中·被索赔/结束租·被索赔/租中·正常/租后·正常/租后·确认无需索赔 */
+    private String houseSituationName;
+
+    /** 租期开始日（关联租赁合同） */
+    private LocalDate rentStartDate;
+
+    /** 租期结束日（关联租赁合同） */
+    private LocalDate rentEndDate;
 }

@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -111,6 +112,13 @@ public class GuaranteeClaimController {
     // ============================================================
     //  辅助：索赔状态流转说明
     // ============================================================
+
+    @Operation(summary = "G-6 管理端可索赔保函列表",
+            description = "ADMIN/banker 代房东发起索赔时选择保函：返回全部 ACTIVE 有效保函，含房东名/租客名/保函金额。")
+    @GetMapping("/claimable-guarantees")
+    public Result<List<Map<String, Object>>> claimableGuarantees() {
+        return Result.success(claimService.listClaimableGuarantees());
+    }
 
     @Operation(summary = "索赔状态流转说明",
             description = "返回 7 态流转：已提交→AI初审→申辩期→人工复核→已赔付/已拒绝→已结案，供前端展示。")
