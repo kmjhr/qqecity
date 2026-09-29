@@ -84,6 +84,47 @@
       <el-empty v-else description="暂无成长轨迹" />
     </el-card>
 
+    <!-- 贷款画像（贷款数据与画像关联：A/B 分类 + 观察期 + 预警） -->
+    <el-card shadow="never" class="loan-card">
+      <template #header>
+        <div class="loan-card-head">
+          <span>贷款画像（A/B 授信分类）</span>
+          <el-tag v-if="profile?.loan?.overdueWarningCount > 0" type="danger" size="small">
+            未处理逾期预警 {{ profile?.loan?.overdueWarningCount }} 条
+          </el-tag>
+        </div>
+      </template>
+      <el-row :gutter="16" v-if="profile?.loan?.creditItems?.length">
+        <el-col :span="12" v-for="(item, i) in profile.loan.creditItems" :key="i">
+          <div class="loan-item" :class="item.creditType === 'A_TYPE' ? 'loan-a' : 'loan-b'">
+            <div class="loan-item-head">
+              <el-tag :type="item.creditType === 'A_TYPE' ? 'primary' : 'success'" size="small">
+                {{ item.creditTypeName }}
+              </el-tag>
+              <span class="loan-status">{{ statusName(item.status) }}</span>
+            </div>
+            <div class="loan-limits">
+              <span>总额 <b>¥{{ item.totalLimit }}</b></span>
+              <span>已用 <b>¥{{ item.usedLimit }}</b></span>
+              <span>可用 <b>¥{{ item.availableLimit }}</b></span>
+            </div>
+            <div class="loan-rate">年化 {{ item.interestRate ? Number(item.interestRate) * 100 + '%' : '-' }}</div>
+            <div v-if="item.creditType === 'B_TYPE' && item.observationStatus" class="loan-obs">
+              <el-tag :type="obsTagType(item.observationStatus)" size="small">
+                {{ obsStatusName(item.observationStatus) }}
+              </el-tag>
+              <span class="obs-meta">
+                观察 {{ item.observationMonths ?? 0 }} 个月 · 评分 {{ item.observationScore ?? 0 }}
+              </span>
+              <el-progress :percentage="item.promotionProgress || 0" :stroke-width="10" style="margin-top:6px" />
+              <span class="obs-tip">转A进度 {{ item.promotionProgress || 0 }}%（数据回流达标 ≥60% 可一键申请转A）</span>
+            </div>
+          </div>
+        </el-col>
+      </el-row>
+      <el-empty v-else description="暂无贷款授信记录。申请 A/B 类贷款后，授信分类与额度将同步到画像" />
+    </el-card>
+
     <!-- 联动提额结果弹窗 -->
     <el-dialog v-model="linkageResultVisible" title="联动提额结果（模拟）" width="480px">
       <div v-if="linkageResult" class="linkage-result">
@@ -157,6 +198,19 @@ async function handleLinkage() {
   } finally {
     linkageLoading.value = false
   }
+}
+
+function statusName(s) {
+  const m = { ACTIVE: '正常', FROZEN: '冻结', CLOSED: '已关闭' }
+  return m[s] || s || '-'
+}
+function obsStatusName(s) {
+  const m = { OBSERVING: '观察中', PROMOTED: '已转A', EXITED: '已退出' }
+  return m[s] || s || '-'
+}
+function obsTagType(s) {
+  const m = { OBSERVING: 'warning', PROMOTED: 'success', EXITED: 'info' }
+  return m[s] || 'info'
 }
 
 onMounted(loadProfile)
@@ -304,4 +358,17 @@ onMounted(loadProfile)
 }
 .r-label { color: #909399; }
 .r-value { color: #303133; font-weight: 600; }
+
+.loan-card { margin-top: 16px; }
+.loan-card-head { display: flex; align-items: center; justify-content: space-between; }
+.loan-item { border-radius: 10px; padding: 14px; margin-bottom: 12px; border: 1px solid #ebeef5; }
+.loan-a { background: linear-gradient(135deg, #ecf5ff, #fff); }
+.loan-b { background: linear-gradient(135deg, #f0f9eb, #fff); }
+.loan-item-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.loan-status { font-size: 12px; color: #909399; }
+.loan-limits { display: flex; gap: 14px; font-size: 13px; color: #606266; margin-bottom: 6px; }
+.loan-rate { font-size: 12px; color: #909399; margin-bottom: 6px; }
+.loan-obs { border-top: 1px dashed #e4e7ed; padding-top: 8px; margin-top: 6px; }
+.obs-meta { font-size: 12px; color: #606266; margin-left: 6px; }
+.obs-tip { display: block; font-size: 12px; color: #909399; margin-top: 4px; }
 </style>

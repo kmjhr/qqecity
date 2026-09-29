@@ -35,6 +35,15 @@ export function getCreditTxns(params: {
   return request.get('/v1/admin/loan/credit-txns', { params })
 }
 
+/** B转A观察期用户列表（管理端） */
+export function getObservationUsers(params: {
+  pageNum?: number
+  pageSize?: number
+  keyword?: string
+}): Promise<PageResult<any>> {
+  return request.get('/v1/admin/loan/observation-users', { params })
+}
+
 /** B 类受托支付流水（全量分页） */
 export function getEntrustPayments(params: {
   pageNum?: number
@@ -42,6 +51,17 @@ export function getEntrustPayments(params: {
   paymentStatus?: string
 }): Promise<PageResult<any>> {
   return request.get('/v1/admin/loan/entrust-payments', { params })
+}
+
+/** AI 审核记录（借款前 AI 审查日志，分页） */
+export function getAiReviewLogs(params: {
+  pageNum?: number
+  pageSize?: number
+  userId?: number
+  result?: string
+  creditType?: string
+}): Promise<PageResult<any>> {
+  return request.get('/v1/admin/loan/ai-review-logs', { params })
 }
 
 /** 商户白名单列表（按状态） */

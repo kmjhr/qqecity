@@ -65,4 +65,7 @@ public class RegisterDTO {
 
     /** 学信档案验证码/学号（模拟） */
     private String studentNo;
+
+    /** 证件照片（base64，毕业证/学生证照片，模拟识别上传） */
+    private String certPhoto;
 }

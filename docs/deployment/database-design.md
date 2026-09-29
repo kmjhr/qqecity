@@ -29,6 +29,15 @@
 
 ## 补充计划新增表说明
 
+### biz_ai_review_log 借款前AI审查日志（模拟AI）
+
+- **用途**：记录每次借款前 AI 审查（A 类提款 / B 类打款）的结果、评分与逐条原因，供管理端「贷款审批 → AI审核记录」展示
+- **核心字段**：`credit_type`（A_TYPE/B_TYPE）、`biz_type`（WITHDRAW提款/ENTRUST_PAY打款）、`result`（PASS/REJECT）、`ai_score`（100分制）、`passed_items`/`rejected_items`（JSON数组）、`user_name`（冗余展示）、`request_no`（审查单号）
+- **写入时机**：`LoanAiGuardService.guard()` 每次审查后落库（提款/打款均触发）
+- **关联接口**：`GET /api/v1/admin/loan/ai-review-logs`（管理端分页，支持按 userId/result/creditType 筛选）
+- **约束**：演示系统为模拟 AI，结果不构成真实授信依据
+
+
 ### biz_policy 政策库
 
 - **用途**：人才安居政策 + 创业贴息政策智能匹配

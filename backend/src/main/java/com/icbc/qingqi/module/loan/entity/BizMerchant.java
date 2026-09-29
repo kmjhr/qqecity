@@ -55,6 +55,9 @@ public class BizMerchant {
     /** 申请说明 */
     private String applyRemark;
 
+    /** 佐证材料（JSON数组：[{name,data}]，营业执照等） */
+    private String evidenceMaterial;
+
     /** 审核意见/驳回原因 */
     private String reviewRemark;
 

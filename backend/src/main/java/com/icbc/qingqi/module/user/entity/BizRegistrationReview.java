@@ -53,6 +53,9 @@ public class BizRegistrationReview {
     /** 学信档案验证码/学号（模拟） */
     private String studentNo;
 
+    /** 证件照片（base64，毕业证/学生证，模拟识别上传） */
+    private String certPhoto;
+
     /** 白名单人群审核：1通过 0拒绝 */
     private Integer whitelistPass;
 

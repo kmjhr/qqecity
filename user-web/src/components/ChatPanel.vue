@@ -42,7 +42,7 @@
             </el-tag>
           </div>
           <div v-if="m.action" class="msg-action">
-            <el-button size="small" type="primary" plain @click="goAction(m.action)">{{ m.action.label }}</el-button>
+            <el-button size="small" type="primary" plain class="grad-white-btn" @click="goAction(m.action)">{{ m.action.label }}</el-button>
           </div>
           <div class="msg-time">{{ formatTime(m.timestamp) }}</div>
         </div>

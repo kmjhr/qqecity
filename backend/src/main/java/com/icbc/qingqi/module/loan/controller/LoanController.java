@@ -5,6 +5,7 @@ import com.icbc.qingqi.common.Result;
 import com.icbc.qingqi.module.loan.dto.*;
 import com.icbc.qingqi.module.loan.entity.BizLoanApplication;
 import com.icbc.qingqi.module.loan.entity.BizMerchant;
+import com.icbc.qingqi.module.loan.service.LoanAiGuardService;
 import com.icbc.qingqi.module.loan.service.LoanService;
 import com.icbc.qingqi.security.UserContext;
 import io.swagger.v3.oas.annotations.Operation;
@@ -29,9 +30,11 @@ import java.util.List;
 public class LoanController {
 
     private final LoanService loanService;
+    private final LoanAiGuardService loanAiGuardService;
 
-    public LoanController(LoanService loanService) {
+    public LoanController(LoanService loanService, LoanAiGuardService loanAiGuardService) {
         this.loanService = loanService;
+        this.loanAiGuardService = loanAiGuardService;
     }
 
     // ============================================================
@@ -171,6 +174,13 @@ public class LoanController {
     }
 
     // ============================================================
+    @Operation(summary = "借款前 AI 审查（模拟）",
+            description = "提款/打款前调用：画像分、收入客观性、多头借贷、长期未还、逾期预警五维审查，通过返回 passed=true")
+    @GetMapping("/ai-review/withdraw")
+    public Result<LoanAiGuardService.AiGuardVO> aiWithdrawGuard() {
+        return Result.success(loanAiGuardService.guard(UserContext.getUserId()));
+    }
+
     //  L-补2 B转A观察期（缺口 #11）
     // ============================================================
 

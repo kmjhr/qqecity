@@ -35,6 +35,12 @@ const routes: RouteRecordRaw[] = [
             name: 'UserManage',
             component: () => import('@/views/system/user/index.vue'),
             meta: { title: '用户管理', icon: 'User', requiresAuth: true }
+          },
+          {
+            path: 'landlord/list',
+            name: 'LandlordManage',
+            component: () => import('@/views/landlord/index.vue'),
+            meta: { title: '房东管理', icon: 'House', requiresAuth: true }
           }
           // 角色管理、菜单管理等在此扩展
         ]

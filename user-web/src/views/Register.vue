@@ -13,7 +13,7 @@
       <div class="register-brand">
         <div class="brand-content">
           <div class="brand-logo" @click="$router.push('/home')">
-            <img src="/logo-icon.jpg" alt="青启e城" />
+            <img src="/logo-icon.png" alt="青启e城" />
             <div>
               <div class="brand-title">青启e城</div>
               <div class="brand-subtitle">QINGQI eCity</div>
@@ -196,11 +196,22 @@
                     v-model="registerForm.studentNo"
                     :placeholder="registerForm.verifyType === 'XUE_XIN_WANG' ? '请输入学信档案在线验证码' : (registerForm.verifyType === 'GRAD_CERT' ? '请输入毕业证编号' : '请输入学号')"
                   />
-                  <el-button v-if="registerForm.verifyType === 'STUDENT_CARD' || registerForm.verifyType === 'GRAD_CERT'" :loading="ocrLoading" @click="handleMockOcr">
-                    {{ registerForm.verifyType === 'GRAD_CERT' ? '模拟上传毕业证识别' : '模拟上传学生证识别' }}
+                  <el-button v-if="registerForm.verifyType === 'STUDENT_CARD' || registerForm.verifyType === 'GRAD_CERT'" :loading="ocrLoading" @click="triggerCertUpload">
+                    {{ registerForm.verifyType === 'GRAD_CERT' ? '上传毕业证识别' : '上传学生证识别' }}
                   </el-button>
                 </div>
               </el-form-item>
+              <input ref="certFileInput" type="file" accept="image/*" style="display:none" @change="onCertFileChange" />
+              <div v-if="certPhotoPreview" class="cert-photo-box">
+                <img :src="certPhotoPreview" class="cert-photo-thumb" alt="证件照片预览" />
+                <div class="cert-photo-meta">
+                  <div class="cert-photo-name">{{ certFileName }}</div>
+                  <div class="cert-photo-actions">
+                    <el-link type="primary" :underline="false" @click="triggerCertUpload">重新选择</el-link>
+                    <el-link type="danger" :underline="false" @click="clearCertPhoto">移除</el-link>
+                  </div>
+                </div>
+              </div>
               <div v-if="ocrMessage" class="ocr-message">
                 <el-icon color="#67c23a"><SuccessFilled /></el-icon>
                 <span>{{ ocrMessage }}</span>
@@ -295,7 +306,8 @@ const registerForm = reactive({
   educationLevel: '',
   graduationDate: '',
   verifyType: '',
-  studentNo: ''
+  studentNo: '',
+  certPhoto: ''
 })
 
 /** STUDENT / GRADUATE 需要学历核验 */
@@ -306,6 +318,9 @@ const needEducation = computed(() =>
 watch(() => registerForm.userType, () => {
   registerForm.verifyType = ''
   registerForm.studentNo = ''
+  registerForm.certPhoto = ''
+  certPhotoPreview.value = ''
+  certFileName.value = ''
   ocrMessage.value = ''
 })
 
@@ -368,7 +383,8 @@ function buildPayload() {
     educationLevel: registerForm.educationLevel,
     graduationDate: registerForm.graduationDate,
     verifyType: registerForm.verifyType,
-    studentNo: registerForm.studentNo
+    studentNo: registerForm.studentNo,
+    certPhoto: registerForm.certPhoto || undefined
   }
 }
 
@@ -393,23 +409,49 @@ async function handleAiReview() {
   })
 }
 
-/** 学生证/毕业证照片 AI 识别（模拟） */
-async function handleMockOcr() {
-  ocrLoading.value = true
-  const isGradCert = registerForm.verifyType === 'GRAD_CERT'
-  try {
-    const data = await studentCardOcr({
-      demoSchool: registerForm.school || '中山大学'
-    })
-    registerForm.school = data.school
-    registerForm.studentNo = data.studentNo
-    ocrMessage.value = `已模拟识别：${data.school} · ${isGradCert ? '毕业证编号' : '学号'} ${data.studentNo}（置信度 ${data.confidence}%）`
-    ElMessage.success(isGradCert ? '毕业证照片识别完成（模拟）' : '学生证照片识别完成（模拟）')
-  } catch (e) {
-    // 错误已在拦截器中提示
-  } finally {
-    ocrLoading.value = false
+/** 触发证件照片文件选择 */
+const certFileInput = ref(null)
+const certPhotoPreview = ref('')
+const certFileName = ref('')
+function triggerCertUpload() {
+  certFileInput.value?.click()
+}
+
+/** 选择证件照片 → 本地预览 → 模拟 AI 识别回填 */
+async function onCertFileChange(e) {
+  const file = e.target.files && e.target.files[0]
+  e.target.value = ''
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = async (ev) => {
+    registerForm.certPhoto = ev.target?.result || ''
+    certPhotoPreview.value = registerForm.certPhoto
+    certFileName.value = file.name
+    ocrLoading.value = true
+    const isGradCert = registerForm.verifyType === 'GRAD_CERT'
+    try {
+      const data = await studentCardOcr({
+        demoSchool: registerForm.school || '中山大学'
+      })
+      registerForm.school = data.school
+      registerForm.studentNo = data.studentNo
+      ocrMessage.value = `已模拟识别：${data.school} · ${isGradCert ? '毕业证编号' : '学号'} ${data.studentNo}（置信度 ${data.confidence}%）`
+      ElMessage.success(isGradCert ? '毕业证照片识别完成（模拟）' : '学生证照片识别完成（模拟）')
+    } catch (err) {
+      // 错误已在拦截器中提示
+    } finally {
+      ocrLoading.value = false
+    }
   }
+  reader.readAsDataURL(file)
+}
+
+/** 移除已选照片 */
+function clearCertPhoto() {
+  registerForm.certPhoto = ''
+  certPhotoPreview.value = ''
+  certFileName.value = ''
+  ocrMessage.value = ''
 }
 
 /** 正式注册（后端再次执行 AI 审核，通过才落库） */
@@ -543,9 +585,9 @@ async function handleRegister() {
 }
 
 .brand-logo img {
-  width: 48px;
-  height: 48px;
-  border-radius: 14px;
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
   box-shadow: 0 8px 20px rgba(14, 165, 233, 0.25);
 }
 
@@ -1013,5 +1055,40 @@ async function handleRegister() {
   .form-scroll {
     padding: 24px 20px;
   }
+}
+.cert-photo-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  background: #f5f7fa;
+  border: 1px dashed #c0c4cc;
+  border-radius: 8px;
+  max-width: 420px;
+}
+.cert-photo-thumb {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid #e4e7ed;
+  flex-shrink: 0;
+}
+.cert-photo-meta {
+  min-width: 0;
+  flex: 1;
+}
+.cert-photo-name {
+  font-size: 13px;
+  color: #303133;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cert-photo-actions {
+  margin-top: 4px;
+  display: flex;
+  gap: 12px;
 }
 </style>

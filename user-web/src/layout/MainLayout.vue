@@ -4,7 +4,7 @@
     <el-header class="header">
       <div class="header-inner">
         <div class="logo" @click="$router.push('/home')">
-          <img src="/logo-icon.jpg" alt="青启e城" class="logo-img" />
+          <img src="/logo-city.png" alt="青启e城" class="logo-img" />
           <div class="logo-text">
             <span class="logo-title">青启e城</span>
             <span class="logo-subtitle">QINGQI eCity</span>
@@ -153,7 +153,7 @@
       </template>
       <div class="drawer-toolbar">
         <span>共 {{ messageTotal }} 条 · {{ unreadCount }} 条未读</span>
-        <el-button text type="primary" size="small" :disabled="!unreadCount" @click="handleMarkAllRead">全部已读</el-button>
+        <el-button text type="primary" size="small" class="grad-white-btn" :disabled="!unreadCount" @click="handleMarkAllRead">全部已读</el-button>
       </div>
       <div v-loading="messageLoading" class="drawer-list">
         <div
@@ -370,7 +370,9 @@ loadUnread()
   width: 56px;
   height: 56px;
   border-radius: 14px;
-  object-fit: cover;
+  object-fit: contain;
+  background: transparent;
+  transform: translateY(-3px);
 }
 
 .logo-text {

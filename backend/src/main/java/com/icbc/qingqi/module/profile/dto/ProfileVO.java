@@ -39,6 +39,43 @@ public class ProfileVO {
     /** 是否模拟 */
     private Boolean simulated;
 
+    /** 贷款画像：A/B 授信分类 + 观察期 + 风险预警（贷款数据与画像关联） */
+    private LoanProfile loan;
+
+    @Data
+    public static class LoanProfile {
+        /** 授信分类列表：A_TYPE/B_TYPE（体现 A/B 分类于画像） */
+        private List<CreditItem> creditItems;
+        /** 未处理逾期风险预警数 */
+        private Integer overdueWarningCount;
+    }
+
+    @Data
+    public static class CreditItem {
+        /** 授信类型：A_TYPE（循环贷）/B_TYPE（定向贷） */
+        private String creditType;
+        /** 类型名 */
+        private String creditTypeName;
+        /** 总额度 */
+        private BigDecimal totalLimit;
+        /** 已用额度 */
+        private BigDecimal usedLimit;
+        /** 可用额度 */
+        private BigDecimal availableLimit;
+        /** 利率（年化） */
+        private BigDecimal interestRate;
+        /** 状态：ACTIVE/FROZEN/CLOSED */
+        private String status;
+        /** 观察期状态：OBSERVING/PROMOTED/EXITED（B转A专用） */
+        private String observationStatus;
+        /** 观察月数 */
+        private Integer observationMonths;
+        /** 观察期累计评分 */
+        private Integer observationScore;
+        /** 转A进度百分比（综合进度，观察期展示） */
+        private Integer promotionProgress;
+    }
+
     @Data
     public static class ScoreDetail {
         /** 场景：HOUSING/ENTREPRENEUR/CONSUMPTION */

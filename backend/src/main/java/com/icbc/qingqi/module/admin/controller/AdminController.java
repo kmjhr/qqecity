@@ -3,12 +3,14 @@ package com.icbc.qingqi.module.admin.controller;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.icbc.qingqi.common.Result;
 import com.icbc.qingqi.module.admin.dto.LoanReviewDTO;
+import com.icbc.qingqi.module.admin.dto.ObservationUserVO;
 import com.icbc.qingqi.module.admin.dto.WarningHandleDTO;
 import com.icbc.qingqi.module.admin.service.AdminService;
 import com.icbc.qingqi.module.guarantee.entity.BizGuaranteeApplication;
 import com.icbc.qingqi.module.guarantee.service.GuaranteeService;
 import com.icbc.qingqi.module.guarantee.dto.GuaranteeApplicationVO;
 import com.icbc.qingqi.module.loan.entity.BizCreditTxn;
+import com.icbc.qingqi.module.loan.entity.BizAiReviewLog;
 import com.icbc.qingqi.module.loan.entity.BizEntrustPayment;
 import com.icbc.qingqi.module.loan.entity.BizEntrustReview;
 import com.icbc.qingqi.module.loan.entity.BizLoanApplication;
@@ -103,6 +105,32 @@ public class AdminController {
             @Parameter(description = "交易类型：WITHDRAW/REPAY")
             @RequestParam(required = false) String txnType) {
         return Result.success(adminService.pageCreditTxns(pageNum, pageSize, txnType));
+    }
+
+    @Operation(summary = "③-3.5 B转A观察期用户列表",
+            description = "B 类授信且进入观察期（OBSERVING/PROMOTED/EXITED）的用户，含观察月数/评分/转A进度，贷款数据与用户画像关联展示。")
+    @GetMapping("/loan/observation-users")
+    public Result<Page<ObservationUserVO>> observationUsers(
+            @RequestParam(defaultValue = "1") int pageNum,
+            @RequestParam(defaultValue = "10") int pageSize,
+            @Parameter(description = "用户名/姓名关键词")
+            @RequestParam(required = false) String keyword) {
+        return Result.success(adminService.pageObservationUsers(pageNum, pageSize, keyword));
+    }
+
+    @Operation(summary = "③-5 AI 审核记录（借款前AI审查日志）",
+            description = "分页查询借款前 AI 审查日志（提款/打款时的模拟AI审查），支持按用户/结果/授信类型筛选。")
+    @GetMapping("/loan/ai-review-logs")
+    public Result<Page<BizAiReviewLog>> aiReviewLogs(
+            @RequestParam(defaultValue = "1") int pageNum,
+            @RequestParam(defaultValue = "10") int pageSize,
+            @Parameter(description = "用户ID")
+            @RequestParam(required = false) Long userId,
+            @Parameter(description = "审查结果：PASS/REJECT")
+            @RequestParam(required = false) String result,
+            @Parameter(description = "授信类型：A_TYPE/B_TYPE")
+            @RequestParam(required = false) String creditType) {
+        return Result.success(adminService.pageAiReviewLogs(pageNum, pageSize, userId, result, creditType));
     }
 
     @Operation(summary = "③-4 B 类受托支付流水（全量分页）",

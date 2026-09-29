@@ -146,7 +146,8 @@ const menuList = [
     title: '系统管理',
     icon: 'Setting',
     children: [
-      { path: '/system/user', title: '用户管理', icon: 'User' }
+      { path: '/system/user', title: '用户管理', icon: 'User' },
+      { path: '/system/landlord/list', title: '房东管理', icon: 'House' }
     ]
   }
 ]
@@ -160,7 +161,9 @@ const breadcrumbs = computed(() => {
 
 function handleCommand(cmd: string) {
   if (cmd === 'home') {
-    window.open('/', '_blank')
+    // 前往用户端（默认 8081，可用 VITE_USER_WEB_URL 覆盖）→ 自动以演示账号 testuser 登录直达
+    const userUrl = import.meta.env.VITE_USER_WEB_URL || 'http://localhost:8081'
+    window.open(userUrl + '/login?demo=testuser', '_blank')
   } else if (cmd === 'logout') {
     ElMessageBox.confirm('确定要退出登录吗？', '提示', {
       confirmButtonText: '确定',

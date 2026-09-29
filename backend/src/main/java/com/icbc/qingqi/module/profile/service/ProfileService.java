@@ -117,7 +117,54 @@ public class ProfileService {
         // 联动演示
         vo.setLinkage(buildLinkage(userId, vo.getStability(), vo.getOperation()));
 
+        // 贷款画像：A/B 授信分类 + 观察期 + 风险预警（贷款数据与画像关联）
+        vo.setLoan(buildLoanProfile(userId));
+
         return vo;
+    }
+
+    /**
+     * 贷款画像：聚合 biz_credit_limit（A/B 授信）+ biz_risk_warning（未处理逾期预警）
+     * 体现 A/B 贷款分类于用户画像；B 类观察期状态/评分随画像可见。
+     */
+    private ProfileVO.LoanProfile buildLoanProfile(Long userId) {
+        ProfileVO.LoanProfile loan = new ProfileVO.LoanProfile();
+        List<ProfileVO.CreditItem> items = new ArrayList<>();
+        List<BizCreditLimit> limits = creditLimitMapper.selectList(
+                new LambdaQueryWrapper<BizCreditLimit>()
+                        .eq(BizCreditLimit::getUserId, userId)
+                        .orderByAsc(BizCreditLimit::getCreditType));
+        for (BizCreditLimit cl : limits) {
+            ProfileVO.CreditItem item = new ProfileVO.CreditItem();
+            item.setCreditType(cl.getCreditType());
+            item.setCreditTypeName("A_TYPE".equals(cl.getCreditType()) ? "A类·循环贷" : "B类·定向贷");
+            item.setTotalLimit(cl.getTotalLimit());
+            item.setUsedLimit(cl.getUsedLimit());
+            item.setAvailableLimit(cl.getAvailableLimit());
+            item.setInterestRate(cl.getInterestRate());
+            item.setStatus(cl.getStatus());
+            item.setObservationStatus(cl.getObservationStatus());
+            item.setObservationMonths(cl.getObservationMonths());
+            item.setObservationScore(cl.getObservationScore());
+            // 转A进度（模拟）：观察期评分即进度；无评分按观察月数/6折算
+            Integer obsScore = cl.getObservationScore();
+            if (obsScore != null) {
+                item.setPromotionProgress(Math.min(100, obsScore));
+            } else if (cl.getObservationMonths() != null) {
+                item.setPromotionProgress(Math.min(100, cl.getObservationMonths() * 100 / 6));
+            } else {
+                item.setPromotionProgress(0);
+            }
+            items.add(item);
+        }
+        loan.setCreditItems(items);
+        Long warn = riskWarningMapper.selectCount(
+                new LambdaQueryWrapper<BizRiskWarning>()
+                        .eq(BizRiskWarning::getUserId, userId)
+                        .eq(BizRiskWarning::getWarningType, "OVERDUE_RISK")
+                        .eq(BizRiskWarning::getIsHandled, 0));
+        loan.setOverdueWarningCount(warn == null ? 0 : warn.intValue());
+        return loan;
     }
 
     /**

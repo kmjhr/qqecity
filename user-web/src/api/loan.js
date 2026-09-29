@@ -7,6 +7,10 @@ import request from './request'
 // ============================================================
 
 /** L-0 青创e贷 A/B 双轨产品规则与风险揭示 */
+export function getWithdrawAiGuard() {
+  return request.get('/v1/loan/ai-review/withdraw')
+}
+
 export function getProductRules() {
   return request.get('/v1/loan/product-rules')
 }

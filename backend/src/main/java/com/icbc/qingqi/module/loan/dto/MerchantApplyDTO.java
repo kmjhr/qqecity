@@ -42,4 +42,7 @@ public class MerchantApplyDTO {
 
     @Schema(description = "申请说明")
     private String applyRemark;
+
+    @Schema(description = "佐证材料（JSON数组：[{name,data}]，营业执照等）")
+    private String evidenceMaterial;
 }

@@ -7,7 +7,7 @@
           <span>消息中心</span>
         </div>
         <div class="panel-head-actions">
-          <el-button size="small" type="primary" link @click="handleMarkAll" :disabled="uiStore.unreadCount === 0">
+          <el-button size="small" type="primary" link class="grad-white-btn" @click="handleMarkAll" :disabled="uiStore.unreadCount === 0">
             全部已读
           </el-button>
           <el-button size="small" text @click="uiStore.closePanel()">

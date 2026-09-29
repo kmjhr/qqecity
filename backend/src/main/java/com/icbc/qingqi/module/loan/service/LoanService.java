@@ -61,6 +61,7 @@ public class LoanService {
     private final ApplicationEventPublisher eventPublisher;
     private final PayService payService;
     private final OverdueRiskService overdueRiskService;
+    private final LoanAiGuardService loanAiGuardService;
 
     // 贷款类型
     private static final String TYPE_A = "A_TYPE";
@@ -74,6 +75,7 @@ public class LoanService {
     // 申请状态
     private static final String STATUS_PRE_CHECK = "PRE_CHECK";
     private static final String STATUS_APPROVED = "APPROVED";
+    private static final String STATUS_REJECTED = "REJECTED";
 
     // 支付状态
     private static final String PAY_SUCCESS = "SUCCESS";
@@ -107,7 +109,8 @@ public class LoanService {
                        SysMessageMapper messageMapper,
                        ApplicationEventPublisher eventPublisher,
                        PayService payService,
-                       OverdueRiskService overdueRiskService) {
+                       OverdueRiskService overdueRiskService,
+                       LoanAiGuardService loanAiGuardService) {
         this.merchantMapper = merchantMapper;
         this.applicationMapper = applicationMapper;
         this.creditLimitMapper = creditLimitMapper;
@@ -121,6 +124,7 @@ public class LoanService {
         this.eventPublisher = eventPublisher;
         this.payService = payService;
         this.overdueRiskService = overdueRiskService;
+        this.loanAiGuardService = loanAiGuardService;
     }
 
     // ============================================================
@@ -185,11 +189,19 @@ public class LoanService {
         app.setPreCheckMinAmount(min);
         app.setPreCheckMaxAmount(max);
         app.setPreCheckDetail(detailText);
-        // 演示口径：B 类预审通过即自动审批通过（无需人工审批），便于走通受托支付闭环
+        // 演示口径：B 类预审通过后由模拟 AI 智能审核（与提款/打款前审查同口径：
+        // 身份对应、画像、收入、多头、长期未还、风险预警）——AI 通过自动放款；AI 拒绝则拒绝并留痕
         if (PRE_ELIGIBLE.equals(result)) {
-            app.setApplyStatus(STATUS_APPROVED);
-            app.setApproveAmount(max);
-            app.setApproveTime(LocalDateTime.now());
+            LoanAiGuardService.AiGuardVO ai = loanAiGuardService.guard(userId, TYPE_B);
+            if (Boolean.TRUE.equals(ai.getPassed())) {
+                app.setApplyStatus(STATUS_APPROVED);
+                app.setApproveAmount(max);
+                app.setApproveTime(LocalDateTime.now());
+            } else {
+                app.setApplyStatus(STATUS_REJECTED);
+                app.setRejectReason("AI 审核拒绝（模拟）：" + String.join("；", ai.getRejectedItems()));
+                app.setApproveTime(LocalDateTime.now());
+            }
         } else {
             app.setApplyStatus(STATUS_PRE_CHECK);
         }
@@ -402,6 +414,12 @@ public class LoanService {
      */
     @Transactional(rollbackFor = Exception.class)
     public EntrustPaymentVO entrustPay(Long userId, EntrustPayDTO dto) {
+        // 借款前 AI 智能审查（模拟）：B 类打款走 B 类自身流程（不要求转A）
+        LoanAiGuardService.AiGuardVO guard = loanAiGuardService.guard(userId, "B_TYPE");
+        if (!Boolean.TRUE.equals(guard.getPassed())) {
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET,
+                    "AI 审查未通过（模拟）：" + String.join("；", guard.getRejectedItems()) + "。请先处理风险后再借。");
+        }
         BizLoanApplication app = applicationMapper.selectById(dto.getLoanApplicationId());
         if (app == null) {
             throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "贷款申请不存在");
@@ -464,6 +482,59 @@ public class LoanService {
             review.setStatus("PENDING");
             entrustReviewMapper.insert(review);
 
+            // 每单复核 AI 智能审核（模拟）：小额且用途明确 → 秒过直付；大额 → 转人工；用途异常 → 拒绝
+            aiReviewEntrust(review);
+
+            if ("APPROVED".equals(review.getStatus())) {
+                // AI 复核通过 → 立即执行放款（模拟直付）
+                BizLoanApplication appForPay = applicationMapper.selectById(review.getLoanApplicationId());
+                BizMerchant merchantForPay = merchantMapper.selectById(review.getMerchantId());
+                EntrustPaymentVO payVo = doEntrustPay(userId, appForPay, merchantForPay,
+                        review.getAmount(), review.getPurpose(), review.getTradeProof());
+                review.setPaymentId(payVo.getId());
+                entrustReviewMapper.updateById(review);
+                EntrustPaymentVO vo = new EntrustPaymentVO();
+                vo.setId(payVo.getId());
+                vo.setPaymentNo(payVo.getPaymentNo());
+                vo.setUserId(userId);
+                vo.setLoanApplicationId(app.getId());
+                vo.setMerchantId(merchant.getId());
+                vo.setMerchantName(merchant.getMerchantName());
+                vo.setAmount(dto.getAmount());
+                vo.setPurpose(dto.getPurpose());
+                vo.setPaymentStatus("SUCCESS");
+                vo.setPaymentStatusName("打款成功（AI复核）");
+                vo.setPendingReview(Boolean.FALSE);
+                vo.setReviewNo(review.getReviewNo());
+                vo.setReviewStatus("APPROVED");
+                vo.setReviewStatusName("AI 复核通过");
+                vo.setFundPath("AI 复核通过（模拟）：100% 直付商户账户（不经过个人账户）");
+                log.info("[受托支付-AI复核通过并放款] 用户={}, 商户={}, 金额={}, 复核单={}",
+                        userId, merchant.getMerchantName(), dto.getAmount(), review.getReviewNo());
+                return vo;
+            }
+            if ("REJECTED".equals(review.getStatus())) {
+                EntrustPaymentVO vo = new EntrustPaymentVO();
+                vo.setId(review.getId());
+                vo.setPaymentNo(review.getReviewNo());
+                vo.setUserId(userId);
+                vo.setLoanApplicationId(app.getId());
+                vo.setMerchantId(merchant.getId());
+                vo.setMerchantName(merchant.getMerchantName());
+                vo.setAmount(dto.getAmount());
+                vo.setPurpose(dto.getPurpose());
+                vo.setPaymentStatus("REJECTED");
+                vo.setPaymentStatusName("AI 复核拒绝");
+                vo.setPendingReview(Boolean.FALSE);
+                vo.setReviewNo(review.getReviewNo());
+                vo.setReviewStatus("REJECTED");
+                vo.setReviewStatusName("AI 复核拒绝");
+                vo.setFundPath("AI 复核拒绝（模拟）：打款未执行，额度未扣减");
+                log.info("[受托支付-AI复核拒绝] 用户={}, 商户={}, 金额={}, 原因={}",
+                        userId, merchant.getMerchantName(), dto.getAmount(), review.getReviewRemark());
+                return vo;
+            }
+
             EntrustPaymentVO vo = new EntrustPaymentVO();
             vo.setId(review.getId());
             vo.setPaymentNo(review.getReviewNo());
@@ -478,9 +549,9 @@ public class LoanService {
             vo.setPendingReview(Boolean.TRUE);
             vo.setReviewNo(review.getReviewNo());
             vo.setReviewStatus("PENDING");
-            vo.setReviewStatusName("待复核");
-            vo.setFundPath("自定义商户每单复核：复核通过后 100% 直付商户账户（不经过个人账户）【模拟】");
-            log.info("[受托支付-每单复核] 用户={}, 商户={}, 金额={}, 复核单={}, 待管理端复核放款【模拟】",
+            vo.setReviewStatusName("待人工复核");
+            vo.setFundPath("大额转人工复核：复核通过后 100% 直付商户账户（不经过个人账户）【模拟】");
+            log.info("[受托支付-每单复核] 用户={}, 商户={}, 金额={}, 复核单={}, AI转人工复核【模拟】",
                     userId, merchant.getMerchantName(), dto.getAmount(), review.getReviewNo());
             return vo;
         }
@@ -570,13 +641,50 @@ public class LoanService {
         m.setBankAccount(dto.getBankAccount());
         m.setBankName(dto.getBankName());
         m.setApplyRemark(dto.getApplyRemark());
+        m.setEvidenceMaterial(dto.getEvidenceMaterial());
         m.setMerchantSource("USER_CUSTOM");
         m.setApplicantUserId(userId);
         m.setVerifyStatus("PENDING");
         m.setStatus(1);
         merchantMapper.insert(m);
         log.info("[自定义商户申请] 用户={}, 商户={}, ID={}", userId, m.getMerchantName(), m.getId());
+        // 商户白名单 AI 智能审核（模拟）：信息完整且有佐证 → 直接通过入白名单；异常/缺材料 → 拒绝
+        aiAuditMerchant(m);
         return m;
+    }
+
+    /**
+     * 商户白名单 AI 智能审核（模拟，替代人工等待）
+     * 规则：① 名称缺失/含明显异常 → 拒绝；② 佐证材料与营业执照均缺失 → 拒绝；
+     * 其余（信息完整）→ AI 审核通过，直接入白名单（VERIFIED），立即可用于受托支付。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    private void aiAuditMerchant(BizMerchant m) {
+        List<String> rejectReasons = new ArrayList<>();
+        String name = m.getMerchantName() == null ? "" : m.getMerchantName().trim();
+        if (name.isEmpty() || name.length() < 2) {
+            rejectReasons.add("商户名称缺失或过短");
+        }
+        if (name.matches(".*(测试|test|未知|\\*|\\?|\\d{15,}).*")) {
+            rejectReasons.add("商户名称含异常信息");
+        }
+        boolean hasEvidence = m.getEvidenceMaterial() != null && !m.getEvidenceMaterial().isBlank();
+        boolean hasLicense = m.getBusinessLicense() != null && !m.getBusinessLicense().isBlank();
+        if (!hasEvidence && !hasLicense) {
+            rejectReasons.add("缺少营业执照与佐证材料（需上传营业执照/租赁合同/银行流水等）");
+        }
+        if (!rejectReasons.isEmpty()) {
+            m.setVerifyStatus("REJECTED");
+            m.setReviewRemark("AI 审核未通过（模拟）：" + String.join("；", rejectReasons) + "。请补充后重新提交。");
+        } else {
+            m.setVerifyStatus("VERIFIED");
+            m.setReviewRemark("AI 审核通过（模拟）：商户信息完整，已自动加入白名单，可直接用于受托支付。");
+        }
+        m.setReviewerId(0L); // 0 = AI 智能审核（模拟）
+        m.setReviewTime(LocalDateTime.now());
+        merchantMapper.updateById(m);
+        log.info("[商户AI审核] 商户={}, ID={}, 结果={}, 意见={}", m.getMerchantName(), m.getId(),
+                m.getVerifyStatus(), m.getReviewRemark());
     }
 
     /**
@@ -656,6 +764,49 @@ public class LoanService {
     }
 
     /**
+     * 每单复核 AI 智能审核（模拟，替代人工等待）
+     * 规则：① 金额 &gt; 10000 → 转人工复核（管理端兜底）；② 用途缺失/含异常 → AI 拒绝；
+     * 其余（金额合理且用途明确）→ AI 复核通过（APPROVED），立即直付。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    private void aiReviewEntrust(BizEntrustReview review) {
+        List<String> rejectReasons = new ArrayList<>();
+        boolean largeAmount = review.getAmount() != null
+                && review.getAmount().compareTo(new BigDecimal("10000")) > 0;
+        String purpose = review.getPurpose() == null ? "" : review.getPurpose().trim();
+        if (purpose.isEmpty()) {
+            rejectReasons.add("用途说明缺失");
+        }
+        if (purpose.matches(".*(测试|test|赌博|刷单|套现).*")) {
+            rejectReasons.add("用途含异常/违规关键词");
+        }
+        if (largeAmount) {
+            // 大额转人工（管理端复核兜底）
+            review.setReviewerId(0L);
+            review.setReviewRemark("AI 预审（模拟）：单笔超过 ¥10,000，转人工复核");
+            review.setReviewTime(LocalDateTime.now());
+            entrustReviewMapper.updateById(review);
+            log.info("[受托支付-AI预审转人工] 复核单={}, 金额={}", review.getReviewNo(), review.getAmount());
+            return;
+        }
+        if (!rejectReasons.isEmpty()) {
+            review.setStatus("REJECTED");
+            review.setReviewerId(0L);
+            review.setReviewRemark("AI 复核未通过（模拟）：" + String.join("；", rejectReasons) + "。打款未执行。");
+            review.setReviewTime(LocalDateTime.now());
+            entrustReviewMapper.updateById(review);
+            log.info("[受托支付-AI复核拒绝] 复核单={}, 原因={}", review.getReviewNo(), String.join("；", rejectReasons));
+            return;
+        }
+        review.setStatus("APPROVED");
+        review.setReviewerId(0L);
+        review.setReviewRemark("AI 复核通过（模拟）：金额与用途正常，直接放款。");
+        review.setReviewTime(LocalDateTime.now());
+        entrustReviewMapper.updateById(review);
+        log.info("[受托支付-AI复核通过] 复核单={}, 金额={}", review.getReviewNo(), review.getAmount());
+    }
+
+    /**
      * 管理端：受托支付复核（每单复核）——通过后执行放款；驳回不打款、额度不动
      */
     @Transactional(rollbackFor = Exception.class)
@@ -710,6 +861,12 @@ public class LoanService {
      */
     @Transactional(rollbackFor = Exception.class)
     public CreditTxnVO withdraw(Long userId, WithdrawDTO dto) {
+        // 借款前 AI 智能审查（模拟）：画像不足/收入不客观/多头借贷/长期未还/逾期预警 → 拒绝
+        LoanAiGuardService.AiGuardVO guard = loanAiGuardService.guard(userId);
+        if (!Boolean.TRUE.equals(guard.getPassed())) {
+            throw new BizException(ErrorCode.BIZ_RULE_NOT_MET,
+                    "AI 审查未通过（模拟）：" + String.join("；", guard.getRejectedItems()) + "。请先处理风险后再借。");
+        }
         BizCreditLimit limit = getActiveACreditLimit(userId);
         if (limit.getAvailableLimit().compareTo(dto.getAmount()) < 0) {
             throw new BizException(ErrorCode.BIZ_RULE_NOT_MET,
@@ -1366,10 +1523,12 @@ public class LoanService {
         if (bLimit == null) {
             throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "暂无B类授信，需先完成B类预审");
         }
-        if (!"OBSERVING".equals(bLimit.getObservationStatus())) {
+        String obsStatus = bLimit.getObservationStatus();
+        if (!"OBSERVING".equals(obsStatus) && obsStatus != null) {
             throw new BizException(ErrorCode.BIZ_RULE_NOT_MET,
-                    "当前观察期状态为" + observationStatusName(bLimit.getObservationStatus()) + "，不可申请转A");
+                    "当前观察期状态为" + observationStatusName(obsStatus) + "，不可申请转A");
         }
+        // "未开始"（尚未进入观察期）但数据回流已达标的用户同样允许一键转A（演示口径）
         Map<String, Object> progress = observationProgress(userId);
         if (!Boolean.TRUE.equals(progress.get("eligible"))) {
             throw new BizException(ErrorCode.BIZ_RULE_NOT_MET,
@@ -1547,6 +1706,9 @@ public class LoanService {
      * 按认证状态筛选商户列表
      */
     public List<BizMerchant> listMerchantsByVerifyStatus(String verifyStatus) {
+        // 平台预置（SYSTEM）商户统一走模拟 AI 审核：未审（PENDING 且未记录审核人）的立即 AI 审，
+        // 正常信息 → 自动入白名单，异常/缺材料 → 自动拒绝；保证商户白名单全程 AI 审核留痕（模拟）
+        autoAiAuditPendingMerchants();
         LambdaQueryWrapper<BizMerchant> wrapper = new LambdaQueryWrapper<BizMerchant>()
                 .eq(BizMerchant::getStatus, 1)
                 .orderByAsc(BizMerchant::getId);
@@ -1554,6 +1716,22 @@ public class LoanService {
             wrapper.eq(BizMerchant::getVerifyStatus, verifyStatus);
         }
         return merchantMapper.selectList(wrapper);
+    }
+
+    /** 未审商户批量 AI 智能审核（模拟）：仅处理 PENDING 且 reviewer_id 为空（含平台预置商户） */
+    @Transactional(rollbackFor = Exception.class)
+    public void autoAiAuditPendingMerchants() {
+        List<BizMerchant> pending = merchantMapper.selectList(
+                new LambdaQueryWrapper<BizMerchant>()
+                        .eq(BizMerchant::getStatus, 1)
+                        .eq(BizMerchant::getVerifyStatus, "PENDING")
+                        .isNull(BizMerchant::getReviewerId));
+        for (BizMerchant m : pending) {
+            aiAuditMerchant(m);
+        }
+        if (!pending.isEmpty()) {
+            log.info("[商户AI审核] 批量自动审核 {} 家待审商户", pending.size());
+        }
     }
 
     /**
@@ -1753,6 +1931,10 @@ public class LoanService {
         vo.setRemark(TYPE_A.equals(limit.getCreditType())
                 ? "随借随还，按实际用款计息"
                 : "定向受托支付，仅限指定商户");
+        vo.setObservationStatusName("PROMOTED".equals(limit.getObservationStatus()) ? "已转A"
+                : "OBSERVING".equals(limit.getObservationStatus()) ? "观察中"
+                : "NONE".equals(limit.getObservationStatus()) ? "未开始"
+                : (limit.getObservationStatus() == null ? "未开始" : limit.getObservationStatus()));
         return vo;
     }
 

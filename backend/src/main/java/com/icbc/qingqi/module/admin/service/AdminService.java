@@ -5,12 +5,17 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.icbc.qingqi.common.BizException;
 import com.icbc.qingqi.common.ErrorCode;
 import com.icbc.qingqi.module.admin.dto.LoanReviewDTO;
+import com.icbc.qingqi.module.admin.dto.ObservationUserVO;
 import com.icbc.qingqi.module.admin.dto.WarningHandleDTO;
 import com.icbc.qingqi.module.guarantee.entity.BizGuaranteeApplication;
 import com.icbc.qingqi.module.guarantee.mapper.BizGuaranteeApplicationMapper;
+import com.icbc.qingqi.module.loan.entity.BizCreditLimit;
 import com.icbc.qingqi.module.loan.entity.BizCreditTxn;
 import com.icbc.qingqi.module.loan.entity.BizEntrustPayment;
 import com.icbc.qingqi.module.loan.entity.BizLoanApplication;
+import com.icbc.qingqi.module.loan.entity.BizAiReviewLog;
+import com.icbc.qingqi.module.loan.mapper.BizAiReviewLogMapper;
+import com.icbc.qingqi.module.loan.mapper.BizCreditLimitMapper;
 import com.icbc.qingqi.module.loan.mapper.BizCreditTxnMapper;
 import com.icbc.qingqi.module.loan.mapper.BizEntrustPaymentMapper;
 import com.icbc.qingqi.module.loan.mapper.BizLoanApplicationMapper;
@@ -29,7 +34,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -57,6 +64,8 @@ public class AdminService {
     private final SysMessageMapper messageMapper;
     private final SysUserMapper sysUserMapper;
     private final BizRegistrationReviewMapper registrationReviewMapper;
+    private final BizCreditLimitMapper creditLimitMapper;
+    private final BizAiReviewLogMapper reviewLogMapper;
 
     // 状态常量
     private static final String LOAN_PENDING_APPROVAL = "PENDING_APPROVAL";
@@ -75,7 +84,9 @@ public class AdminService {
                         BizRiskWarningMapper riskWarningMapper,
                         SysMessageMapper messageMapper,
                         SysUserMapper sysUserMapper,
-                        BizRegistrationReviewMapper registrationReviewMapper) {
+                        BizRegistrationReviewMapper registrationReviewMapper,
+                        BizCreditLimitMapper creditLimitMapper,
+                        BizAiReviewLogMapper reviewLogMapper) {
         this.guaranteeApplicationMapper = guaranteeApplicationMapper;
         this.loanApplicationMapper = loanApplicationMapper;
         this.creditTxnMapper = creditTxnMapper;
@@ -84,6 +95,8 @@ public class AdminService {
         this.messageMapper = messageMapper;
         this.sysUserMapper = sysUserMapper;
         this.registrationReviewMapper = registrationReviewMapper;
+        this.creditLimitMapper = creditLimitMapper;
+        this.reviewLogMapper = reviewLogMapper;
     }
 
     // ============================================================
@@ -108,10 +121,8 @@ public class AdminService {
         LambdaQueryWrapper<BizLoanApplication> wrapper = new LambdaQueryWrapper<>();
         if (status != null && !status.isBlank()) {
             wrapper.eq(BizLoanApplication::getApplyStatus, status);
-        } else {
-            // 默认查待审批
-            wrapper.eq(BizLoanApplication::getApplyStatus, LOAN_PENDING_APPROVAL);
         }
+        // 状态为空 → 查询全部（含待审批/已通过/已拒绝/退回），不附加默认条件
         if (loanType != null && !loanType.isBlank()) {
             wrapper.eq(BizLoanApplication::getLoanType, loanType);
         }
@@ -186,6 +197,67 @@ public class AdminService {
         messageMapper.insert(msg);
 
         return app;
+    }
+
+    /**
+     * B转A观察期用户列表：biz_credit_limit 中 B 类且进入观察期的用户（管理端展示）
+     */
+    public Page<ObservationUserVO> pageObservationUsers(int pageNum, int pageSize, String keyword) {
+        Page<ObservationUserVO> page = new Page<>(pageNum, pageSize);
+        List<ObservationUserVO> vos = new ArrayList<>();
+        List<BizCreditLimit> limits = creditLimitMapper.selectList(
+                new LambdaQueryWrapper<BizCreditLimit>()
+                        .eq(BizCreditLimit::getCreditType, "B_TYPE")
+                        .isNotNull(BizCreditLimit::getObservationStatus)
+                        .orderByDesc(BizCreditLimit::getUpdateTime));
+        long total = 0;
+        for (BizCreditLimit cl : limits) {
+            SysUser u = sysUserMapper.selectById(cl.getUserId());
+            if (u == null || u.getDeleted() != null && u.getDeleted() == 1) continue;
+            if (keyword != null && !keyword.isBlank()
+                    && !(u.getUsername() != null && u.getUsername().contains(keyword))
+                    && !(u.getRealName() != null && u.getRealName().contains(keyword))) continue;
+            total++;
+            if (vos.size() >= pageSize) continue;
+            ObservationUserVO vo = new ObservationUserVO();
+            vo.setUserId(cl.getUserId());
+            vo.setUsername(u.getUsername());
+            vo.setRealName(u.getRealName());
+            vo.setPhone(u.getPhone());
+            vo.setCreditType(cl.getCreditType());
+            vo.setTotalLimit(cl.getTotalLimit());
+            vo.setUsedLimit(cl.getUsedLimit());
+            vo.setAvailableLimit(cl.getAvailableLimit());
+            vo.setObservationStatus(cl.getObservationStatus());
+            vo.setObservationMonths(cl.getObservationMonths());
+            vo.setObservationScore(cl.getObservationScore());
+            Integer obsScore = cl.getObservationScore();
+            if (obsScore != null) {
+                vo.setPromotionProgress(Math.min(100, obsScore));
+            } else if (cl.getObservationMonths() != null) {
+                vo.setPromotionProgress(Math.min(100, cl.getObservationMonths() * 100 / 6));
+            } else {
+                vo.setPromotionProgress(0);
+            }
+            vo.setCreateTime(cl.getCreateTime());
+            vos.add(vo);
+        }
+        page.setRecords(vos);
+        page.setTotal(total);
+        return page;
+    }
+
+    /**
+     * AI 审核记录（借款前 AI 审查日志）分页：时间倒序，支持按用户/结果/授信类型筛选
+     */
+    public Page<BizAiReviewLog> pageAiReviewLogs(int pageNum, int pageSize, Long userId, String result, String creditType) {
+        Page<BizAiReviewLog> page = new Page<>(pageNum, pageSize);
+        LambdaQueryWrapper<BizAiReviewLog> wrapper = new LambdaQueryWrapper<>();
+        if (userId != null) wrapper.eq(BizAiReviewLog::getUserId, userId);
+        if (result != null && !result.isBlank()) wrapper.eq(BizAiReviewLog::getResult, result);
+        if (creditType != null && !creditType.isBlank()) wrapper.eq(BizAiReviewLog::getCreditType, creditType);
+        wrapper.orderByDesc(BizAiReviewLog::getCreateTime).orderByDesc(BizAiReviewLog::getId);
+        return reviewLogMapper.selectPage(page, wrapper);
     }
 
     public Page<BizCreditTxn> pageCreditTxns(int pageNum, int pageSize, String txnType) {

@@ -142,6 +142,7 @@ public class RegistrationReviewService {
         record.setGraduationDate(dto.getGraduationDate());
         record.setVerifyType(dto.getVerifyType());
         record.setStudentNo(dto.getStudentNo());
+        record.setCertPhoto(dto.getCertPhoto());
         record.setWhitelistPass(vo.getItems().stream()
                 .filter(i -> "WHITELIST_CROWD".equals(i.getCode()) || "EDUCATION".equals(i.getCode()))
                 .allMatch(i -> Boolean.TRUE.equals(i.getPass())) ? 1 : 0);

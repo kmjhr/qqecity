@@ -13,7 +13,7 @@
       <div class="login-brand">
         <div class="brand-content">
           <div class="brand-logo" @click="$router.push('/home')">
-            <img src="/logo-icon.jpg" alt="青启e城" />
+            <img src="/logo-icon.png" alt="青启e城" />
             <div>
               <div class="brand-title">青启e城</div>
               <div class="brand-subtitle">QINGQI eCity</div>
@@ -131,7 +131,7 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User, Lock, Wallet } from '@element-plus/icons-vue'
@@ -154,6 +154,16 @@ const loginRules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
 }
+
+// 管理端"前往用户端"直达：?demo=账号 → 自动以演示账号登录（如 /login?demo=testuser）
+onMounted(async () => {
+  const demo = route.query.demo
+  if (demo && ['testuser', 'entrepreneur', 'banker01'].includes(String(demo))) {
+    loginForm.username = String(demo)
+    loginForm.password = '123456'
+    await handleLogin()
+  }
+})
 
 async function handleLogin() {
   if (!loginFormRef.value) return
@@ -285,9 +295,9 @@ async function handleLogin() {
 }
 
 .brand-logo img {
-  width: 48px;
-  height: 48px;
-  border-radius: 14px;
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
   box-shadow: 0 8px 20px rgba(14, 165, 233, 0.25);
 }
 

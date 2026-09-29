@@ -204,6 +204,8 @@ public class SysUserService {
     public Page<UserVO> pageUsers(int pageNum, int pageSize, String keyword) {
         Page<SysUser> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
+        // 房东为独立业务主体（LANDLORD 角色），不混入普通用户列表，由管理端"房东分区"管理
+        wrapper.ne(SysUser::getRole, "LANDLORD");
         if (keyword != null && !keyword.isEmpty()) {
             wrapper.like(SysUser::getUsername, keyword)
                     .or().like(SysUser::getNickname, keyword)

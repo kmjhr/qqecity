@@ -31,6 +31,8 @@
             <div class="zone-title">A类循环贷 · 随借随还</div>
             <div class="zone-desc">有画像即可贷：循环额度最高 ¥50,000（年化 3.85%），提款后按日计息，随借随还无违约金；还款后额度即时恢复</div>
           </div>
+          <el-alert v-if="!promoted" type="warning" :closable="false" show-icon style="margin-bottom:16px"
+            title="A 类循环贷仅限 A 类用户：需先完成 B 类定向贷观察期达标并一键转 A，方可使用本专区" />
 
           <!-- 功能区1：额度与提款（左额度卡 + 右规则折叠） -->
           <div id="a-withdraw" class="zone-block">
@@ -76,7 +78,7 @@
                       <ol class="rule-list">
                         <li v-for="(r, i) in rules.productA?.rules || []" :key="i">{{ r }}</li>
                       </ol>
-                      <el-button size="small" type="primary" plain @click="openRisk(rules.productA)">查看 A类 专属风险提示</el-button>
+                      <el-button size="small" type="primary" plain class="grad-white-btn" @click="openRisk(rules.productA)">查看 A类 专属风险提示</el-button>
                     </div>
                   </el-collapse-item>
                 </el-collapse>
@@ -111,7 +113,7 @@
                   <!-- 右列：借款明细 + 还款操作（固定表格高度 + 操作区贴底） -->
                   <el-col :xs="24" :md="15" class="repay-right">
                     <div class="loan-table-title">未结清借款明细（按笔计息 · 先进先出冲抵）</div>
-                    <el-table :data="repayPreview.loans || []" size="small" :height="repayTableHeight" style="margin-bottom:8px">
+                    <el-table :data="repayPreview.loans || []" size="small" :height="repayTableHeight" style="min-height:132px">
                       <el-table-column label="借款日期" width="92">
                         <template #default="{ row }">{{ row.loanDate }}</template>
                       </el-table-column>
@@ -180,6 +182,8 @@
             <div class="zone-title">B类定向贷 · 两步式受托支付</div>
             <div class="zone-desc">零历史也能贷：免费预审（不查征信）→ 审批通过 → 100%受托支付直付白名单商户，专款专用；提款后进入 6 个月观察期，经营数据回流达标可一键转A</div>
           </div>
+          <el-alert v-if="promoted" type="warning" :closable="false" show-icon style="margin-bottom:16px"
+            title="您已是 A 类用户（已完成 B 转 A）：定向贷仅限 B 类用户使用，请前往 A 类循环贷专区" />
 
           <!-- 功能区1：预审 + 申请（左表单 + 右结果/申请） -->
           <div id="b-apply" class="zone-block">
@@ -210,7 +214,7 @@
                       <el-input v-model="precheckForm.businessPlan" type="textarea" :rows="4" placeholder="简述你的创业计划、经营内容、还款来源等" />
                     </el-form-item>
                     <el-form-item>
-                      <el-button type="primary" :loading="prechecking" @click="submitPrecheck">提交预审（不查征信 · 模拟）</el-button>
+                      <el-button type="primary" :loading="prechecking" :disabled="promoted" @click="submitPrecheck">提交预审（不查征信 · 模拟）</el-button>
                     </el-form-item>
                   </el-form>
                 </el-card>
@@ -303,7 +307,7 @@
                     <el-col :span="8"><div class="obs-item"><span>AI记账笔数</span><b>{{ obsProgress.bookCount }}/{{ obsProgress.bookThreshold }}笔</b></div></el-col>
                     <el-col :span="8"><div class="obs-item"><span>现金流健康度</span><b>{{ obsProgress.cashScore }}分（{{ obsProgress.cashLevelName }}）</b></div></el-col>
                   </el-row>
-                  <el-button v-if="obsProgress.observationStatus === 'OBSERVING' && obsProgress.eligible" type="success" size="small"
+                  <el-button v-if="(obsProgress.observationStatus === 'OBSERVING' || obsProgress.observationStatus === 'NONE' || !obsProgress.observationStatus) && obsProgress.eligible" type="success" size="small"
                     :loading="obsPromoting" style="margin-top:10px" @click="doApplyPromotion">一键申请转A（提额至5万）</el-button>
                   <div v-if="obsProgress.observationStatus !== 'OBSERVING'" class="obs-tip" style="margin-top:10px">{{ obsProgress.message }}</div>
                   <el-alert v-if="obsProgress.observationStatus === 'OBSERVING' && !obsProgress.eligible" type="info" :closable="false" style="margin-top:10px" :title="obsProgress.message" />
@@ -325,7 +329,7 @@
                       <ol class="rule-list">
                         <li v-for="(r, i) in rules.productB?.rules || []" :key="i">{{ r }}</li>
                       </ol>
-                      <el-button size="small" type="primary" plain @click="openRisk(rules.productB)">查看 B类 专属风险提示</el-button>
+                      <el-button size="small" type="primary" plain class="grad-white-btn" @click="openRisk(rules.productB)">查看 B类 专属风险提示</el-button>
                     </div>
                   </el-collapse-item>
                 </el-collapse>
@@ -363,7 +367,10 @@
                     <el-input v-model="entrustForm.purpose" placeholder="资金用途说明" />
                   </el-form-item>
                   <el-form-item>
-                    <el-button type="primary" :loading="paying" @click="submitEntrust">确认受托支付（模拟）</el-button>
+                    <el-button type="primary" :loading="paying" :disabled="promoted" @click="submitEntrust">确认受托支付（模拟）</el-button>
+                    <div v-if="promoted" style="margin-top:6px; font-size:12px; color:#f56c6c">
+                      您已是 A 类用户：定向贷（受托支付）仅限 B 类用户使用，请使用 A 类循环贷
+                    </div>
                   </el-form-item>
                 </el-form>
                 <el-card shadow="never" style="margin-top:4px" v-if="entrustResult">
@@ -469,7 +476,7 @@
                   <!-- 右列：借款明细 + 还款操作（固定表格高度 + 操作区贴底） -->
                   <el-col :xs="24" :md="15" class="repay-right">
                     <div class="loan-table-title">未结清借款明细（按笔计息 · 先进先出冲抵）</div>
-                    <el-table :data="repayPreview.loans || []" size="small" :height="repayTableHeight" style="margin-bottom:8px">
+                    <el-table :data="repayPreview.loans || []" size="small" :height="repayTableHeight" style="min-height:96px">
                       <el-table-column label="借款日期" width="92">
                         <template #default="{ row }">{{ row.loanDate }}</template>
                       </el-table-column>
@@ -555,6 +562,25 @@
         <el-form-item label="申请说明">
           <el-input v-model="merchantForm.applyRemark" type="textarea" :rows="2" placeholder="说明与该商户的交易背景、用途" />
         </el-form-item>
+        <el-form-item label="佐证材料">
+          <el-upload
+            v-model:file-list="merchantEvidenceList"
+            :auto-upload="false"
+            :limit="3"
+            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+            :on-change="onEvidenceChange"
+            :on-exceed="onEvidenceExceed"
+            :on-remove="onEvidenceRemove"
+            style="width:100%"
+          >
+            <el-button size="small" type="primary" plain>
+              <el-icon><Plus /></el-icon>&nbsp;选择文件
+            </el-button>
+            <template #tip>
+              <div class="dialog-tip">营业执照、租赁合同、银行流水等佐证材料（图片/PDF/Word/Excel，最多 3 个），随申请提交管理端审核</div>
+            </template>
+          </el-upload>
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" :loading="merchantSubmitting" @click="submitMerchantApply">提交审核</el-button>
           <el-button @click="merchantDialog = false">取消</el-button>
@@ -608,6 +634,34 @@
       </template>
     </el-dialog>
 
+    <!-- 借款前 AI 智能审查结果（模拟） -->
+    <el-dialog v-model="aiGuardVisible" title="借款前 AI 智能审查（模拟）" width="520px">
+      <div v-if="aiGuardResult" class="ai-guard-body">
+        <div class="ai-guard-head">
+          <span class="ai-guard-badge" :class="aiGuardResult.passed ? 'pass' : 'reject'">
+            {{ aiGuardResult.passed ? '审查通过' : '审查未通过' }}
+          </span>
+          <span class="ai-guard-score">AI 风险评分 {{ aiGuardResult.aiScore }} / 100</span>
+        </div>
+        <p class="ai-guard-summary">{{ aiGuardResult.summary }}</p>
+        <ul class="ai-guard-list">
+          <li v-for="(item, i) in aiGuardResult.passedItems" :key="'p' + i" class="pass-item">
+            <span class="dot">✓</span>{{ item }}
+          </li>
+          <li v-for="(item, i) in aiGuardResult.rejectedItems" :key="'r' + i" class="reject-item">
+            <span class="dot">✕</span>{{ item }}
+          </li>
+        </ul>
+        <p class="ai-guard-no">{{ aiGuardResult.reviewNo }}</p>
+      </div>
+      <template #footer>
+        <el-button @click="aiReviewAgain" :loading="aiGuardLoading">重新审查</el-button>
+        <el-button v-if="aiGuardResult && aiGuardResult.passed" type="primary" :loading="creditSubmitting"
+          @click="aiGuardVisible = false; submitCreditAction()">继续提款</el-button>
+        <el-button v-else type="primary" @click="aiGuardVisible = false">知道了</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 风险揭示弹窗 -->
     <el-dialog v-model="riskDialog" title="贷款风险揭示" width="720px">
       <div v-if="currentRisk" class="risk-panel">
@@ -631,30 +685,21 @@
 <script setup>
 import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Refresh } from '@element-plus/icons-vue'
+import { Refresh, Plus } from '@element-plus/icons-vue'
 import { getProductRules, preCheck, getCreditLimit, entrustPayment, getMerchants, applyMerchant, getMyMerchants,
   getEntrustRecords, getLoanApplications,
-  withdrawCredit, repayCredit, getCreditTxns, getRepayPreview, entrustRepay, createRepayOrder,
+  withdrawCredit, getWithdrawAiGuard, repayCredit, getCreditTxns, getRepayPreview, entrustRepay, createRepayOrder,
   getObservationProgress, applyPromotion, getRepayGuard } from '@/api/loan'
 import PayCashier from '@/components/PayCashier.vue'
 import ModuleHeader from '@/components/ModuleHeader.vue'
 
 const activeTab = ref('tabA')
 
-// ---- 还款表格自适应高度：表格变短，使右列按钮底部与左列最后一行字对齐 ----
-const repayTableHeight = ref(160)
-async function fitRepayTable() {
-  await nextTick()
-  const left = document.querySelector('.repay-left')
-  const ops = document.querySelector('.repay-ops')
-  if (!left || !ops) return
-  const h = left.offsetHeight - ops.offsetHeight - 36
-  repayTableHeight.value = Math.max(48, Math.round(h))
-}
-
 // A/B 分区内各自的流程进度（步骤条高亮）
 const aCredit = computed(() => creditList.value.find(x => x.creditType === 'A_TYPE') || null)
 const bCredit = computed(() => creditList.value.find(x => x.creditType === 'B_TYPE') || null)
+// 是否已完成 B 转 A（A 类用户）：A 类贷款仅限 A 类用户，B 类贷款仅限 B 类用户
+const promoted = computed(() => bCredit.value && bCredit.value.observationStatus === 'PROMOTED')
 const aStep = computed(() => (aCredit.value && aCredit.value.usedLimit > 0) ? 1 : 0)
 const bStep = computed(() => {
   const approved = (applications.value || []).some(a => a.applyStatus === 'APPROVED')
@@ -666,14 +711,37 @@ const bStep = computed(() => {
   return 0
 })
 
+// ---- 还款表格固定高度：右列按钮底部与左列最后一行字对齐；同一面板无论几条明细均同一大小（超出内部滚动） ----
+const repayTableHeight = ref(200)
+async function fitRepayTable() {
+  await nextTick()
+  // 按当前激活分区精确取面板
+  const isA = activeTab.value === 'tabA'
+  const paneSel = isA ? '#pane-tabA' : '#pane-tabB'
+  if (!isA) {
+    // B 类还款面板：明细表格固定较短高度（紧凑展示，超出内部滚动）
+    repayTableHeight.value = 130
+    return
+  }
+  const left = document.querySelector(paneSel + ' .repay-left')
+  const title = document.querySelector(paneSel + ' .loan-table-title')
+  const ops = document.querySelector(paneSel + ' .repay-ops')
+  if (!left || !ops) return
+  // A 类：表格高度 = 左列总高 - 右列明细标题高 - 右列操作区高 - 一个半按钮高度（约 60px），比按钮贴底稍短
+  const titleH = title ? title.offsetHeight : 0
+  const h = left.offsetHeight - titleH - ops.offsetHeight - 60
+  repayTableHeight.value = Math.max(120, Math.round(h))
+}
+
 // 切换分区时同步还款中心类型
 watch(activeTab, (v) => {
   if (v === 'tabA') switchRepay('A_TYPE')
   else switchRepay('B_TYPE')
-  setTimeout(fitRepayTable, 120)
+  // 数据/文案加载完成后校准一次（计算结果固定，不随明细条数变化）
+  setTimeout(fitRepayTable, 180)
 })
 
-// 窗口尺寸变化时重新适配还款表格高度
+// 窗口尺寸变化时重新适配
 if (typeof window !== 'undefined') {
   window.addEventListener('resize', () => setTimeout(fitRepayTable, 80))
 }
@@ -795,7 +863,11 @@ const switchRepay = async (type) => {
     repayPreview.value = await getRepayPreview(type)
     repayAmount.value = (repayPreview.value && repayPreview.value.usedLimit > 0)
       ? Number(repayPreview.value.totalDue) : 0
-  } catch (e) {} finally { repayLoading.value = false }
+  } catch (e) {} finally {
+    // 固定布局：表格高度由 left/ops 布局决定，明细条数不影响；数据/保障金文案加载后校准一次贴底
+    repayLoading.value = false
+    setTimeout(fitRepayTable, 120)
+  }
 }
 const loadRepayPanel = async () => {
   // 由所在分区决定还款中心类型
@@ -898,17 +970,41 @@ const openTxns = async (c) => {
   creditDialog.value = true
   try { txnList.value = await getCreditTxns(c.creditType) } catch (e) { txnList.value = [] }
 }
+const aiGuardVisible = ref(false)
+const aiGuardResult = ref(null)
+const aiGuardLoading = ref(false)
+
 const submitCreditAction = async () => {
+  const amount = creditAmount.value
+  if (!amount || amount <= 0) return
   creditSubmitting.value = true
   try {
-    const amount = creditAmount.value
-    if (!amount || amount <= 0) return
+    // 借款前 AI 智能审查（模拟）：画像分/收入客观性/多头借贷/长期未还/逾期预警
+    const guard = await getWithdrawAiGuard()
+    if (guard && guard.passed === false) {
+      aiGuardResult.value = guard
+      aiGuardVisible.value = true
+      return
+    }
+    if (guard && guard.passed === true && aiGuardResult.value) {
+      aiGuardResult.value = guard
+    }
     const res = await withdrawCredit({ amount })
-    ElMessage.success('提款成功（模拟），贷款资金已放款到账（演示口径：不经平台钱包），按日计息')
+    ElMessage.success('AI 审查通过（模拟）· 提款成功，贷款资金已放款到账（演示口径：不经平台钱包），按日计息')
     creditDialog.value = false
     loadCredit()
     loadRepayPanel()
-  } catch (e) {} finally { creditSubmitting.value = false }
+  } catch (e) {
+    if (e && e.message && e.message.includes('AI 审查')) {
+      ElMessage.error(e.message)
+    }
+  } finally { creditSubmitting.value = false }
+}
+const aiReviewAgain = async () => {
+  aiGuardLoading.value = true
+  try {
+    aiGuardResult.value = await getWithdrawAiGuard()
+  } catch (e) {} finally { aiGuardLoading.value = false }
 }
 
 // 受托支付
@@ -925,10 +1021,28 @@ const merchants = ref([])
 const myMerchants = ref([])
 const entrustRecords = ref([])
 const merchantDialog = ref(false)
+const merchantEvidenceList = ref([])
+const onEvidenceChange = (file) => {
+  if (!file.raw) return
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    file.data = e.target?.result || ''
+    merchantForm.evidenceMaterial = JSON.stringify(
+      merchantEvidenceList.value.filter(f => f.data).map(f => ({ name: f.name, data: f.data }))
+    )
+  }
+  reader.readAsDataURL(file.raw)
+}
+const onEvidenceExceed = () => ElMessage.warning('最多上传 3 张佐证材料')
+const onEvidenceRemove = () => {
+  merchantForm.evidenceMaterial = JSON.stringify(
+    merchantEvidenceList.value.filter(f => f.data).map(f => ({ name: f.name, data: f.data }))
+  )
+}
 const merchantSubmitting = ref(false)
 const merchantForm = reactive({
   merchantName: '', merchantType: 'MATERIAL', contactName: '', contactPhone: '',
-  businessLicense: '', bankAccount: '', bankName: '', applyRemark: ''
+  businessLicense: '', bankAccount: '', bankName: '', applyRemark: '', evidenceMaterial: ''
 })
 const merchantTypeOptions = [
   { value: 'MATERIAL', label: '物料采购' },
@@ -999,7 +1113,7 @@ const submitMerchantApply = async () => {
     ElMessage.success('已提交，进入灰名单待管理端 banker 审核；通过后仅你本人可用，且每次打款前仍会复核')
     merchantDialog.value = false
     merchantForm.merchantName = ''; merchantForm.contactName = ''; merchantForm.contactPhone = ''
-    merchantForm.businessLicense = ''; merchantForm.bankAccount = ''; merchantForm.bankName = ''; merchantForm.applyRemark = ''
+    merchantForm.businessLicense = ''; merchantForm.bankAccount = ''; merchantForm.bankName = ''; merchantForm.applyRemark = ''; merchantForm.evidenceMaterial = ''; merchantEvidenceList.value = []
     loadMyMerchants()
   } catch (e) {
     ElMessage.error(e?.message || '提交失败')
@@ -1109,6 +1223,9 @@ onMounted(() => { loadRules(); loadCredit(); loadMerchants(); loadApplications()
 .repay-btns .el-button + .el-button { margin-left: 0; margin-top: 0; }
 .repay-right { display: flex; flex-direction: column; min-width: 0; height: 100%; }
 .repay-left { display: flex; flex-direction: column; min-width: 0; }
+.repay-right { display: flex; flex-direction: column; min-width: 0; }
+.repay-right .el-table__body-wrapper { overflow-y: auto; }
+/* 未结清借款明细：无论几条明细均为同一固定高度（超出内部滚动），禁止内容自适应 */
 .repay-left .repay-remark { margin-top: 12px; }
 .repay-ops { margin-top: auto; padding-top: 4px; }
 .repay-right :deep(.el-table__body-wrapper) { overflow-y: auto; }
@@ -1175,4 +1292,18 @@ onMounted(() => { loadRules(); loadCredit(); loadMerchants(); loadApplications()
   border: none !important;
   color: #fff !important;
 }
+
+.ai-guard-body { padding: 4px 0; }
+.ai-guard-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.ai-guard-badge { padding: 4px 12px; border-radius: 12px; color: #fff; font-size: 13px; font-weight: 600; }
+.ai-guard-badge.pass { background: #67c23a; }
+.ai-guard-badge.reject { background: #f56c6c; }
+.ai-guard-score { color: #606266; font-size: 13px; }
+.ai-guard-summary { color: #303133; font-weight: 600; margin: 6px 0 8px; }
+.ai-guard-list { list-style: none; padding: 0; margin: 0 0 8px; }
+.ai-guard-list li { font-size: 13px; line-height: 22px; padding: 3px 10px; border-radius: 6px; margin-bottom: 4px; }
+.ai-guard-list .pass-item { color: #529b2e; background: #f0f9eb; }
+.ai-guard-list .reject-item { color: #c45656; background: #fef0f0; }
+.ai-guard-list .dot { font-weight: 700; margin-right: 6px; }
+.ai-guard-no { color: #909399; font-size: 12px; }
 </style>

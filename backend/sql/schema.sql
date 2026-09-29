@@ -127,6 +127,7 @@ CREATE TABLE `biz_registration_review` (
   `graduation_date`  DATE         NULL COMMENT '毕业日期',
   `verify_type`      VARCHAR(20)  NULL COMMENT '核验方式：XUE_XIN_WANG/STUDENT_CARD',
   `student_no`       VARCHAR(100) NULL COMMENT '学信档案验证码/学号（模拟）',
+  `cert_photo`       TEXT         NULL COMMENT '证件照片（base64，毕业证/学生证，模拟识别上传）',
   `whitelist_pass`   TINYINT      NULL COMMENT '白名单人群审核：1通过 0拒绝',
   `whitelist_detail` VARCHAR(500) NULL COMMENT '白名单审核明细',
   `material_pass`    TINYINT      NULL COMMENT '同一材料/同一人审核：1通过 0命中重复',
@@ -382,6 +383,7 @@ CREATE TABLE `biz_merchant` (
   `merchant_source`  VARCHAR(20)  NOT NULL DEFAULT 'SYSTEM' COMMENT '商户来源：SYSTEM预置/USER_CUSTOM用户自定义',
   `applicant_user_id` BIGINT      NULL COMMENT '申请人用户ID（用户自定义商户）',
   `apply_remark`     VARCHAR(500) NULL COMMENT '申请说明',
+  `evidence_material` TEXT         NULL COMMENT '佐证材料（JSON数组：[{name,data}]，营业执照等）',
   `review_remark`    VARCHAR(500) NULL COMMENT '审核意见/驳回原因',
   `reviewer_id`      BIGINT       NULL COMMENT '审核人ID（banker）',
   `review_time`      DATETIME     NULL COMMENT '审核时间',
@@ -1263,3 +1265,25 @@ INSERT INTO `biz_anti_fraud_content` (`title`, `content_type`, `category`, `summ
 (0x4554432fe8bf9de7aba0e79fade4bfa1e8af88e9aa97, 'ARTICLE', 0x455443e79fade4bfa1e8af88e9aa97, 0x4554432fe8bf9de7aba0e79fade4bfa1e8af88e9aa97, 0x232320e5b8b8e8a781e8af9de69caf5c6e27e682a8e79a84455443e5b7b2e5819ce794a8efbc8ce782b9e587bbe993bee68ea5e8aea4e8af812727e8bda6e8be86e8bf9de7aba0efbc8ce782b9e587bbe69fa5e79c8be8afa6e683852727e9809ae8a18ce8b4b9e689a3e6acbee5a4b1e8b4a5efbc8ce99c80e9878de696b0e7adbee7baa627e380825c6e5c6e232320e8af88e9aa97e6898be6b3955c6e312e20e4bcaae59fbae7ab992fe79fade4bfa1e7bea4e58f91efbc8ce4bbbfe58692455443e4b8ade5bf83e38081e4baa4e8ada6e983a8e997a85c6e322e20e993bee68ea5e8b7b3e8bdace99293e9b1bce9a1b5e99da2efbc8ce8afb1e5afbce5a1abe58699e993b6e8a18ce58da1e38081e5af86e7a081e38081e9aa8ce8af81e7a0815c6e332e20e68896e4b88be8bdbd27e8aea4e8af8141505027e6a48de585a5e69ca8e9a9ace79b97e588b75c6e5c6e232320e998b2e88c83e5bbbae8aeae5c6e2d204554432fe4baa4e7aea1e4b89ae58aa1e9809ae8bf87e5ae98e696b9e5b08fe7a88be5ba8fe58a9ee79086efbc8ce79fade4bfa1e993bee68ea5e4b880e5be8be4b88de782b95c6e2d20e9aa8ce8af81e7a081e698afe69c80e5908ee998b2e7babfefbc8ce7bb9de4b88de5a496e6b3845c6e2d20e69c89e79691e997aee68ba8e68993e5ae98e696b9e783ade7babfe6a0b8e5ae9e, 53, 1, NOW()),
 (0xe69cbae7a5a8e98080e694b9e7adbee8af88e9aa97, 'ARTICLE', 0xe69cbae7a5a8e98080e694b9e7adbe, 0xe69cbae7a5a8e98080e694b9e7adbee8af88e9aa97, 0x232320e5b8b8e8a781e8af9de69caf5c6e27e682a8e79a84e888aae78fade58f96e6b688efbc8ce58fafe694b9e7adbee68896e79086e8b5942727e8a1a5e581bfe98791e99c80e5bc80e9809ae694afe4bb98e9809ae981932727e58588e4baa4e694b9e7adbee8b4b9e5868de98080e6acbe27e380825c6e5c6e232320e8af88e9aa97e6898be6b3955c6e312e20e99d9ee6b395e88eb7e58f96e888aae78fade4bfa1e681afefbc8ce79fade4bfa1e9809ae79fa527e888aae78fade58f96e6b688275c6e322e20e8afb1e5afbce68ba8e6899334303027e5aea2e69c8d27e794b5e8af9defbc8ce5a597e58f96e993b6e8a18ce58da1e4bfa1e681af5c6e332e20e68896e8afb1e5afbce4b88be8bdbd415050e5bc80e590afe5b18fe5b995e585b1e4baabe79b97e588b75c6e5c6e232320e998b2e88c83e5bbbae8aeae5c6e2d20e888aae78fade58f98e58aa8e9809ae8bf87e888aae58fb8e5ae98e696b94150502fe794b5e8af9de6a0b8e5ae9eefbc8ce4b88de68ba8e79fade4bfa1e58685e794b5e8af9d5c6e2d20e98080e694b9e7adbee4b88de694b6e4bbbbe4bd95e8b4b9e794a8efbc8ce69bb4e4b88de99c80e8a681e9aa8ce8af81e7a0815c6e2d20e694b6e588b0e79fade4bfa1e58588e799bbe5bd95e5ae98e696b9e6b8a0e98193e69fa5e8af81, 54, 1, NOW()),
 (0xe585bce8818ce59fb9e8aeade8b4b9e8af88e9aa97, 'ARTICLE', 0xe585bce8818ce8af88e9aa97, 0xe585bce8818ce59fb9e8aeade8b4b9e8af88e9aa97, 0x232320e5b8b8e8a781e8af9de69caf5c6e27e9ab98e896aae585bce8818cefbc8ce58588e4baa4e59fb9e8aeade8b4b92fe69c8de8a385e8b4b92fe68abce987912727e9858de99fb32fe589aae8be91e8afbee7a88befbc8ce5ada6e5ae8ce68ea5e58d95e59b9ee69cac2727e585a5e8818ce99c80e58a9ee79086e5b7a5e58da1e8b4b927e380825c6e5c6e232320e8af88e9aa97e6898be6b3955c6e312e20e58f91e5b88327e8bdbbe69dbee9ab98e896aa27e585bce8818ce4bfa1e681afefbc8ce99da2e8af95e5908ee8a681e6b182e7bcb4e8b4b95c6e322e20e694b6e58f96e59fb9e8aeade8b4b92fe4bf9de8af81e987912fe5b7a5e69cace8b4b9e5908ee5ae89e68e9227e588b7e58d952727e68b89e4babae5a4b4275c6e332e20e68896e68ea8e99480e9ab98e4bbb7e8afbee7a88befbc8ce689bfe8afba27e5ada6e5ae8ce8bf94e4bda327e5908ee5a4b1e881945c6e5c6e232320e998b2e88c83e5bbbae8aeae5c6e2d20e585a5e8818ce58588e4baa4e992b1e79a84e983bde698afe9aa97e5b180efbc8ce6ada3e8a784e4bc81e4b89ae4b88de694b6e8b4b95c6e2d20e585bce8818ce79c8be8b584e8b4a8efbc8c27e8bdbbe69dbee9ab98e896aa27e5a49ae698afe999b7e998b15c6e2d20e7bcb4e8b4b9e5898de58588e69fa5e585ace58fb8e5b7a5e59586e4bfa1e681afe4b88ee58fa3e7a291, 55, 1, NOW());
+
+
+-- -------------------------------------------------------------
+-- 补充：biz_ai_review_log 借款前AI审查日志（模拟AI）
+-- -------------------------------------------------------------
+DROP TABLE IF EXISTS `biz_ai_review_log`;
+CREATE TABLE `biz_ai_review_log` (
+  `id`             BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `user_id`        BIGINT       NOT NULL COMMENT '申请人ID',
+  `user_name`      VARCHAR(50)  NULL     COMMENT '申请人姓名（冗余，便于管理端展示）',
+  `credit_type`    VARCHAR(20)  NOT NULL COMMENT '授信类型：A_TYPE循环贷 / B_TYPE定向贷',
+  `biz_type`       VARCHAR(20)  NOT NULL COMMENT '业务场景：WITHDRAW提款 / ENTRUST_PAY打款',
+  `result`         VARCHAR(10)  NOT NULL COMMENT '审查结果：PASS通过 / REJECT拒绝',
+  `ai_score`       INT          NOT NULL COMMENT 'AI审查评分（100分制）',
+  `passed_items`   TEXT         NULL     COMMENT '通过项明细（JSON数组）',
+  `rejected_items` TEXT         NULL     COMMENT '风险项明细（JSON数组）',
+  `request_no`     VARCHAR(40)  NULL     COMMENT '关联业务单号（提款流水号/支付单号）',
+  `create_time`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '审查时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='借款前AI审查日志（模拟AI）';

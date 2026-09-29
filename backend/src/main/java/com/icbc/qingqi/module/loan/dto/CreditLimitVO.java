@@ -46,4 +46,10 @@ public class CreditLimitVO {
 
     /** 备注（A类随借随还 / B类定向受托支付） */
     private String remark;
+
+    /** B 类观察期状态（仅 B 类额度有值）：NONE未开始 / OBSERVING观察中 / PROMOTED已转A / EXITED已退出 */
+    private String observationStatus;
+
+    /** 观察期状态展示名 */
+    private String observationStatusName;
 }

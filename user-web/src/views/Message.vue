@@ -9,7 +9,7 @@
           </el-badge>
         </span>
       </div>
-      <el-button type="primary" link @click="handleMarkAll" :disabled="unreadCount === 0">
+      <el-button type="primary" link class="grad-white-btn" @click="handleMarkAll" :disabled="unreadCount === 0">
         全部已读
       </el-button>
     </el-card>
