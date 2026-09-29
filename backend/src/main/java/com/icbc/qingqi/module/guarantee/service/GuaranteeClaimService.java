@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.icbc.qingqi.common.BizException;
 import com.icbc.qingqi.common.ErrorCode;
+import com.icbc.qingqi.module.admin.service.DemoAutoApproveService;
 import com.icbc.qingqi.module.guarantee.dto.*;
 import com.icbc.qingqi.module.guarantee.entity.*;
 import com.icbc.qingqi.module.guarantee.mapper.*;
@@ -43,6 +44,7 @@ public class GuaranteeClaimService {
     private final BizLandlordMapper landlordMapper;
     private final SysUserMapper userMapper;
     private final SysMessageMapper messageMapper;
+    private final DemoAutoApproveService demoAutoApprove;
 
     // 索赔状态
     private static final String CLAIM_SUBMITTED = "SUBMITTED";
@@ -72,13 +74,15 @@ public class GuaranteeClaimService {
                                   BizGuaranteeApplicationMapper applicationMapper,
                                   BizLandlordMapper landlordMapper,
                                   SysUserMapper userMapper,
-                                  SysMessageMapper messageMapper) {
+                                  SysMessageMapper messageMapper,
+                                  DemoAutoApproveService demoAutoApprove) {
         this.claimMapper = claimMapper;
         this.guaranteeMapper = guaranteeMapper;
         this.applicationMapper = applicationMapper;
         this.landlordMapper = landlordMapper;
         this.userMapper = userMapper;
         this.messageMapper = messageMapper;
+        this.demoAutoApprove = demoAutoApprove;
     }
 
     // ============================================================
@@ -245,18 +249,34 @@ public class GuaranteeClaimService {
 
             log.info("[AI初审-速赔] 索赔编号={}, 置信度={}, 赔付金额={}", claim.getClaimNo(), confidence, claim.getPayoutAmount());
         } else {
-            // 存疑 → 转申辩期
-            claim.setClaimStatus(CLAIM_DEFENSE_PERIOD);
-            claimMapper.updateById(claim);
+            if (demoAutoApprove.isEnabled()) {
+                // 演示模式：AI 初审存疑也直接裁决赔付通过（模拟 banker 人工复核 APPROVED）
+                claim.setClaimStatus(CLAIM_APPROVED);
+                claim.setPayoutAmount(claim.getClaimAmount());
+                claim.setCloseTime(LocalDateTime.now());
+                claimMapper.updateById(claim);
+                updateGuaranteeClaimed(guarantee);
+                sendInternalMessage(claim.getTenantId(), "保函索赔结案通知（演示自动通过）",
+                        "保函" + claim.getGuaranteeNo() + "的索赔（编号" + claim.getClaimNo()
+                                + "）AI初审存疑，演示模式下自动判定赔付¥" + claim.getPayoutAmount() + "。【模拟】",
+                        "GUARANTEE", claim.getId());
+                log.info("[AI初审-演示自动通过] 索赔编号={}, 赔付金额={}", claim.getClaimNo(), claim.getPayoutAmount());
+                claim.setClaimStatus(CLAIM_CLOSED);
+                claimMapper.updateById(claim);
+            } else {
+                // 存疑 → 转申辩期
+                claim.setClaimStatus(CLAIM_DEFENSE_PERIOD);
+                claimMapper.updateById(claim);
 
-            // 给租客发站内信：申辩期开始
-            sendInternalMessage(claim.getTenantId(), "保函索赔申辩通知",
-                    "保函" + claim.getGuaranteeNo() + "的索赔（编号" + claim.getClaimNo()
-                            + "）存在疑问，请您在申辩期内提交反证。索赔原因：" + claim.getClaimReason()
-                            + "，索赔金额：¥" + claim.getClaimAmount() + "。【模拟】",
-                    "GUARANTEE", claim.getId());
+                // 给租客发站内信：申辩期开始
+                sendInternalMessage(claim.getTenantId(), "保函索赔申辩通知",
+                        "保函" + claim.getGuaranteeNo() + "的索赔（编号" + claim.getClaimNo()
+                                + "）存在疑问，请您在申辩期内提交反证。索赔原因：" + claim.getClaimReason()
+                                + "，索赔金额：¥" + claim.getClaimAmount() + "。【模拟】",
+                        "GUARANTEE", claim.getId());
 
-            log.info("[AI初审-转申辩] 索赔编号={}, 置信度={}, 命中规则={}", claim.getClaimNo(), confidence, hitRules);
+                log.info("[AI初审-转申辩] 索赔编号={}, 置信度={}, 命中规则={}", claim.getClaimNo(), confidence, hitRules);
+            }
         }
 
         return toClaimVO(claim);
@@ -294,6 +314,22 @@ public class GuaranteeClaimService {
         claimMapper.updateById(claim);
 
         log.info("[租客申辩] 索赔编号={}, 租客={}, 已转入人工复核", claim.getClaimNo(), currentUserId);
+
+        // 演示模式：申辩后自动人工复核通过（模拟 banker 裁决赔付）
+        if (demoAutoApprove.isEnabled()) {
+            claim.setClaimStatus(CLAIM_APPROVED);
+            claim.setPayoutAmount(claim.getClaimAmount());
+            claim.setCloseTime(LocalDateTime.now());
+            BizGuarantee g = guaranteeMapper.selectById(claim.getGuaranteeId());
+            updateGuaranteeClaimed(g);
+            sendInternalMessage(claim.getTenantId(), "保函索赔结案通知（演示自动通过）",
+                    "保函" + claim.getGuaranteeNo() + "的索赔（编号" + claim.getClaimNo()
+                            + "）经申辩后，演示模式下自动判定赔付¥" + claim.getPayoutAmount() + "。【模拟】",
+                    "GUARANTEE", claim.getId());
+            claim.setClaimStatus(CLAIM_CLOSED);
+            claimMapper.updateById(claim);
+            log.info("[申辩-演示自动通过] 索赔编号={}, 赔付金额={}", claim.getClaimNo(), claim.getPayoutAmount());
+        }
 
         return toClaimVO(claim);
     }

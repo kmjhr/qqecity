@@ -17,6 +17,9 @@ const request = axios.create({
   timeout: 60000
 })
 
+// 登录过期处理防抖标志：并发 1002/1004/1005 只弹一次、只跳一次
+let authRedirecting = false
+
 // 请求拦截器：注入 Token
 request.interceptors.request.use(
   config => {
@@ -41,10 +44,24 @@ request.interceptors.response.use(
     }
     // 登录过期 / Token 无效
     if (res.code === 1002 || res.code === 1004 || res.code === 1005) {
-      ElMessage.warning('登录已过期，请重新登录')
+      // 本地直接清理会话（不调后端 logout 接口：无 token 时登出接口同样返回 1002，
+      // 会触发本分支 → 递归弹窗风暴）
       const userStore = useUserStore()
-      userStore.logout()
-      router.push('/login')
+      userStore.token = ''
+      userStore.refreshToken = ''
+      userStore.userInfo = null
+      localStorage.removeItem('accessToken')
+      localStorage.removeItem('refreshToken')
+      localStorage.removeItem('userInfo')
+      // 并发多个请求同时 1002 时只提示一次、只跳转一次（防抖窗口 2s）
+      if (!authRedirecting) {
+        authRedirecting = true
+        if (router.currentRoute.value.path !== '/login') {
+          ElMessage.warning('登录已过期，请重新登录')
+        }
+        router.push('/login')
+        setTimeout(() => { authRedirecting = false }, 2000)
+      }
       return Promise.reject(new Error(res.message))
     }
     // 其他业务错误

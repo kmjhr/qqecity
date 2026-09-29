@@ -1,5 +1,28 @@
 <template>
   <div class="dashboard-page">
+    <!-- 演示模式：人工审核自动通过开关 -->
+    <el-card shadow="never" class="demo-switch-card">
+      <div class="demo-switch-content">
+        <div>
+          <p class="demo-switch-title">
+            演示模式：人工审核自动通过
+            <el-tag size="small" :type="autoApprove.enabled ? 'success' : 'info'" style="margin-left: 8px">
+              {{ autoApprove.enabled ? '已开启' : '已关闭' }}
+            </el-tag>
+          </p>
+          <p class="demo-switch-desc">
+            开启后：待房东确认 / AI复审转人工 / 索赔存疑与申辩 / 大额受托支付 / 商户审核 全部自动通过，评委演示无需逐单点击；关闭后恢复真实人工审核流程。
+          </p>
+        </div>
+        <el-switch
+          v-model="autoApprove.enabled"
+          active-text="自动通过"
+          inactive-text="人工审核"
+          @change="toggleAutoApprove"
+        />
+      </div>
+    </el-card>
+
     <!-- 数据概览卡片（对接真实统计接口） -->
     <el-row :gutter="20">
       <el-col :span="6" v-for="item in stats" :key="item.title">
@@ -49,11 +72,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { getDashboardStats } from '@/api/dashboard'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
+import { getDashboardStats, getDemoAutoApprove, setDemoAutoApprove } from '@/api/dashboard'
 
 const loading = ref(false)
 const data = ref<any>({})
+const autoApprove = reactive<{ enabled: boolean }>({ enabled: true })
+
+async function toggleAutoApprove(val: boolean) {
+  try {
+    const res = await setDemoAutoApprove(val)
+    autoApprove.enabled = res.enabled
+    ElMessage.success(res.enabled ? '演示自动审核已开启（所有人工审核自动通过）' : '演示自动审核已关闭（恢复人工审核）')
+  } catch (e: any) {
+    autoApprove.enabled = !val
+    ElMessage.error('切换失败：' + (e?.message || '未知错误'))
+  }
+}
 
 const stats = computed(() => [
   {
@@ -127,7 +163,17 @@ const todos = computed(() => [
 
 onMounted(() => {
   loadData()
+  loadAutoApprove()
 })
+
+async function loadAutoApprove() {
+  try {
+    const res = await getDemoAutoApprove()
+    autoApprove.enabled = res.enabled
+  } catch (e) {
+    // 开关接口异常时保持默认开启展示
+  }
+}
 
 async function loadData() {
   loading.value = true
@@ -142,6 +188,33 @@ async function loadData() {
 <style scoped>
 .dashboard-page {
   width: 100%;
+}
+
+.demo-switch-card {
+  border-radius: 8px;
+  margin-bottom: 20px;
+  background: linear-gradient(90deg, #f0f9ff, #ecf5ff);
+  border-color: #b3d8ff;
+}
+
+.demo-switch-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.demo-switch-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 6px;
+}
+
+.demo-switch-desc {
+  font-size: 12px;
+  color: #606266;
+  line-height: 1.6;
+  max-width: 900px;
 }
 
 .stat-card {

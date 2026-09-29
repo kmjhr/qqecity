@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.icbc.qingqi.common.BizException;
 import com.icbc.qingqi.common.ErrorCode;
+import com.icbc.qingqi.module.admin.service.DemoAutoApproveService;
 import com.icbc.qingqi.module.bookkeeping.entity.BizBookkeepingRecord;
 import com.icbc.qingqi.module.bookkeeping.entity.BizCashflowReport;
 import com.icbc.qingqi.module.bookkeeping.mapper.BizBookkeepingRecordMapper;
@@ -62,6 +63,7 @@ public class LoanService {
     private final PayService payService;
     private final OverdueRiskService overdueRiskService;
     private final LoanAiGuardService loanAiGuardService;
+    private final DemoAutoApproveService demoAutoApprove;
 
     // 贷款类型
     private static final String TYPE_A = "A_TYPE";
@@ -110,7 +112,8 @@ public class LoanService {
                        ApplicationEventPublisher eventPublisher,
                        PayService payService,
                        OverdueRiskService overdueRiskService,
-                       LoanAiGuardService loanAiGuardService) {
+                       LoanAiGuardService loanAiGuardService,
+                       DemoAutoApproveService demoAutoApprove) {
         this.merchantMapper = merchantMapper;
         this.applicationMapper = applicationMapper;
         this.creditLimitMapper = creditLimitMapper;
@@ -125,6 +128,7 @@ public class LoanService {
         this.payService = payService;
         this.overdueRiskService = overdueRiskService;
         this.loanAiGuardService = loanAiGuardService;
+        this.demoAutoApprove = demoAutoApprove;
     }
 
     // ============================================================
@@ -781,6 +785,16 @@ public class LoanService {
             rejectReasons.add("用途含异常/违规关键词");
         }
         if (largeAmount) {
+            if (demoAutoApprove.isEnabled()) {
+                // 演示模式：大额也不转人工，直接复核通过（模拟 banker 裁决）
+                review.setStatus("APPROVED");
+                review.setReviewerId(0L);
+                review.setReviewRemark("AI 预审（模拟）：单笔超过 ¥10,000，演示模式下自动复核通过。");
+                review.setReviewTime(LocalDateTime.now());
+                entrustReviewMapper.updateById(review);
+                log.info("[受托支付-演示自动通过] 复核单={}, 金额={}", review.getReviewNo(), review.getAmount());
+                return;
+            }
             // 大额转人工（管理端复核兜底）
             review.setReviewerId(0L);
             review.setReviewRemark("AI 预审（模拟）：单笔超过 ¥10,000，转人工复核");
@@ -817,6 +831,11 @@ public class LoanService {
         }
         if (!"PENDING".equals(review.getStatus())) {
             throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "该复核单已处理（当前状态：" + review.getStatus() + "）");
+        }
+        // 演示模式：管理端点复核即自动通过并放款
+        if (demoAutoApprove.isEnabled()) {
+            approve = true;
+            reason = (reason != null && !reason.isBlank() ? reason + "；" : "") + "演示模式自动通过（模拟 banker 复核 APPROVED）";
         }
         review.setReviewerId(reviewerId);
         review.setReviewRemark(reason);
@@ -1748,6 +1767,11 @@ public class LoanService {
         }
         if (!"PENDING".equals(merchant.getVerifyStatus())) {
             throw new BizException(ErrorCode.BIZ_RULE_NOT_MET, "该商户不在待审队列（当前状态：" + merchant.getVerifyStatus() + "）");
+        }
+        // 演示模式：管理端点审核即自动通过（白名单）
+        if (demoAutoApprove.isEnabled()) {
+            verifyStatus = "VERIFIED";
+            reason = "演示模式自动通过（模拟 banker 审核 VERIFIED）";
         }
         if (!"VERIFIED".equals(verifyStatus) && !"REJECTED".equals(verifyStatus)) {
             throw new BizException(ErrorCode.PARAM_ERROR, "审核结论只能为 VERIFIED 或 REJECTED");

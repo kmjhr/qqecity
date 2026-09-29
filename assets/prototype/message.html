@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>消息中心 - 青启e城</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <!-- 顶部导航栏 -->
+  <nav class="navbar">
+    <div class="navbar-inner">
+      <div class="navbar-left">
+        <a href="index.html" class="logo">
+          <div class="logo-icon">青</div>
+          <span>青启e城</span>
+        </a>
+        <div class="nav-menu">
+          <a href="index.html" data-page="home">首页</a>
+          <a href="guarantee.html" data-page="guarantee">安居保函</a>
+          <a href="loan.html" data-page="loan">青创e贷</a>
+          <a href="budget.html" data-page="budget">预算消费</a>
+          <a href="safety.html" data-page="safety">金融安全</a>
+        </div>
+      </div>
+      <div class="navbar-right">
+        <a href="message.html" class="notification-icon" style="color: var(--primary);">
+          🔔
+          <span class="notification-dot"></span>
+        </a>
+        <div class="user-area">
+          <div class="user-avatar">刘</div>
+          <span class="user-name">刘小明</span>
+          <div class="user-dropdown">
+            <a href="profile.html">个人中心</a>
+            <a href="login.html">退出登录</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 内容区 -->
+  <div class="page-container">
+    <div class="page-header">
+      <h1>
+        📬 消息中心
+        <span class="unread-badge" id="unreadCount">3 条未读</span>
+      </h1>
+      <p class="subtitle">业务通知、预算提醒、系统公告，重要信息不错过。</p>
+    </div>
+
+    <div class="message-header">
+      <!-- Tab 切换 -->
+      <div class="tabs" style="margin-bottom: 0; border-bottom: none;">
+        <div class="tab-item active" data-filter="all">全部</div>
+        <div class="tab-item" data-filter="unread">未读</div>
+        <div class="tab-item" data-filter="system">系统通知</div>
+        <div class="tab-item" data-filter="budget">预算提醒</div>
+        <div class="tab-item" data-filter="business">业务通知</div>
+      </div>
+      <button class="btn btn-outline btn-sm" id="markAllReadBtn">
+        ✓ 全部已读
+      </button>
+    </div>
+
+    <!-- 消息列表 -->
+    <div class="message-list" id="messageList">
+      <!-- 由 JS 渲染 -->
+    </div>
+  </div>
+
+  <!-- 页脚 -->
+  <footer class="footer">
+    © 2025 青启e城 · 面向青年的城市新场景金融服务平台
+    <span class="demo-tag">演示系统</span>
+  </footer>
+
+  <script src="assets/mock.js"></script>
+  <script>
+    let messages = [...MockData.messages];
+    let currentFilter = 'all';
+
+    // 渲染消息列表
+    function renderMessages() {
+      const list = document.getElementById('messageList');
+      let filtered = messages;
+      
+      if (currentFilter === 'unread') {
+        filtered = messages.filter(m => m.unread);
+      } else if (currentFilter === 'system') {
+        filtered = messages.filter(m => m.category === '系统通知');
+      } else if (currentFilter === 'budget') {
+        filtered = messages.filter(m => m.category === '预算提醒');
+      } else if (currentFilter === 'business') {
+        filtered = messages.filter(m => m.category === '业务通知');
+      }
+
+      if (filtered.length === 0) {
+        list.innerHTML = `
+          <div class="empty-state" style="background: #fff; padding: 60px 20px;">
+            <div class="icon">📭</div>
+            <p>暂无消息</p>
+          </div>
+        `;
+        return;
+      }
+
+      list.innerHTML = filtered.map(m => `
+        <div class="message-item ${m.unread ? 'unread' : ''}" data-id="${m.id}">
+          <div class="message-icon ${m.iconType}">${getIconForType(m.iconType)}</div>
+          <div class="message-content">
+            <div class="message-title">
+              <span>${m.title}</span>
+              <span class="message-time">${m.time}</span>
+            </div>
+            <div class="message-desc">${m.desc}</div>
+          </div>
+        </div>
+      `).join('');
+
+      // 绑定点击事件
+      list.querySelectorAll('.message-item').forEach(item => {
+        item.addEventListener('click', function() {
+          const id = parseInt(this.dataset.id);
+          markAsRead(id);
+        });
+      });
+
+      // 更新未读数量
+      updateUnreadCount();
+    }
+
+    function getIconForType(type) {
+      const icons = {
+        system: '🔔',
+        budget: '💰',
+        business: '📋',
+        security: '🛡️'
+      };
+      return icons[type] || '📩';
+    }
+
+    function markAsRead(id) {
+      const msg = messages.find(m => m.id === id);
+      if (msg && msg.unread) {
+        msg.unread = false;
+        renderMessages();
+      }
+    }
+
+    function updateUnreadCount() {
+      const unreadCount = messages.filter(m => m.unread).length;
+      document.getElementById('unreadCount').textContent = unreadCount > 0 ? `${unreadCount} 条未读` : '全部已读';
+      
+      // 更新导航栏小红点
+      const dot = document.querySelector('.notification-dot');
+      if (dot) {
+        dot.style.display = unreadCount > 0 ? 'block' : 'none';
+      }
+    }
+
+    // Tab 切换
+    document.querySelectorAll('.tab-item').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        currentFilter = tab.dataset.filter;
+        renderMessages();
+      });
+    });
+
+    // 全部已读
+    document.getElementById('markAllReadBtn').addEventListener('click', function() {
+      messages.forEach(m => m.unread = false);
+      renderMessages();
+    });
+
+    // 初始化
+    renderMessages();
+  </script>
+</body>
+</html>

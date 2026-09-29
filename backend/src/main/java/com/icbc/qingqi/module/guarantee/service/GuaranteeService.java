@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.icbc.qingqi.common.BizException;
 import com.icbc.qingqi.common.ErrorCode;
+import com.icbc.qingqi.module.admin.service.DemoAutoApproveService;
 import com.icbc.qingqi.module.guarantee.dto.GuaranteeApplyDTO;
 import com.icbc.qingqi.module.guarantee.dto.MoveoutRecordDTO;
 import com.icbc.qingqi.module.guarantee.dto.GuaranteeApplicationVO;
@@ -61,6 +62,7 @@ public class GuaranteeService {
     private final SysUserMapper userMapper;
     private final SysMessageMapper messageMapper;
     private final PayService payService;
+    private final DemoAutoApproveService demoAutoApprove;
 
     // 申请状态
     private static final String STATUS_SUBMITTED = "SUBMITTED";
@@ -106,7 +108,8 @@ public class GuaranteeService {
                             BizGuaranteeClaimMapper claimMapper,
                             SysUserMapper userMapper,
                             SysMessageMapper messageMapper,
-                            PayService payService) {
+                            PayService payService,
+                            DemoAutoApproveService demoAutoApprove) {
         this.landlordMapper = landlordMapper;
         this.houseMapper = houseMapper;
         this.contractMapper = contractMapper;
@@ -117,6 +120,7 @@ public class GuaranteeService {
         this.userMapper = userMapper;
         this.messageMapper = messageMapper;
         this.payService = payService;
+        this.demoAutoApprove = demoAutoApprove;
     }
 
     // ============================================================
@@ -185,7 +189,39 @@ public class GuaranteeService {
                 "您的保函申请（编号" + app.getApplyNo() + "）已提交成功，等待房东确认。保函费¥" + fee + "（费率" + rate + "）。【模拟】",
                 "GUARANTEE", app.getId());
 
+        // 演示模式：自动代房东确认 + AI 复审（转人工也自动通过）→ 直达待缴费，无需人工点击
+        if (demoAutoApprove.isEnabled()) {
+            return autoApproveFlow(app);
+        }
+
         return toApplicationVO(app, house, contract, null);
+    }
+
+    /**
+     * 演示模式自动推进：模拟房东确认 → AI 复审 → 人工复审自动通过 → 待缴费
+     */
+    private GuaranteeApplicationVO autoApproveFlow(BizGuaranteeApplication app) {
+        // 1. 模拟房东确认 + 电子签署（演示自动）
+        app.setApplyStatus(STATUS_LANDLORD_CONFIRM);
+        app.setLandlordConfirmTime(LocalDateTime.now());
+        app.setSignContent("DEMO_AUTO_CONFIRM");
+        app.setSignTime(LocalDateTime.now());
+        applicationMapper.updateById(app);
+
+        // 2. AI 合同复审（内部若转人工，演示模式自动通过）
+        GuaranteeApplicationVO vo = aiReview(app);
+
+        // 3. 兜底：若仍停在人工复审 → 自动裁决通过
+        if (STATUS_MANUAL_REVIEW.equals(app.getApplyStatus())) {
+            app.setApplyStatus(STATUS_PENDING_PAY);
+            app.setAiReviewDetail((app.getAiReviewDetail() != null ? app.getAiReviewDetail() : "")
+                    + " | 演示模式自动通过（模拟人工复审 APPROVED）。【模拟】");
+            applicationMapper.updateById(app);
+            sendInternalMessage(app.getTenantId(), "人工复审通过（演示自动）",
+                    "保函申请（编号" + app.getApplyNo() + "）演示模式下人工复审自动通过，请缴纳保函费¥" + app.getGuaranteeFee() + "。【模拟】",
+                    "GUARANTEE", app.getId());
+        }
+        return vo;
     }
 
     /**
@@ -442,12 +478,22 @@ public class GuaranteeService {
                     "保函申请（编号" + app.getApplyNo() + "）AI复审通过，置信度" + score + "%，请缴纳保函费¥" + app.getGuaranteeFee() + "。【模拟】",
                     "GUARANTEE", app.getId());
         } else {
-            // 置信度不足，停在人工复审
-            app.setApplyStatus(STATUS_MANUAL_REVIEW);
-            // 站内信：AI复审转人工
-            sendInternalMessage(app.getTenantId(), "AI复审转人工复核",
-                    "保函申请（编号" + app.getApplyNo() + "）AI复审置信度" + score + "%<60%，已转人工复核，等待banker审核。【模拟】",
-                    "GUARANTEE", app.getId());
+            if (demoAutoApprove.isEnabled()) {
+                // 演示模式：AI 复审转人工后自动裁决通过 → 待缴费（无需 banker 点击）
+                app.setApplyStatus(STATUS_PENDING_PAY);
+                app.setAiReviewDetail(detail.toString()
+                        + " | 演示模式自动通过（模拟人工复审 APPROVED）。【模拟】");
+                sendInternalMessage(app.getTenantId(), "AI复审转人工已自动通过（演示）",
+                        "保函申请（编号" + app.getApplyNo() + "）AI复审转人工，演示模式下已自动通过，请缴纳保函费¥" + app.getGuaranteeFee() + "。【模拟】",
+                        "GUARANTEE", app.getId());
+            } else {
+                // 置信度不足，停在人工复审
+                app.setApplyStatus(STATUS_MANUAL_REVIEW);
+                // 站内信：AI复审转人工
+                sendInternalMessage(app.getTenantId(), "AI复审转人工复核",
+                        "保函申请（编号" + app.getApplyNo() + "）AI复审置信度" + score + "%<60%，已转人工复核，等待banker审核。【模拟】",
+                        "GUARANTEE", app.getId());
+            }
         }
         applicationMapper.updateById(app);
 

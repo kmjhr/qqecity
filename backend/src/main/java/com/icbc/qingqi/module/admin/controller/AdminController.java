@@ -6,6 +6,7 @@ import com.icbc.qingqi.module.admin.dto.LoanReviewDTO;
 import com.icbc.qingqi.module.admin.dto.ObservationUserVO;
 import com.icbc.qingqi.module.admin.dto.WarningHandleDTO;
 import com.icbc.qingqi.module.admin.service.AdminService;
+import com.icbc.qingqi.module.admin.service.DemoAutoApproveService;
 import com.icbc.qingqi.module.guarantee.entity.BizGuaranteeApplication;
 import com.icbc.qingqi.module.guarantee.service.GuaranteeService;
 import com.icbc.qingqi.module.guarantee.dto.GuaranteeApplicationVO;
@@ -22,6 +23,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -43,6 +45,7 @@ import java.util.Map;
  * 所有银行能力均为模拟桩，演示数据标注"模拟"。
  */
 @Tag(name = "管理端业务审核台")
+@Slf4j
 @RestController
 @RequestMapping("/v1/admin")
 public class AdminController {
@@ -50,11 +53,14 @@ public class AdminController {
     private final AdminService adminService;
     private final LoanService loanService;
     private final GuaranteeService guaranteeService;
+    private final DemoAutoApproveService demoAutoApproveService;
 
-    public AdminController(AdminService adminService, LoanService loanService, GuaranteeService guaranteeService) {
+    public AdminController(AdminService adminService, LoanService loanService, GuaranteeService guaranteeService,
+                           DemoAutoApproveService demoAutoApproveService) {
         this.adminService = adminService;
         this.loanService = loanService;
         this.guaranteeService = guaranteeService;
+        this.demoAutoApproveService = demoAutoApproveService;
     }
 
     // ============================================================
@@ -267,6 +273,34 @@ public class AdminController {
     @GetMapping("/dashboard/stats")
     public Result<Map<String, Object>> dashboardStats() {
         return Result.success(adminService.dashboardStats());
+    }
+
+    // ============================================================
+    //  ⑨ 演示模式：人工审核自动通过开关（默认开启）
+    // ============================================================
+
+    @Operation(summary = "⑨ 查询演示自动通过开关状态",
+            description = "返回演示模式下「人工审核自动通过」开关当前状态。开启时：待房东确认/AI复审转人工/索赔存疑/申辩裁决/大额受托支付/商户审核全部自动通过，便于评委演示。")
+    @GetMapping("/demo-auto-approve")
+    public Result<Map<String, Object>> demoAutoApproveStatus() {
+        return Result.success(Map.of("enabled", demoAutoApproveService.isEnabled(),
+                "desc", "演示模式：人工审核自动通过（默认开启，便于演示）"));
+    }
+
+    @Operation(summary = "⑨-2 切换演示自动通过开关",
+            description = "PUT body {enabled:true|false}；开启=所有人工审核自动通过（默认），关闭=恢复真实人工审核流程。")
+    @PutMapping("/demo-auto-approve")
+    public Result<Map<String, Object>> setDemoAutoApprove(@RequestBody Map<String, Object> body) {
+        Object v = body.get("enabled");
+        if (!(v instanceof Boolean)) {
+            throw new com.icbc.qingqi.common.BizException(com.icbc.qingqi.common.ErrorCode.PARAM_ERROR,
+                    "enabled 必须为布尔值 true/false");
+        }
+        boolean enabled = (Boolean) v;
+        demoAutoApproveService.setEnabled(enabled);
+        log.info("[演示模式] 人工审核自动通过开关 -> {}", enabled);
+        return Result.success(Map.of("enabled", demoAutoApproveService.isEnabled(),
+                "desc", "演示模式：人工审核自动通过（默认开启，便于演示）"));
     }
 
     // ============================================================

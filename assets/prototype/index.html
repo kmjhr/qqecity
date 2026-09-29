@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>首页 - 青启e城</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <!-- 顶部导航栏 -->
+  <nav class="navbar">
+    <div class="navbar-inner">
+      <div class="navbar-left">
+        <a href="index.html" class="logo">
+          <div class="logo-icon">青</div>
+          <span>青启e城</span>
+        </a>
+        <div class="nav-menu">
+          <a href="index.html" data-page="home" class="active">首页</a>
+          <a href="guarantee.html" data-page="guarantee">安居保函</a>
+          <a href="loan.html" data-page="loan">青创e贷</a>
+          <a href="budget.html" data-page="budget">预算消费</a>
+          <a href="safety.html" data-page="safety">金融安全</a>
+        </div>
+      </div>
+      <div class="navbar-right">
+        <a href="message.html" class="notification-icon">
+          🔔
+          <span class="notification-dot"></span>
+        </a>
+        <div class="user-area">
+          <div class="user-avatar">刘</div>
+          <span class="user-name">刘小明</span>
+          <div class="user-dropdown">
+            <a href="profile.html">个人中心</a>
+            <a href="login.html">退出登录</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 内容区 -->
+  <div class="page-container">
+    <!-- 欢迎区 -->
+    <div class="welcome-section">
+      <div class="welcome-content">
+        <div class="welcome-avatar">刘</div>
+        <div class="welcome-info">
+          <h2>
+            你好，刘小明！
+            <span class="user-tag">在校大学生</span>
+          </h2>
+          <p>今天也是元气满满的一天，让我们一起规划美好生活吧 ✨</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 功能入口 -->
+    <div class="section-title">
+      <span>🧭</span>
+      <span>功能入口</span>
+    </div>
+    <div class="feature-grid" id="featureGrid">
+      <!-- 由 JS 渲染 -->
+    </div>
+
+    <!-- 近期动态 -->
+    <div class="news-section">
+      <div class="section-title" style="margin-bottom: 8px;">
+        <span>📰</span>
+        <span>近期动态</span>
+        <a href="message.html" style="margin-left: auto; font-size: 13px; color: var(--primary); font-weight: normal;">查看全部 →</a>
+      </div>
+      <div id="newsList">
+        <!-- 由 JS 渲染 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- 页脚 -->
+  <footer class="footer">
+    © 2025 青启e城 · 面向青年的城市新场景金融服务平台
+    <span class="demo-tag">演示系统</span>
+  </footer>
+
+  <script src="assets/mock.js"></script>
+  <script>
+    // 渲染功能入口
+    function renderFeatures() {
+      const grid = document.getElementById('featureGrid');
+      grid.innerHTML = MockData.features.map(f => `
+        <a href="${f.url}" class="feature-card">
+          <div class="feature-icon ${f.gradient}">${f.icon}</div>
+          <h3>${f.title}</h3>
+          <p>${f.desc}</p>
+        </a>
+      `).join('');
+    }
+
+    // 渲染近期动态
+    function renderNews() {
+      const list = document.getElementById('newsList');
+      list.innerHTML = MockData.news.map(n => `
+        <a href="message.html" class="news-item">
+          <div style="display: flex; align-items: center; flex: 1; min-width: 0;">
+            ${n.unread ? '<span class="news-dot"></span>' : '<span style="width: 6px; margin-right: 12px;"></span>'}
+            <span class="news-title">${n.title}</span>
+          </div>
+          <span class="news-time">${n.time}</span>
+        </a>
+      `).join('');
+    }
+
+    // 初始化
+    renderFeatures();
+    renderNews();
+    setActiveNav('home');
+  </script>
+</body>
+</html>

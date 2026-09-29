@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>安居保函 - 青启e城</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <!-- 顶部导航栏 -->
+  <nav class="navbar">
+    <div class="navbar-inner">
+      <div class="navbar-left">
+        <a href="index.html" class="logo">
+          <div class="logo-icon">青</div>
+          <span>青启e城</span>
+        </a>
+        <div class="nav-menu">
+          <a href="index.html" data-page="home">首页</a>
+          <a href="guarantee.html" data-page="guarantee" class="active">安居保函</a>
+          <a href="loan.html" data-page="loan">青创e贷</a>
+          <a href="budget.html" data-page="budget">预算消费</a>
+          <a href="safety.html" data-page="safety">金融安全</a>
+        </div>
+      </div>
+      <div class="navbar-right">
+        <a href="message.html" class="notification-icon">
+          🔔
+          <span class="notification-dot"></span>
+        </a>
+        <div class="user-area">
+          <div class="user-avatar">刘</div>
+          <span class="user-name">刘小明</span>
+          <div class="user-dropdown">
+            <a href="profile.html">个人中心</a>
+            <a href="login.html">退出登录</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 内容区 -->
+  <div class="page-container">
+    <div class="page-header">
+      <h1>
+        🏠 安居金融风控
+        <span class="demo-badge">演示系统</span>
+      </h1>
+      <p class="subtitle">租房押金零压力，信用保函替你付。面向青年群体的安居保函服务，让租房更轻松。</p>
+    </div>
+
+    <!-- Tab 切换 -->
+    <div class="tabs">
+      <div class="tab-item active" data-tab="myGuarantee">我的保函</div>
+      <div class="tab-item" data-tab="applyGuarantee">申请保函</div>
+    </div>
+
+    <!-- 我的保函 Tab -->
+    <div class="tab-content active" id="myGuarantee">
+      <!-- 状态流转说明 -->
+      <div class="status-flow" style="margin-bottom: 20px;">
+        <span>📋 保函状态流转：</span>
+        <span class="step">申请中</span>
+        <span class="arrow">→</span>
+        <span class="step">待确认</span>
+        <span class="arrow">→</span>
+        <span class="step">待缴费</span>
+        <span class="arrow">→</span>
+        <span class="step">已开立</span>
+        <span class="arrow">→</span>
+        <span class="step">已失效</span>
+      </div>
+
+      <div class="guarantee-list" id="guaranteeList">
+        <!-- 由 JS 渲染 -->
+      </div>
+    </div>
+
+    <!-- 申请保函 Tab -->
+    <div class="tab-content" id="applyGuarantee">
+      <div class="card">
+        <div class="success-tip" id="applySuccessTip">
+          ✅ 申请提交成功！保函编号已生成，请等待房东确认。
+        </div>
+        <form id="applyForm">
+          <h3 style="font-size: 16px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border);">
+            🏠 房屋信息
+          </h3>
+          <div class="form-row">
+            <div class="form-group" style="flex: 2;">
+              <label class="form-label">
+                <span class="required">*</span>房屋地址
+              </label>
+              <input type="text" class="form-input" placeholder="请输入详细房屋地址">
+            </div>
+            <div class="form-group">
+              <label class="form-label">
+                <span class="required">*</span>房屋类型
+              </label>
+              <select class="form-select">
+                <option value="">请选择</option>
+                <option>整租</option>
+                <option>合租</option>
+                <option>单间</option>
+                <option>公寓</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">
+                <span class="required">*</span>面积（㎡）
+              </label>
+              <input type="number" class="form-input" placeholder="请输入房屋面积">
+            </div>
+            <div class="form-group">
+              <label class="form-label">
+                <span class="required">*</span>月租金（元）
+              </label>
+              <input type="number" class="form-input" placeholder="请输入月租金">
+            </div>
+          </div>
+
+          <h3 style="font-size: 16px; margin: 24px 0 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border);">
+            👤 房东信息
+          </h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">
+                <span class="required">*</span>房东姓名
+              </label>
+              <input type="text" class="form-input" placeholder="请输入房东姓名">
+            </div>
+            <div class="form-group">
+              <label class="form-label">
+                <span class="required">*</span>房东手机号
+              </label>
+              <input type="tel" class="form-input" placeholder="请输入房东手机号">
+            </div>
+          </div>
+
+          <h3 style="font-size: 16px; margin: 24px 0 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border);">
+            💰 保函信息
+          </h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">
+                <span class="required">*</span>押金金额（元）
+              </label>
+              <input type="number" class="form-input" placeholder="请输入押金金额（保函金额）">
+            </div>
+            <div class="form-group">
+              <label class="form-label">
+                <span class="required">*</span>租期
+              </label>
+              <select class="form-select">
+                <option value="">请选择租期</option>
+                <option>3个月</option>
+                <option>6个月</option>
+                <option selected>12个月</option>
+                <option>24个月</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">
+                <span class="required">*</span>起租日期
+              </label>
+              <input type="date" class="form-input">
+            </div>
+            <div class="form-group">
+              <label class="form-label">
+                到期日期
+              </label>
+              <input type="date" class="form-input" disabled style="background: var(--bg-page);">
+            </div>
+          </div>
+
+          <h3 style="font-size: 16px; margin: 24px 0 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border);">
+            📎 上传材料
+          </h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">租房合同照片</label>
+              <div class="upload-area">
+                <div class="icon">📄</div>
+                <p>点击上传租房合同照片</p>
+                <p class="hint">支持 JPG/PNG 格式，大小不超过 5MB</p>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">房屋照片</label>
+              <div class="upload-area">
+                <div class="icon">🖼️</div>
+                <p>点击上传房屋照片</p>
+                <p class="hint">支持 JPG/PNG 格式，可上传多张</p>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top: 24px; text-align: center;">
+            <button type="submit" class="btn btn-primary btn-lg" style="min-width: 200px;">
+              提交申请
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 页脚 -->
+  <footer class="footer">
+    © 2025 青启e城 · 面向青年的城市新场景金融服务平台
+    <span class="demo-tag">演示系统</span>
+  </footer>
+
+  <script src="assets/mock.js"></script>
+  <script>
+    // 渲染保函列表
+    function renderGuarantees() {
+      const list = document.getElementById('guaranteeList');
+      list.innerHTML = MockData.guarantees.map(g => {
+        const stepsHtml = MockData.guaranteeSteps.map((step, idx) => {
+          const isCurrent = idx === g.currentStep;
+          return `
+            <span class="step ${isCurrent ? 'current' : ''}">${step}</span>
+            ${idx < MockData.guaranteeSteps.length - 1 ? '<span class="arrow">→</span>' : ''}
+          `;
+        }).join('');
+
+        return `
+          <div class="guarantee-card">
+            <div class="guarantee-info">
+              <div class="guarantee-id">保函编号：${g.id}</div>
+              <div class="guarantee-address">${g.address}</div>
+              <div class="guarantee-meta">
+                <span>起租：${g.startDate}</span>
+                <span>到期：${g.endDate}</span>
+                <span class="status-tag status-${g.status}">${g.statusText}</span>
+              </div>
+              <div class="status-flow" style="margin-top: 12px; margin-bottom: 0;">
+                ${stepsHtml}
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div class="guarantee-amount">¥${formatMoney(g.amount)}</div>
+              <button class="btn btn-outline btn-sm">查看详情</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Tab 切换
+    document.querySelectorAll('.tab-item').forEach((tab, index) => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        tab.classList.add('active');
+        document.querySelectorAll('.tab-content')[index].classList.add('active');
+      });
+    });
+
+    // 表单提交
+    document.getElementById('applyForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const tip = document.getElementById('applySuccessTip');
+      tip.classList.add('show');
+      tip.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    // 初始化
+    renderGuarantees();
+    setActiveNav('guarantee');
+  </script>
+</body>
+</html>
