@@ -304,6 +304,17 @@ public class AdminController {
     }
 
     // ============================================================
+    //  ⑩ 额度与流水一致性校准（模拟运维）
+    // ============================================================
+
+    @Operation(summary = "⑩ 额度与流水一致性校准",
+            description = "对全部用户 A/B 额度按「流水实时冲抵」重算 used_limit/available_limit；已转A用户 B 类借款并入 A 类、B 额度未结清置零。用于修复「应还合计与未结清明细不一致」的脏数据。")
+    @PostMapping("/loan/reconcile-limits")
+    public Result<Map<String, Object>> reconcileUsedLimits() {
+        return Result.success(loanService.reconcileUsedLimits());
+    }
+
+    // ============================================================
     //  简化入参校验工具
     // ============================================================
     // (内部辅助方法如需要可在此扩展)

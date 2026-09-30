@@ -5,7 +5,8 @@ WORKDIR /app
 COPY settings.xml /root/.m2/settings.xml
 COPY pom.xml .
 COPY src ./src
-RUN mvn package -DskipTests -B
+# BuildKit 缓存挂载：Maven 依赖缓存在宿主，源码改动不再全量重下依赖
+RUN --mount=type=cache,target=/root/.m2 mvn package -DskipTests -B
 
 # ---------- 运行阶段 ----------
 FROM eclipse-temurin:17-jre-alpine

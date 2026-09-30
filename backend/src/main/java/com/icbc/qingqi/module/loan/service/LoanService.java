@@ -1244,7 +1244,9 @@ public class LoanService {
         BigDecimal rate = TYPE_A.equals(creditType) ? A_TYPE_RATE : B_TYPE_RATE;
         BizCreditLimit limit = TYPE_A.equals(creditType) ? getActiveACreditLimit(userId) : getActiveBCreditLimit(userId);
         List<LoanItemVO> loans = buildLoanItems(userId, creditType, rate, limit);
-        BigDecimal used = limit.getUsedLimit() == null ? BigDecimal.ZERO : limit.getUsedLimit();
+        // 应还本金以流水实时冲抵为准（与未结清明细同口径），额度表 used_limit 仅作授信占用展示，不再直接作为应还合计
+        BigDecimal used = loans.stream().map(LoanItemVO::getRemainingPrincipal)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal interestTotal = loans.stream().map(LoanItemVO::getInterestPreview)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         int maxDays = loans.stream().mapToInt(LoanItemVO::getBorrowDays).max().orElse(0);
@@ -1269,15 +1271,31 @@ public class LoanService {
 
     /**
      * 构建未结清借款明细（按笔计息，FIFO 冲抵，实时重算）：
-     * A 类 = 每笔提款流水；B 类 = 每笔受托支付成功；还款流水按时间先进先出冲抵本金
+     * A 类 = 每笔提款流水 + 已转A用户的历史受托支付（B 借款并入 A）；B 类 = 每笔受托支付成功；
+     * 还款流水按时间先进先出/指定结清冲抵本金（已转A用户合并 A+B 两额度还款流水）。
      */
+    /**
+     * 是否已转A：B 类额度观察状态为 PROMOTED（B 类借款已并入 A 类统一管理）
+     */
+    private boolean isBPromoted(Long userId) {
+        BizCreditLimit b = creditLimitMapper.selectOne(new LambdaQueryWrapper<BizCreditLimit>()
+                .eq(BizCreditLimit::getUserId, userId)
+                .eq(BizCreditLimit::getCreditType, TYPE_B)
+                .last("LIMIT 1"));
+        return b != null && "PROMOTED".equals(b.getObservationStatus());
+    }
+
     private List<LoanItemVO> buildLoanItems(Long userId, String creditType, BigDecimal rate, BizCreditLimit limit) {
         List<String> loanNos = new ArrayList<>();
         List<LocalDate> loanDates = new ArrayList<>();
         List<BigDecimal> principals = new ArrayList<>();
         List<BigDecimal> remaining = new ArrayList<>();
 
-        if (TYPE_A.equals(creditType)) {
+        boolean aType = TYPE_A.equals(creditType);
+        // 已转A（B 额度 PROMOTED）：历史 B 类受托支付借款自动并入 A 类明细（统一在 A 类管理/还款）
+        boolean bPromoted = aType && isBPromoted(userId);
+
+        if (aType) {
             List<BizCreditTxn> ws = creditTxnMapper.selectList(new LambdaQueryWrapper<BizCreditTxn>()
                     .eq(BizCreditTxn::getCreditLimitId, limit.getId())
                     .eq(BizCreditTxn::getTxnType, "WITHDRAW")
@@ -1288,6 +1306,20 @@ public class LoanService {
                 loanDates.add(w.getTxnTime() == null ? LocalDate.now() : w.getTxnTime().toLocalDate());
                 principals.add(w.getPrincipalAmount());
                 remaining.add(w.getPrincipalAmount());
+            }
+            if (bPromoted) {
+                // B 类借款并入 A 类：已转A用户的历史受托支付成功流水视作 A 类未结清借款
+                List<BizEntrustPayment> ps = paymentMapper.selectList(new LambdaQueryWrapper<BizEntrustPayment>()
+                        .eq(BizEntrustPayment::getUserId, userId)
+                        .eq(BizEntrustPayment::getPaymentStatus, PAY_SUCCESS)
+                        .orderByAsc(BizEntrustPayment::getPaymentTime)
+                        .orderByAsc(BizEntrustPayment::getId));
+                for (BizEntrustPayment p : ps) {
+                    loanNos.add(p.getPaymentNo());
+                    loanDates.add(p.getPaymentTime() == null ? LocalDate.now() : p.getPaymentTime().toLocalDate());
+                    principals.add(p.getAmount());
+                    remaining.add(p.getAmount());
+                }
             }
         } else {
             List<BizEntrustPayment> ps = paymentMapper.selectList(new LambdaQueryWrapper<BizEntrustPayment>()
@@ -1302,12 +1334,24 @@ public class LoanService {
                 remaining.add(p.getAmount());
             }
         }
-        // 还款冲抵：① 指定结清某笔（target_loan_no）→ 精确冲抵该笔借款（不参与 FIFO，不漂移）
-        List<BizCreditTxn> repays = creditTxnMapper.selectList(new LambdaQueryWrapper<BizCreditTxn>()
+        // 还款冲抵：本额度 REPAY + 已转A用户的 B 额度 REPAY（历史 B 还款继续冲抵并入的 B 借款），按时间合并
+        List<BizCreditTxn> repays = new ArrayList<>(creditTxnMapper.selectList(new LambdaQueryWrapper<BizCreditTxn>()
                 .eq(BizCreditTxn::getCreditLimitId, limit.getId())
-                .eq(BizCreditTxn::getTxnType, "REPAY")
-                .orderByAsc(BizCreditTxn::getTxnTime)
-                .orderByAsc(BizCreditTxn::getId));
+                .eq(BizCreditTxn::getTxnType, "REPAY")));
+        if (bPromoted) {
+            BizCreditLimit bLimit = creditLimitMapper.selectOne(new LambdaQueryWrapper<BizCreditLimit>()
+                    .eq(BizCreditLimit::getUserId, userId)
+                    .eq(BizCreditLimit::getCreditType, TYPE_B)
+                    .last("LIMIT 1"));
+            if (bLimit != null) {
+                repays.addAll(creditTxnMapper.selectList(new LambdaQueryWrapper<BizCreditTxn>()
+                        .eq(BizCreditTxn::getCreditLimitId, bLimit.getId())
+                        .eq(BizCreditTxn::getTxnType, "REPAY")));
+            }
+        }
+        repays.sort(Comparator.comparing(BizCreditTxn::getTxnTime, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(BizCreditTxn::getId));
+        // ① 指定结清某笔（target_loan_no）→ 精确冲抵该笔借款（不参与 FIFO，不漂移）
         for (BizCreditTxn r : repays) {
             String target = r.getTargetLoanNo();
             if (target == null || target.isBlank()) continue;
@@ -1566,6 +1610,11 @@ public class LoanService {
      * 转A：观察期置 PROMOTED + 创建/升级 A 类循环额度（提额至 5 万）
      */
     private void promoteToA(Long userId, BizCreditLimit bLimit) {
+        // 转A前计算 B 类未结清借款（转A后将自动并入 A 类额度统一管理/还款）
+        List<LoanItemVO> bLoans = buildLoanItems(userId, TYPE_B, B_TYPE_RATE, bLimit);
+        BigDecimal bRemain = bLoans.stream().map(LoanItemVO::getRemainingPrincipal)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
         bLimit.setObservationStatus("PROMOTED");
         BizCreditLimit aLimit = creditLimitMapper.selectOne(
                 new LambdaQueryWrapper<BizCreditLimit>()
@@ -1573,13 +1622,61 @@ public class LoanService {
                         .eq(BizCreditLimit::getCreditType, TYPE_A));
         if (aLimit == null) {
             aLimit = createCreditLimit(userId, TYPE_A, A_TYPE_TOTAL, A_TYPE_RATE);
-        } else {
-            aLimit.setTotalLimit(A_TYPE_TOTAL);
-            aLimit.setAvailableLimit(A_TYPE_TOTAL.subtract(aLimit.getUsedLimit()));
-            aLimit.setStatus("ACTIVE");
-            creditLimitMapper.updateById(aLimit);
         }
+        // A 类额度吸收 B 类未结清借款（B 借款并入 A 类统一管理/还款）
+        BigDecimal aUsed = aLimit.getUsedLimit() == null ? BigDecimal.ZERO : aLimit.getUsedLimit();
+        aLimit.setUsedLimit(aUsed.add(bRemain));
+        aLimit.setTotalLimit(A_TYPE_TOTAL);
+        aLimit.setAvailableLimit(A_TYPE_TOTAL.subtract(aLimit.getUsedLimit()));
+        aLimit.setStatus("ACTIVE");
+        creditLimitMapper.updateById(aLimit);
+        // B 类未结清置零（借款已并入 A 类管理）
+        bLimit.setUsedLimit(BigDecimal.ZERO);
+        bLimit.setAvailableLimit(bLimit.getTotalLimit() == null ? BigDecimal.ZERO : bLimit.getTotalLimit());
         creditLimitMapper.updateById(bLimit);
+    }
+
+    /**
+     * 额度与流水一致性校准（管理端·模拟运维）：
+     * 对全部用户 A/B 额度按「流水实时冲抵」重算 used_limit/available_limit；
+     * 已转A（PROMOTED）用户 B 类借款已并入 A 类管理，B 额度未结清强制为 0。
+     */
+    public Map<String, Object> reconcileUsedLimits() {
+        List<BizCreditLimit> limits = creditLimitMapper.selectList(null);
+        List<Map<String, Object>> changes = new ArrayList<>();
+        for (BizCreditLimit limit : limits) {
+            if (limit == null || limit.getUserId() == null) continue;
+            String type = limit.getCreditType();
+            BigDecimal actual;
+            if (TYPE_B.equals(type) && "PROMOTED".equals(limit.getObservationStatus())) {
+                // 已转A：B 借款并入 A，B 额度不再占用
+                actual = BigDecimal.ZERO;
+            } else {
+                BigDecimal rate = TYPE_A.equals(type) ? A_TYPE_RATE : B_TYPE_RATE;
+                List<LoanItemVO> loans = buildLoanItems(limit.getUserId(), type, rate, limit);
+                actual = loans.stream().map(LoanItemVO::getRemainingPrincipal)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+            }
+            BigDecimal oldUsed = limit.getUsedLimit() == null ? BigDecimal.ZERO : limit.getUsedLimit();
+            if (oldUsed.compareTo(actual) != 0) {
+                limit.setUsedLimit(actual);
+                BigDecimal total = limit.getTotalLimit() == null ? BigDecimal.ZERO : limit.getTotalLimit();
+                limit.setAvailableLimit(total.subtract(actual));
+                creditLimitMapper.updateById(limit);
+                Map<String, Object> m = new HashMap<>();
+                m.put("limitId", limit.getId());
+                m.put("userId", limit.getUserId());
+                m.put("creditType", type);
+                m.put("oldUsed", oldUsed);
+                m.put("newUsed", actual);
+                changes.add(m);
+            }
+        }
+        Map<String, Object> result = new HashMap<>();
+        result.put("total", limits.size());
+        result.put("changed", changes.size());
+        result.put("changes", changes);
+        return result;
     }
 
     /**

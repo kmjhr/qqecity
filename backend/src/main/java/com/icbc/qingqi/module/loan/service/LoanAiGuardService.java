@@ -25,6 +25,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -253,7 +254,14 @@ public class LoanAiGuardService {
         List<String> nos = new ArrayList<>();
         List<LocalDate> dates = new ArrayList<>();
         List<BigDecimal> remaining = new ArrayList<>();
-        if ("A_TYPE".equals(creditType)) {
+        boolean aType = "A_TYPE".equals(creditType);
+        // 已转A（B 额度 PROMOTED）：历史 B 类受托支付借款并入 A 类（与还款面板未结清明细同口径）
+        BizCreditLimit bLimit = aType ? creditLimitMapper.selectOne(new LambdaQueryWrapper<BizCreditLimit>()
+                .eq(BizCreditLimit::getUserId, userId)
+                .eq(BizCreditLimit::getCreditType, "B_TYPE")
+                .last("LIMIT 1")) : null;
+        boolean bPromoted = bLimit != null && "PROMOTED".equals(bLimit.getObservationStatus());
+        if (aType) {
             List<BizCreditTxn> ws = creditTxnMapper.selectList(new LambdaQueryWrapper<BizCreditTxn>()
                     .eq(BizCreditTxn::getCreditLimitId, limit.getId())
                     .eq(BizCreditTxn::getTxnType, "WITHDRAW")
@@ -263,6 +271,18 @@ public class LoanAiGuardService {
                 nos.add(w.getTxnNo());
                 dates.add(w.getTxnTime() == null ? LocalDate.now() : w.getTxnTime().toLocalDate());
                 remaining.add(w.getPrincipalAmount());
+            }
+            if (bPromoted) {
+                List<BizEntrustPayment> ps = paymentMapper.selectList(new LambdaQueryWrapper<BizEntrustPayment>()
+                        .eq(BizEntrustPayment::getUserId, userId)
+                        .eq(BizEntrustPayment::getPaymentStatus, "SUCCESS")
+                        .orderByAsc(BizEntrustPayment::getPaymentTime)
+                        .orderByAsc(BizEntrustPayment::getId));
+                for (BizEntrustPayment p : ps) {
+                    nos.add(p.getPaymentNo());
+                    dates.add(p.getPaymentTime() == null ? LocalDate.now() : p.getPaymentTime().toLocalDate());
+                    remaining.add(p.getAmount());
+                }
             }
         } else {
             List<BizEntrustPayment> ps = paymentMapper.selectList(new LambdaQueryWrapper<BizEntrustPayment>()
@@ -276,11 +296,16 @@ public class LoanAiGuardService {
                 remaining.add(p.getAmount());
             }
         }
-        List<BizCreditTxn> repays = creditTxnMapper.selectList(new LambdaQueryWrapper<BizCreditTxn>()
+        List<BizCreditTxn> repays = new ArrayList<>(creditTxnMapper.selectList(new LambdaQueryWrapper<BizCreditTxn>()
                 .eq(BizCreditTxn::getCreditLimitId, limit.getId())
-                .eq(BizCreditTxn::getTxnType, "REPAY")
-                .orderByAsc(BizCreditTxn::getTxnTime)
-                .orderByAsc(BizCreditTxn::getId));
+                .eq(BizCreditTxn::getTxnType, "REPAY")));
+        if (bPromoted) {
+            repays.addAll(creditTxnMapper.selectList(new LambdaQueryWrapper<BizCreditTxn>()
+                    .eq(BizCreditTxn::getCreditLimitId, bLimit.getId())
+                    .eq(BizCreditTxn::getTxnType, "REPAY")));
+        }
+        repays.sort(Comparator.comparing(BizCreditTxn::getTxnTime, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(BizCreditTxn::getId));
         // ① 指定结清（target_loan_no）精确冲抵
         for (BizCreditTxn r : repays) {
             String target = r.getTargetLoanNo();
